@@ -1,0 +1,10 @@
+export { ClientesResource } from './clientes.js';
+export { VendedoresResource } from './vendedores.js';
+export { ProdutosResource } from './produtos.js';
+export { PrecosResource } from './precos.js';
+export { EstoqueResource } from './estoque.js';
+export { PedidosResource } from './pedidos.js';
+export { FinanceirosResource } from './financeiros.js';
+export { CadastrosResource } from './cadastros.js';
+export { FiscalResource } from './fiscal.js';
+export { GatewayResource } from './gateway.js';
