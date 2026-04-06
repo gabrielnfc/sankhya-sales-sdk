@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-04-06T20:08:38.820Z"
+status: executing
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-04-06T20:54:25.499Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 8
   completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 14
+  completed_plans: 13
   percent: 0
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-06)
 
 **Core value:** Qualquer dev Node.js integra com Sankhya ERP sem estudar a API — tipos seguros, métodos intuitivos, peculiaridades abstraídas.
-**Current focus:** Phase 04 — public-api-surface
+**Current focus:** Phase 05 — test-coverage-hardening
 
 ## Current Position
 
-Phase: 5
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 05 (test-coverage-hardening) — EXECUTING
+Plan: 3 of 3
+Status: Ready to execute
 Last activity: 2026-04-06
 
 Progress: [░░░░░░░░░░] 0%
@@ -62,6 +62,8 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03 P03 | 2min | 2 tasks | 1 files |
 | Phase 04 P02 | 4m52s | 2 tasks | 7 files |
 | Phase 04 P03 | 3m30s | 2 tasks | 7 files |
+| Phase 05 P01 | 17min | 2 tasks | 7 files |
+| Phase 05 P02 | 3m30s | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -88,6 +90,9 @@ Recent decisions affecting current work:
 - [Phase 04]: AbortSignal.any combines internal timeout with external signal (Node 20+ native)
 - [Phase 04]: Per-call timeout uses options.timeout ?? this.timeout fallback pattern
 - [Phase 04]: RequestOptions with idempotencyKey threaded to all 14 mutation methods in pedidos and financeiros
+- [Phase 05]: createMockHttp() factory pattern established for resource unit tests - returns mock HttpClient with vi.fn() stubs
+- [Phase 05]: PrecosResource has 4 methods not 5 - todosPorTabela does not exist, tested actual API surface
+- [Phase 05]: TAXAJURO always returns 0 in CadastrosResource because field not requested from Gateway -- edge case is architectural, not runtime
 
 ### Pending Todos
 
@@ -100,6 +105,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T20:00:57.008Z
-Stopped at: Completed 04-03-PLAN.md
+Last session: 2026-04-06T20:54:25.495Z
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None

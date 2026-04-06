@@ -93,8 +93,8 @@ Plans:
   6. Unit tests cover TAXAJURO empty object, DHALTER extra field, pagination string values, and TipoPessoa F/J edge cases explicitly
 **Plans**: 3 plans
 Plans:
-- [ ] 05-01-PLAN.md — Unit tests for simple resources (clientes, vendedores, produtos, precos, estoque, fiscal) + SankhyaClient + edge cases
-- [ ] 05-02-PLAN.md — Unit tests for complex resources (pedidos, financeiros, cadastros, gateway)
+- [x] 05-01-PLAN.md — Unit tests for simple resources (clientes, vendedores, produtos, precos, estoque, fiscal) + SankhyaClient + edge cases
+- [x] 05-02-PLAN.md — Unit tests for complex resources (pedidos, financeiros, cadastros, gateway)
 - [ ] 05-03-PLAN.md — Coverage config, npm scripts, CJS/ESM smoke tests
 
 ### Phase 6: Documentation
@@ -146,7 +146,7 @@ Plans:
 | 2. Read-Path Resource Validation | 2/2 | Complete   | 2026-04-06 |
 | 3. Write-Path & E2E Validation | 0/3 | Planning complete | - |
 | 4. Public API Surface | 1/3 | In Progress | - |
-| 5. Test Coverage Hardening | 0/3 | Planning complete | - |
+| 5. Test Coverage Hardening | 2/3 | In Progress|  |
 | 6. Documentation | 0/TBD | Not started | - |
 | 7. Package Validation | 0/TBD | Not started | - |
 | 8. CI/CD & Release | 0/TBD | Not started | - |
