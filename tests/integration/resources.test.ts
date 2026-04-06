@@ -24,7 +24,20 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
   it('clientes.listar()', async () => {
     const result = await sankhya.clientes.listar({ page: 1 });
     expect(result.data.length).toBeGreaterThan(0);
+
+    const cliente = result.data[0]!;
+    expect(cliente).toHaveProperty('codigoCliente');
+    expect(cliente).toHaveProperty('nome');
+    expect(typeof cliente.nome).toBe('string');
+    expect(cliente).toHaveProperty('tipo');
+    expect(['F', 'J']).toContain(cliente.tipo);
+    expect(cliente).toHaveProperty('cnpjCpf');
+    expect(typeof cliente.cnpjCpf).toBe('string');
+    expect(cliente).toHaveProperty('endereco');
+    expect(typeof cliente.endereco).toBe('object');
     expect(typeof result.hasMore).toBe('boolean');
+    expect(typeof result.page).toBe('number');
+
     console.log(`clientes: ${result.data.length} items, hasMore=${result.hasMore}`);
   });
 
@@ -32,19 +45,72 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
   it('vendedores.listar()', async () => {
     const result = await sankhya.vendedores.listar();
     expect(result.data.length).toBeGreaterThan(0);
+
+    const vendedor = result.data[0]!;
+    expect(vendedor).toHaveProperty('codigoVendedor');
+    expect(typeof vendedor.codigoVendedor).toBe('number');
+    expect(vendedor).toHaveProperty('nome');
+    expect(typeof vendedor.nome).toBe('string');
+    expect(vendedor).toHaveProperty('ativo');
+    expect(typeof vendedor.ativo).toBe('boolean');
+    expect(vendedor).toHaveProperty('tipo');
+
     console.log(`vendedores: ${result.data.length} items, hasMore=${result.hasMore}`);
+  });
+
+  it('vendedores.buscar()', async () => {
+    const list = await sankhya.vendedores.listar();
+    const code = list.data[0]!.codigoVendedor;
+    const vendedor = await sankhya.vendedores.buscar(code);
+    expect(vendedor.codigoVendedor).toBe(code);
+    expect(typeof vendedor.nome).toBe('string');
+    expect(vendedor).toHaveProperty('ativo');
+    console.log(`vendedores.buscar(${code}): ${vendedor.nome}`);
   });
 
   // --- Produtos ---
   it('produtos.listar()', async () => {
     const result = await sankhya.produtos.listar();
     expect(result.data.length).toBeGreaterThan(0);
+
+    const produto = result.data[0]!;
+    expect(produto).toHaveProperty('codigoProduto');
+    expect(typeof produto.codigoProduto).toBe('number');
+    expect(produto).toHaveProperty('nome');
+    expect(typeof produto.nome).toBe('string');
+    expect(produto).toHaveProperty('volume');
+    expect(typeof produto.volume).toBe('string');
+    expect(produto).toHaveProperty('ativo');
+    expect(typeof produto.ativo).toBe('boolean');
+
     console.log(`produtos: ${result.data.length} items, hasMore=${result.hasMore}`);
+  });
+
+  it('produtos.buscar()', async () => {
+    const list = await sankhya.produtos.listar();
+    const code = list.data[0]!.codigoProduto;
+    const produto = await sankhya.produtos.buscar(code);
+    expect(produto.codigoProduto).toBe(code);
+    expect(typeof produto.nome).toBe('string');
+    expect(produto).toHaveProperty('ativo');
+    expect(produto).toHaveProperty('volume');
+    console.log(`produtos.buscar(${code}): ${produto.nome}`);
   });
 
   it('produtos.listarGrupos()', async () => {
     const result = await sankhya.produtos.listarGrupos();
     expect(result.data.length).toBeGreaterThan(0);
+
+    const grupo = result.data[0]!;
+    expect(grupo).toHaveProperty('codigoGrupoProduto');
+    expect(typeof grupo.codigoGrupoProduto).toBe('number');
+    expect(grupo).toHaveProperty('nome');
+    expect(typeof grupo.nome).toBe('string');
+    expect(grupo).toHaveProperty('analitico');
+    expect(typeof grupo.analitico).toBe('boolean');
+    expect(grupo).toHaveProperty('ativo');
+    expect(typeof grupo.ativo).toBe('boolean');
+
     console.log(`grupos-produto: ${result.data.length} items`);
   });
 
