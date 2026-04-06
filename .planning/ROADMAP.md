@@ -76,7 +76,9 @@ Plans:
   5. Internal utilities (`withRetry`, `createPaginator`, `deserializeRows`) are marked `@internal` and excluded from the public type surface; per-call timeout override works via `RequestOptions`
 **Plans**: 3 plans
 Plans:
-- [ ] TBD
+- [ ] 04-01-PLAN.md -- Type guards, SankhyaErrorCode union, RequestOptions interface, export audit
+- [ ] 04-02-PLAN.md -- listarTodos() gap fill on all resources + per-call timeout in HttpClient
+- [ ] 04-03-PLAN.md -- Idempotency key support for pedidos and financeiros mutations
 
 ### Phase 5: Test Coverage Hardening
 **Goal**: The entire codebase is covered by >= 90% unit tests plus integration tests for every resource and a verified CJS/ESM dual-format build
@@ -141,7 +143,7 @@ Plans:
 | 1. Core Hardening | 3/3 | Complete |  |
 | 2. Read-Path Resource Validation | 2/2 | Complete   | 2026-04-06 |
 | 3. Write-Path & E2E Validation | 0/3 | Planning complete | - |
-| 4. Public API Surface | 0/TBD | Not started | - |
+| 4. Public API Surface | 0/3 | Planning complete | - |
 | 5. Test Coverage Hardening | 0/TBD | Not started | - |
 | 6. Documentation | 0/TBD | Not started | - |
 | 7. Package Validation | 0/TBD | Not started | - |
