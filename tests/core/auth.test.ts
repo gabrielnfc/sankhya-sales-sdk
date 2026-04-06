@@ -174,3 +174,41 @@ describe('AuthManager', () => {
     expect(globalThis.fetch).toHaveBeenCalledOnce(); // fetch chamado 1x apenas
   });
 });
+
+describe('CORE-04: TTL lower-bound guard', () => {
+  let originalFetch: typeof globalThis.fetch;
+
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('deve cachear token mesmo com expires_in menor que SAFETY_MARGIN (30s)', async () => {
+    globalThis.fetch = mockFetchSuccess('token-short-ttl', 30);
+    const auth = createAuthManager();
+
+    const token1 = await auth.getToken();
+    expect(token1).toBe('token-short-ttl');
+
+    // Second call should use cache, not re-authenticate
+    const token2 = await auth.getToken();
+    expect(token2).toBe('token-short-ttl');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('deve cachear token com expires_in=10 (muito curto)', async () => {
+    globalThis.fetch = mockFetchSuccess('token-very-short', 10);
+    const auth = createAuthManager();
+
+    const token = await auth.getToken();
+    expect(token).toBe('token-very-short');
+
+    const token2 = await auth.getToken();
+    expect(token2).toBe('token-very-short');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+});

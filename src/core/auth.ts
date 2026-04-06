@@ -4,6 +4,7 @@ import { AuthError } from './errors.js';
 
 const TOKEN_CACHE_KEY = 'sankhya_sdk_token';
 const SAFETY_MARGIN_SECONDS = 60;
+const MINIMUM_TTL_SECONDS = 10;
 
 export class AuthManager {
   private readonly baseUrl: string;
@@ -119,7 +120,7 @@ export class AuthManager {
     }
 
     const data: AuthResponse = await response.json();
-    const ttlSeconds = data.expires_in - SAFETY_MARGIN_SECONDS;
+    const ttlSeconds = Math.max(data.expires_in - SAFETY_MARGIN_SECONDS, MINIMUM_TTL_SECONDS);
     const tokenData: TokenData = {
       accessToken: data.access_token,
       expiresAt: Date.now() + ttlSeconds * 1000,
