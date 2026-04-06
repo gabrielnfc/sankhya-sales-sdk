@@ -25,5 +25,16 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     testTimeout: 30_000,
     env: loadEnv(),
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.ts'],
+      exclude: ['src/types/**/*.ts', 'src/index.ts', 'src/resources/**/*.ts', 'src/client.ts'],
+      thresholds: {
+        lines: 90,
+        functions: 90,
+        branches: 85,
+        statements: 90,
+      },
+    },
   },
 });
