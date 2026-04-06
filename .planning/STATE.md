@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
+milestone: v1.0.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-03-PLAN.md
-last_updated: "2026-04-06T19:14:27.219Z"
-last_activity: 2026-04-06
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-04-06T19:41:49.054Z"
+last_activity: 2026-04-06 -- Phase 04 execution started
 progress:
-  total_phases: 1
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 1
+  total_phases: 8
+  completed_phases: 3
+  total_plans: 11
+  completed_plans: 9
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-06)
 
 **Core value:** Qualquer dev Node.js integra com Sankhya ERP sem estudar a API — tipos seguros, métodos intuitivos, peculiaridades abstraídas.
-**Current focus:** Phase 03 — write-path-e2e-validation
+**Current focus:** Phase 04 — public-api-surface
 
 ## Current Position
 
-Phase: 03 (write-path-e2e-validation) — EXECUTING
-Plan: 3 of 3
-Status: Ready to execute
-Last activity: 2026-04-06
+Phase: 04 (public-api-surface) — EXECUTING
+Plan: 2 of 3
+Status: Executing Phase 04
+Last activity: 2026-04-06 -- Completed 04-01 (type guards, export audit)
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 04 P01 | 2m54s | 2 tasks | 5 files |
 | Phase 01 P02 | 2m32s | 2 tasks | 4 files |
 | Phase 01 P01 | 3min | 2 tasks | 2 files |
 | Phase 01 P03 | 2m30s | 1 tasks | 3 files |
