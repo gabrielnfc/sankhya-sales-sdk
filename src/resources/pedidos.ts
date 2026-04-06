@@ -2,6 +2,7 @@ import { serialize } from '../core/gateway-serializer.js';
 import type { HttpClient } from '../core/http.js';
 import { extractRestData, normalizeRestPagination } from '../core/pagination.js';
 import type { PaginatedResult } from '../types/common.js';
+import type { RequestOptions } from '../types/config.js';
 import type {
   CancelarPedidoInput,
   ConfirmarPedidoInput,
@@ -42,24 +43,25 @@ export class PedidosResource {
     return normalizeRestPagination(data, pagination);
   }
 
-  async criar(pedido: PedidoVendaInput): Promise<{ codigoPedido: number }> {
-    return this.http.restPost('/vendas/pedidos', pedido);
+  async criar(pedido: PedidoVendaInput, options?: RequestOptions): Promise<{ codigoPedido: number }> {
+    return this.http.restPost('/vendas/pedidos', pedido, options);
   }
 
   async atualizar(
     codigoPedido: number,
     pedido: PedidoVendaInput,
+    options?: RequestOptions,
   ): Promise<{ codigoPedido: number }> {
-    return this.http.restPut(`/vendas/pedidos/${codigoPedido}`, pedido);
+    return this.http.restPut(`/vendas/pedidos/${codigoPedido}`, pedido, options);
   }
 
-  async cancelar(input: CancelarPedidoInput): Promise<{ codigoPedido: number }> {
+  async cancelar(input: CancelarPedidoInput, options?: RequestOptions): Promise<{ codigoPedido: number }> {
     return this.http.restPost(`/vendas/pedidos/${input.codigoPedido}/cancela`, {
       motivo: input.motivo,
-    });
+    }, options);
   }
 
-  async confirmar(input: ConfirmarPedidoInput): Promise<void> {
+  async confirmar(input: ConfirmarPedidoInput, options?: RequestOptions): Promise<void> {
     await this.http.gatewayCall('mgecom', 'ServicosNfeSP.confirmarNota', {
       nota: {
         NUNOTA: { $: String(input.codigoPedido) },
@@ -67,10 +69,10 @@ export class PedidosResource {
           ? { COMPENSAR: { $: input.compensarAutomaticamente ? 'S' : 'N' } }
           : {}),
       },
-    });
+    }, options);
   }
 
-  async faturar(input: FaturarPedidoInput): Promise<void> {
+  async faturar(input: FaturarPedidoInput, options?: RequestOptions): Promise<void> {
     await this.http.gatewayCall('mgecom', 'SelecaoDocumentoSP.faturar', {
       notas: {
         codTipOper: input.codigoTipoOperacao,
@@ -81,10 +83,10 @@ export class PedidosResource {
           NUNOTA: { $: String(input.codigoPedido) },
         },
       },
-    });
+    }, options);
   }
 
-  async incluirNotaGateway(input: IncluirNotaGatewayInput): Promise<{ codigoPedido: number }> {
+  async incluirNotaGateway(input: IncluirNotaGatewayInput, options?: RequestOptions): Promise<{ codigoPedido: number }> {
     const itens = input.itens.map((item) =>
       serialize({
         CODPROD: item.codigoProduto,
@@ -113,13 +115,14 @@ export class PedidosResource {
           itens: { item: itens },
         },
       },
+      options,
     );
 
     const nunota = (result as Record<string, unknown>).NUNOTA;
     return { codigoPedido: Number(nunota) || 0 };
   }
 
-  async incluirAlterarItem(codigoPedido: number, itens: ItemNotaGatewayInput[]): Promise<void> {
+  async incluirAlterarItem(codigoPedido: number, itens: ItemNotaGatewayInput[], options?: RequestOptions): Promise<void> {
     const serializedItens = itens.map((item) =>
       serialize({
         CODPROD: item.codigoProduto,
@@ -135,15 +138,15 @@ export class PedidosResource {
         NUNOTA: { $: String(codigoPedido) },
         itens: { item: serializedItens },
       },
-    });
+    }, options);
   }
 
-  async excluirItem(codigoPedido: number, sequencia: number): Promise<void> {
+  async excluirItem(codigoPedido: number, sequencia: number, options?: RequestOptions): Promise<void> {
     await this.http.gatewayCall('mgecom', 'CACSP.excluirItemNota', {
       nota: {
         NUNOTA: { $: String(codigoPedido) },
         SEQUENCIA: { $: String(sequencia) },
       },
-    });
+    }, options);
   }
 }

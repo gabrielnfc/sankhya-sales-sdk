@@ -45,6 +45,7 @@ export type {
   LoggerOptions,
   LogLevel,
   Logger,
+  RequestOptions,
   AuthResponse,
   TokenData,
   PaginationParams,
