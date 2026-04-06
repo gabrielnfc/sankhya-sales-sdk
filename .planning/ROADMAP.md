@@ -45,8 +45,8 @@ Plans:
   5. TypeScript interfaces for each of the 7 resources in this phase have zero field name mismatches against real API responses
 **Plans**: 3 plans
 Plans:
-- [ ] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
-- [ ] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
+- [x] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
+- [x] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
 - [ ] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
 
 ### Phase 3: Write-Path & E2E Validation

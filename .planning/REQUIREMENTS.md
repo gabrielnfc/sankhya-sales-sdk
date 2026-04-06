@@ -7,9 +7,9 @@
 
 ### Core Hardening
 
-- [ ] **CORE-01**: Serializer Gateway trata `TAXAJURO {}` sem produzir `"[object Object]"`
-- [ ] **CORE-02**: Serializer Gateway trata campos extras (DHALTER) sem dropar dados silenciosamente
-- [ ] **CORE-03**: Serializer Gateway rejeita/loga retornos vazios em vez de silenciar erros de contrato
+- [x] **CORE-01**: Serializer Gateway trata `TAXAJURO {}` sem produzir `"[object Object]"`
+- [x] **CORE-02**: Serializer Gateway trata campos extras (DHALTER) sem dropar dados silenciosamente
+- [x] **CORE-03**: Serializer Gateway rejeita/loga retornos vazios em vez de silenciar erros de contrato
 - [x] **CORE-04**: Token refresh tem lower-bound guard para TTLs curtos (ambientes não-produção)
 - [x] **CORE-05**: Retry inclui jitter para prevenir thundering herd
 - [ ] **CORE-06**: Coverage enforcement >= 90% configurado com `@vitest/coverage-v8`
@@ -109,9 +109,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CORE-01 | Phase 1 | Pending |
-| CORE-02 | Phase 1 | Pending |
-| CORE-03 | Phase 1 | Pending |
+| CORE-01 | Phase 1 | Complete |
+| CORE-02 | Phase 1 | Complete |
+| CORE-03 | Phase 1 | Complete |
 | CORE-04 | Phase 1 | Complete |
 | CORE-05 | Phase 1 | Complete |
 | CORE-06 | Phase 1 | Pending |
