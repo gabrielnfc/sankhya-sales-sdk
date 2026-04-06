@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-04-06T18:56:31.067Z"
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-04-06T18:56:24.971Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 8
-  completed_phases: 2
-  total_plans: 8
-  completed_plans: 6
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -57,7 +57,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P03 | 2m30s | 1 tasks | 3 files |
 | Phase 02 P01 | 3m12s | 2 tasks | 6 files |
 | Phase 02 P02 | 2m07s | 2 tasks | 2 files |
-| Phase 03 P02 | 2m09s | 2 tasks | 5 files |
+| Phase 03 P01 | 2min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -78,7 +78,8 @@ Recent decisions affecting current work:
 - [Phase 02]: buscar() methods unwrap { resource: {...} } wrapper from REST v1 single-item responses
 - [Phase 02]: Vendedor/Produto interfaces extended with fields discovered from sandbox (not in documentation)
 - [Phase 02]: TAXAJURO parsed from Gateway response with Number() || 0 fallback for empty object values
-- [Phase 03]: BaixarReceita/BaixarDespesa return Promise<unknown> — baixa response shape uncertain until sandbox validation
+- [Phase 03]: GatewayError catch pattern for confirmar/faturar sandbox tests -- graceful skip on fiscal config absence
+- [Phase 03]: Unique CNPJ via Date.now() for gateway saveRecord to avoid PK conflicts in sandbox
 
 ### Pending Todos
 
@@ -91,6 +92,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T18:56:31.064Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-04-06T18:56:24.967Z
+Stopped at: Completed 03-01-PLAN.md
 Resume file: None
