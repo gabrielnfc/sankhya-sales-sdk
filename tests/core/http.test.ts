@@ -241,16 +241,20 @@ describe('HttpClient', () => {
       globalThis.fetch = vi.fn().mockImplementation(
         (_url: string, init?: RequestInit) =>
           new Promise((_resolve, reject) => {
+            if (init?.signal?.aborted) {
+              reject(new DOMException('The operation was aborted.', 'AbortError'));
+              return;
+            }
             init?.signal?.addEventListener('abort', () => {
               reject(new DOMException('The operation was aborted.', 'AbortError'));
             });
+            // Abort after a short delay to ensure listener is attached
+            setTimeout(() => externalController.abort(), 5);
           }),
       );
 
       const client = createHttpClient(undefined, 60000);
       const promise = client.restGet('/slow', undefined, { signal: externalController.signal });
-
-      externalController.abort();
 
       await expect(promise).rejects.toThrow(TimeoutError);
     });
