@@ -103,7 +103,7 @@ describe('PedidosResource', () => {
 
       const result = await pedidos.criar(input);
 
-      expect(http.restPost).toHaveBeenCalledWith('/vendas/pedidos', input);
+      expect(http.restPost).toHaveBeenCalledWith('/vendas/pedidos', input, undefined);
       expect(result.codigoPedido).toBe(42);
     });
   });
@@ -117,7 +117,7 @@ describe('PedidosResource', () => {
 
       const result = await pedidos.atualizar(42, input);
 
-      expect(http.restPut).toHaveBeenCalledWith('/vendas/pedidos/42', input);
+      expect(http.restPut).toHaveBeenCalledWith('/vendas/pedidos/42', input, undefined);
       expect(result.codigoPedido).toBe(42);
     });
   });
@@ -132,7 +132,7 @@ describe('PedidosResource', () => {
 
       expect(http.restPost).toHaveBeenCalledWith('/vendas/pedidos/42/cancela', {
         motivo: 'teste',
-      });
+      }, undefined);
       expect(result.codigoPedido).toBe(42);
     });
   });
@@ -151,6 +151,7 @@ describe('PedidosResource', () => {
         'mgecom',
         'ServicosNfeSP.confirmarNota',
         { nota: { NUNOTA: { $: '123' } } },
+        undefined,
       );
     });
 
@@ -224,6 +225,7 @@ describe('PedidosResource', () => {
             nota: { NUNOTA: { $: '99' } },
           },
         },
+        undefined,
       );
     });
 
@@ -288,6 +290,7 @@ describe('PedidosResource', () => {
             },
           }),
         }),
+        undefined,
       );
     });
 
@@ -367,6 +370,7 @@ describe('PedidosResource', () => {
             },
           },
         },
+        undefined,
       );
     });
   });
@@ -388,6 +392,7 @@ describe('PedidosResource', () => {
             SEQUENCIA: { $: '3' },
           },
         },
+        undefined,
       );
     });
   });
