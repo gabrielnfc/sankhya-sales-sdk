@@ -68,3 +68,79 @@ export interface ReceitasFiltro extends PaginationParams {
   dataNegociacaoInicio?: string;
   dataNegociacaoFinal?: string;
 }
+
+export interface RegistrarReceitaInput {
+  codigoEmpresa: number;
+  codigoTipoOperacao: number;
+  codigoNatureza: number;
+  codigoParceiro: number;
+  codigoTipoPagamento: number;
+  dataNegociacao: string;
+  dataVencimento: string;
+  numeroParcela?: number;
+  valorParcela: number;
+  codigoCentroResultado?: number;
+  codigoContaBancaria?: number;
+  observacao?: string;
+}
+
+export interface AtualizarReceitaInput {
+  codigoTipoOperacao?: number;
+  codigoNatureza?: number;
+  codigoParceiro?: number;
+  codigoTipoPagamento?: number;
+  dataNegociacao?: string;
+  dataVencimento?: string;
+  valorParcela?: number;
+  codigoCentroResultado?: number;
+  codigoContaBancaria?: number;
+  observacao?: string;
+}
+
+export interface BaixarReceitaInput {
+  codigoFinanceiro: number;
+  dataBaixa: string;
+  valorBaixa: number;
+  codigoContaBancaria?: number;
+  historico?: string;
+}
+
+export interface RegistrarDespesaInput {
+  codigoEmpresa: number;
+  codigoTipoOperacao: number;
+  codigoNatureza: number;
+  codigoParceiro: number;
+  codigoTipoPagamento: number;
+  dataNegociacao: string;
+  dataVencimento: string;
+  numeroParcela?: number;
+  valorParcela: number;
+  codigoCentroResultado?: number;
+  codigoContaBancaria?: number;
+  observacao?: string;
+}
+
+export interface AtualizarDespesaInput {
+  codigoTipoOperacao?: number;
+  codigoNatureza?: number;
+  codigoParceiro?: number;
+  codigoTipoPagamento?: number;
+  dataNegociacao?: string;
+  dataVencimento?: string;
+  valorParcela?: number;
+  codigoCentroResultado?: number;
+  codigoContaBancaria?: number;
+  observacao?: string;
+}
+
+export interface BaixarDespesaInput {
+  codigoFinanceiro: number;
+  dataBaixa: string;
+  valorBaixa: number;
+  codigoContaBancaria?: number;
+  historico?: string;
+}
+
+export interface RegistrarFinanceiroResponse {
+  codigoFinanceiro: number;
+}

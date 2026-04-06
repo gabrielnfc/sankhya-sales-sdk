@@ -2,10 +2,17 @@ import type { HttpClient } from '../core/http.js';
 import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
 import type { PaginatedResult } from '../types/common.js';
 import type {
+  AtualizarDespesaInput,
+  AtualizarReceitaInput,
+  BaixarDespesaInput,
+  BaixarReceitaInput,
   ContaBancaria,
   Moeda,
   Receita,
   ReceitasFiltro,
+  RegistrarDespesaInput,
+  RegistrarFinanceiroResponse,
+  RegistrarReceitaInput,
   TipoPagamento,
 } from '../types/financeiros.js';
 
@@ -51,18 +58,18 @@ export class FinanceirosResource {
     return normalizeRestPagination(data, pagination);
   }
 
-  async registrarReceita(dados: Record<string, unknown>): Promise<unknown> {
+  async registrarReceita(dados: RegistrarReceitaInput): Promise<RegistrarFinanceiroResponse> {
     return this.http.restPost('/financeiros/receitas', dados);
   }
 
   async atualizarReceita(
     codigoFinanceiro: number,
-    dados: Record<string, unknown>,
-  ): Promise<unknown> {
+    dados: AtualizarReceitaInput,
+  ): Promise<RegistrarFinanceiroResponse> {
     return this.http.restPut(`/financeiros/receitas/${codigoFinanceiro}`, dados);
   }
 
-  async baixarReceita(dados: Record<string, unknown>): Promise<unknown> {
+  async baixarReceita(dados: BaixarReceitaInput): Promise<unknown> {
     return this.http.restPost('/financeiros/receitas/baixa', dados);
   }
 
@@ -75,18 +82,18 @@ export class FinanceirosResource {
     return normalizeRestPagination(data, pagination);
   }
 
-  async registrarDespesa(dados: Record<string, unknown>): Promise<unknown> {
+  async registrarDespesa(dados: RegistrarDespesaInput): Promise<RegistrarFinanceiroResponse> {
     return this.http.restPost('/financeiros/despesas', dados);
   }
 
   async atualizarDespesa(
     codigoFinanceiro: number,
-    dados: Record<string, unknown>,
-  ): Promise<unknown> {
+    dados: AtualizarDespesaInput,
+  ): Promise<RegistrarFinanceiroResponse> {
     return this.http.restPut(`/financeiros/despesas/${codigoFinanceiro}`, dados);
   }
 
-  async baixarDespesa(dados: Record<string, unknown>): Promise<unknown> {
+  async baixarDespesa(dados: BaixarDespesaInput): Promise<unknown> {
     return this.http.restPost('/financeiros/despesas/baixa', dados);
   }
 
