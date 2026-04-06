@@ -79,6 +79,13 @@ export type {
   Moeda,
   ContaBancaria,
   ReceitasFiltro,
+  RegistrarReceitaInput,
+  AtualizarReceitaInput,
+  BaixarReceitaInput,
+  RegistrarDespesaInput,
+  AtualizarDespesaInput,
+  BaixarDespesaInput,
+  RegistrarFinanceiroResponse,
 } from './financeiros.js';
 
 export { TipoMovimento } from './cadastros.js';
