@@ -114,7 +114,7 @@ describe('FinanceirosResource', () => {
 
       const result = await fin.registrarReceita(dados);
 
-      expect(http.restPost).toHaveBeenCalledWith('/financeiros/receitas', dados, undefined);
+      expect(http.restPost).toHaveBeenCalledWith('/financeiros/receitas', dados);
       expect(result).toEqual({ id: 1 });
     });
   });
@@ -128,7 +128,7 @@ describe('FinanceirosResource', () => {
 
       const result = await fin.atualizarReceita(5, dados);
 
-      expect(http.restPut).toHaveBeenCalledWith('/financeiros/receitas/5', dados, undefined);
+      expect(http.restPut).toHaveBeenCalledWith('/financeiros/receitas/5', dados);
       expect(result).toEqual({ id: 5 });
     });
   });
@@ -142,7 +142,7 @@ describe('FinanceirosResource', () => {
 
       const result = await fin.baixarReceita(dados);
 
-      expect(http.restPost).toHaveBeenCalledWith('/financeiros/receitas/baixa', dados, undefined);
+      expect(http.restPost).toHaveBeenCalledWith('/financeiros/receitas/baixa', dados);
       expect(result).toEqual({ ok: true });
     });
   });
@@ -171,7 +171,7 @@ describe('FinanceirosResource', () => {
 
       await fin.registrarDespesa(dados);
 
-      expect(http.restPost).toHaveBeenCalledWith('/financeiros/despesas', dados, undefined);
+      expect(http.restPost).toHaveBeenCalledWith('/financeiros/despesas', dados);
     });
   });
 
@@ -183,7 +183,7 @@ describe('FinanceirosResource', () => {
 
       await fin.atualizarDespesa(7, { valor: 75 });
 
-      expect(http.restPut).toHaveBeenCalledWith('/financeiros/despesas/7', { valor: 75 }, undefined);
+      expect(http.restPut).toHaveBeenCalledWith('/financeiros/despesas/7', { valor: 75 });
     });
   });
 
@@ -197,7 +197,7 @@ describe('FinanceirosResource', () => {
 
       expect(http.restPost).toHaveBeenCalledWith('/financeiros/despesas/baixa', {
         codigoFinanceiro: 3,
-      }, undefined);
+      });
     });
   });
 
