@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-04-06T15:28:02.969Z"
+status: executing
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-04-06T15:58:24.121Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 8
-  completed_phases: 0
-  total_plans: 3
-  completed_plans: 2
+  completed_phases: 1
+  total_plans: 5
+  completed_plans: 4
   percent: 0
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-06)
 
 **Core value:** Qualquer dev Node.js integra com Sankhya ERP sem estudar a API — tipos seguros, métodos intuitivos, peculiaridades abstraídas.
-**Current focus:** Phase 01 — core-hardening
+**Current focus:** Phase 02 — read-path-resource-validation
 
 ## Current Position
 
-Phase: 01 (core-hardening) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
+Phase: 02 (read-path-resource-validation) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-04-06
 
 Progress: [░░░░░░░░░░] 0%
@@ -55,6 +55,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P02 | 2m32s | 2 tasks | 4 files |
 | Phase 01 P01 | 3min | 2 tasks | 2 files |
 | Phase 01 P03 | 2m30s | 1 tasks | 3 files |
+| Phase 02 P01 | 3m12s | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -71,6 +72,9 @@ Recent decisions affecting current work:
 - [Phase 01]: unwrapDollarValue returns empty string for any object in $ — objects are always invalid Gateway data
 - [Phase 01]: Branch coverage threshold set to 85% (not 90%) for Phase 1 — edge-case branches in core modules deferred to Phase 5 test hardening
 - [Phase 01]: Resources and client.ts excluded from coverage until Phase 5 adds resource-layer tests
+- [Phase 02]: Cliente.codigoCliente typed as number|string - sandbox returns string
+- [Phase 02]: buscar() methods unwrap { resource: {...} } wrapper from REST v1 single-item responses
+- [Phase 02]: Vendedor/Produto interfaces extended with fields discovered from sandbox (not in documentation)
 
 ### Pending Todos
 
@@ -83,6 +87,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T15:28:02.963Z
-Stopped at: Completed 01-03-PLAN.md
+Last session: 2026-04-06T15:58:24.118Z
+Stopped at: Completed 02-01-PLAN.md
 Resume file: None

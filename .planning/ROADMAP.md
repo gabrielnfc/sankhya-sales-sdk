@@ -45,7 +45,7 @@ Plans:
   5. TypeScript interfaces for each of the 7 resources in this phase have zero field name mismatches against real API responses
 **Plans**: 2 plans
 Plans:
-- [ ] 02-01-PLAN.md — Validate clientes, vendedores, produtos types and add field-level integration tests
+- [x] 02-01-PLAN.md — Validate clientes, vendedores, produtos types and add field-level integration tests
 - [ ] 02-02-PLAN.md — Validate precos, estoque, cadastros types, fix TAXAJURO, add field-level integration tests
 
 ### Phase 3: Write-Path & E2E Validation
@@ -137,7 +137,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Core Hardening | 3/3 | Complete |  |
-| 2. Read-Path Resource Validation | 0/2 | Not started | - |
+| 2. Read-Path Resource Validation | 1/2 | In Progress|  |
 | 3. Write-Path & E2E Validation | 0/TBD | Not started | - |
 | 4. Public API Surface | 0/TBD | Not started | - |
 | 5. Test Coverage Hardening | 0/TBD | Not started | - |

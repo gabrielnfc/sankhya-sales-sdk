@@ -17,9 +17,9 @@
 
 ### Resource Validation
 
-- [ ] **RVAL-01**: Resource `clientes` — CRUD completo validado contra sandbox (listar, criar, atualizar, contatos)
-- [ ] **RVAL-02**: Resource `vendedores` — leitura validada contra sandbox (listar, buscar)
-- [ ] **RVAL-03**: Resource `produtos` — leitura validada contra sandbox (listar, buscar, componentes, volumes, grupos)
+- [x] **RVAL-01**: Resource `clientes` — CRUD completo validado contra sandbox (listar, criar, atualizar, contatos)
+- [x] **RVAL-02**: Resource `vendedores` — leitura validada contra sandbox (listar, buscar)
+- [x] **RVAL-03**: Resource `produtos` — leitura validada contra sandbox (listar, buscar, componentes, volumes, grupos)
 - [ ] **RVAL-04**: Resource `precos` — leitura validada contra sandbox (porProduto, porTabela, contextualizado)
 - [ ] **RVAL-05**: Resource `estoque` — leitura validada contra sandbox (porProduto, listar, locais, detalhesGateway)
 - [ ] **RVAL-06**: Resource `pedidos` — fluxo completo validado contra sandbox (criar → item → confirmar → faturar)
@@ -27,7 +27,7 @@
 - [ ] **RVAL-08**: Resource `cadastros` — leitura validada contra sandbox (TOPs, naturezas, projetos, centros, empresas, usuarios, tiposNegociacao, modelosNota)
 - [ ] **RVAL-09**: Resource `fiscal` — validado contra sandbox (calcularImpostos, importarNfse)
 - [ ] **RVAL-10**: Resource `gateway` — CRUD genérico validado contra sandbox (loadRecords, loadRecord, saveRecord)
-- [ ] **RVAL-11**: Tipos TypeScript de cada resource correspondem exatamente aos campos retornados pela API real
+- [x] **RVAL-11**: Tipos TypeScript de cada resource correspondem exatamente aos campos retornados pela API real
 - [ ] **RVAL-12**: Fluxo e2e completo de pedido B2B validado no sandbox (criar cliente → consultar produto → checar estoque → criar pedido → adicionar itens → confirmar → faturar)
 
 ### API Surface
@@ -116,13 +116,13 @@
 | CORE-05 | Phase 1 | Complete |
 | CORE-06 | Phase 1 | Complete |
 | CORE-07 | Phase 1 | Complete |
-| RVAL-01 | Phase 2 | Pending |
-| RVAL-02 | Phase 2 | Pending |
-| RVAL-03 | Phase 2 | Pending |
+| RVAL-01 | Phase 2 | Complete |
+| RVAL-02 | Phase 2 | Complete |
+| RVAL-03 | Phase 2 | Complete |
 | RVAL-04 | Phase 2 | Pending |
 | RVAL-05 | Phase 2 | Pending |
 | RVAL-08 | Phase 2 | Pending |
-| RVAL-11 | Phase 2 | Pending |
+| RVAL-11 | Phase 2 | Complete |
 | RVAL-06 | Phase 3 | Pending |
 | RVAL-07 | Phase 3 | Pending |
 | RVAL-09 | Phase 3 | Pending |
