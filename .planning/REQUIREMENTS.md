@@ -10,10 +10,10 @@
 - [ ] **CORE-01**: Serializer Gateway trata `TAXAJURO {}` sem produzir `"[object Object]"`
 - [ ] **CORE-02**: Serializer Gateway trata campos extras (DHALTER) sem dropar dados silenciosamente
 - [ ] **CORE-03**: Serializer Gateway rejeita/loga retornos vazios em vez de silenciar erros de contrato
-- [ ] **CORE-04**: Token refresh tem lower-bound guard para TTLs curtos (ambientes não-produção)
-- [ ] **CORE-05**: Retry inclui jitter para prevenir thundering herd
+- [x] **CORE-04**: Token refresh tem lower-bound guard para TTLs curtos (ambientes não-produção)
+- [x] **CORE-05**: Retry inclui jitter para prevenir thundering herd
 - [ ] **CORE-06**: Coverage enforcement >= 90% configurado com `@vitest/coverage-v8`
-- [ ] **CORE-07**: Retry em POST/PUT mutações (pedidos, financeiros) é seguro — idempotency ou desabilitado
+- [x] **CORE-07**: Retry em POST/PUT mutações (pedidos, financeiros) é seguro — idempotency ou desabilitado
 
 ### Resource Validation
 
@@ -112,10 +112,10 @@
 | CORE-01 | Phase 1 | Pending |
 | CORE-02 | Phase 1 | Pending |
 | CORE-03 | Phase 1 | Pending |
-| CORE-04 | Phase 1 | Pending |
-| CORE-05 | Phase 1 | Pending |
+| CORE-04 | Phase 1 | Complete |
+| CORE-05 | Phase 1 | Complete |
 | CORE-06 | Phase 1 | Pending |
-| CORE-07 | Phase 1 | Pending |
+| CORE-07 | Phase 1 | Complete |
 | RVAL-01 | Phase 2 | Pending |
 | RVAL-02 | Phase 2 | Pending |
 | RVAL-03 | Phase 2 | Pending |

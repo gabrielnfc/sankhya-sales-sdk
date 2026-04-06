@@ -29,8 +29,8 @@ The SDK core is complete (OAuth 2.0, HTTP client, 10 resources, dual ESM/CJS bui
   5. `vitest run --coverage` enforces >= 90% thresholds and fails CI if not met
 **Plans**: 3 plans
 Plans:
-- [ ] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
-- [ ] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
+- [x] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
+- [x] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
 - [ ] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
 
 ### Phase 2: Read-Path Resource Validation
@@ -147,7 +147,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core Hardening | 0/TBD | Not started | - |
+| 1. Core Hardening | 2/3 | In Progress|  |
 | 2. Read-Path Resource Validation | 0/TBD | Not started | - |
 | 3. Write-Path & E2E Validation | 0/TBD | Not started | - |
 | 4. Public API Surface | 0/TBD | Not started | - |
