@@ -28,7 +28,7 @@
 - [ ] **RVAL-09**: Resource `fiscal` — validado contra sandbox (calcularImpostos, importarNfse)
 - [x] **RVAL-10**: Resource `gateway` — CRUD genérico validado contra sandbox (loadRecords, loadRecord, saveRecord)
 - [x] **RVAL-11**: Tipos TypeScript de cada resource correspondem exatamente aos campos retornados pela API real
-- [ ] **RVAL-12**: Fluxo e2e completo de pedido B2B validado no sandbox (criar cliente → consultar produto → checar estoque → criar pedido → adicionar itens → confirmar → faturar)
+- [x] **RVAL-12**: Fluxo e2e completo de pedido B2B validado no sandbox (criar cliente → consultar produto → checar estoque → criar pedido → adicionar itens → confirmar → faturar)
 
 ### API Surface
 
@@ -127,7 +127,7 @@
 | RVAL-07 | Phase 3 | Pending |
 | RVAL-09 | Phase 3 | Pending |
 | RVAL-10 | Phase 3 | Complete |
-| RVAL-12 | Phase 3 | Pending |
+| RVAL-12 | Phase 3 | Complete |
 | APIS-01 | Phase 4 | Pending |
 | APIS-02 | Phase 4 | Pending |
 | APIS-03 | Phase 4 | Pending |
