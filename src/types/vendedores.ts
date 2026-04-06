@@ -14,16 +14,32 @@ export interface Vendedor {
   codigoVendedor: number;
   nome: string;
   ativo: boolean;
-  tipo: TipoVendedor;
-  comissaoGerencia: number;
-  comissaoVenda: number;
+  /** Sandbox retorna string (ex: "" ou "4"), não enum numérico */
+  tipo: TipoVendedor | number | string;
+  /** Sandbox pode retornar null quando não definido */
+  comissaoGerencia: number | null;
+  /** Sandbox pode retornar null quando não definido */
+  comissaoVenda: number | null;
   email: string;
-  codigoEmpresa: number;
+  /** Sandbox pode retornar null quando não definido */
+  codigoEmpresa: number | null;
   nomeEmpresa: string;
   codigoParceiro: number;
+  /** Sandbox retorna campo nomeParceiro junto com codigoParceiro */
+  nomeParceiro?: string;
   codigoGerente?: number;
+  /** Sandbox retorna campo nomeGerente junto com codigoGerente */
+  nomeGerente?: string;
   codigoRegiao?: number;
   nomeRegiao?: string;
+  /** Sandbox retorna codigoFuncionario (pode ser null) */
+  codigoFuncionario?: number | null;
+  /** Sandbox retorna nomeFuncionario */
+  nomeFuncionario?: string;
+  /** Sandbox retorna codigoCentroResultado */
+  codigoCentroResultado?: number;
+  /** Sandbox retorna nomeCentroResultado */
+  nomeCentroResultado?: string;
 }
 
 export interface ListarVendedoresParams extends PaginationParams, ModifiedSinceParams {}
