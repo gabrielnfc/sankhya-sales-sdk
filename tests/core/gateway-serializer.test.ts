@@ -1,5 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { deserialize, deserializeRows, serialize } from '../../src/core/gateway-serializer.js';
+import type { Logger } from '../../src/types/config.js';
+
+function createMockLogger(): Logger {
+  return {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  };
+}
 
 describe('serialize', () => {
   it('deve converter valores simples para formato { $: valor }', () => {
@@ -209,5 +219,122 @@ describe('deserializeRows', () => {
       CODPROD: '1001',
       DESCRPROD: 'Produto A',
     });
+  });
+});
+
+describe('deserialize — TAXAJURO bug (CORE-01)', () => {
+  it('deve retornar string vazia para { $: {} } (TAXAJURO)', () => {
+    const result = deserialize({ TAXAJURO: { $: {} } });
+    expect(result).toEqual({ TAXAJURO: '' });
+  });
+
+  it('deve retornar string vazia para { $: null }', () => {
+    const result = deserialize({ CAMPO: { $: null } });
+    expect(result).toEqual({ CAMPO: '' });
+  });
+
+  it('deve retornar string vazia para { $: undefined }', () => {
+    const result = deserialize({ CAMPO: { $: undefined } });
+    expect(result).toEqual({ CAMPO: '' });
+  });
+});
+
+describe('deserializeRows — TAXAJURO in rows (CORE-01)', () => {
+  it('deve retornar string vazia para campo com { $: {} }', () => {
+    const responseBody = {
+      entities: {
+        total: '1',
+        hasMoreResult: 'false',
+        offsetPage: '0',
+        metadata: {
+          fields: {
+            field: [{ name: 'CODPROD' }, { name: 'TAXAJURO' }],
+          },
+        },
+        entity: [{ f0: { $: '100' }, f1: { $: {} }, _rmd: {} }],
+      },
+    };
+
+    const result = deserializeRows(responseBody);
+    expect(result.rows[0].TAXAJURO).toBe('');
+  });
+});
+
+describe('deserializeRows — campos extras DHALTER (CORE-02)', () => {
+  it('deve logar warning para campos alem do metadata', () => {
+    const responseBody = {
+      entities: {
+        total: '1',
+        hasMoreResult: 'false',
+        offsetPage: '0',
+        metadata: {
+          fields: {
+            field: [{ name: 'CODPROD' }, { name: 'DESCRPROD' }],
+          },
+        },
+        entity: [
+          {
+            _rmd: {},
+            f0: { $: '100' },
+            f1: { $: 'Produto A' },
+            f2: { $: '2026-01-01' },
+          },
+        ],
+      },
+    };
+
+    const mockLogger = createMockLogger();
+    deserializeRows(responseBody, mockLogger);
+    expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringMatching(/Campo extra/));
+  });
+
+  it('deve preservar campos mapeados mesmo com extras', () => {
+    const responseBody = {
+      entities: {
+        total: '1',
+        hasMoreResult: 'false',
+        offsetPage: '0',
+        metadata: {
+          fields: {
+            field: [{ name: 'CODPROD' }, { name: 'DESCRPROD' }],
+          },
+        },
+        entity: [
+          {
+            _rmd: {},
+            f0: { $: '100' },
+            f1: { $: 'Produto A' },
+            f2: { $: '2026-01-01' },
+          },
+        ],
+      },
+    };
+
+    const mockLogger = createMockLogger();
+    const result = deserializeRows(responseBody, mockLogger);
+    expect(result.rows[0]).toEqual({
+      CODPROD: '100',
+      DESCRPROD: 'Produto A',
+    });
+  });
+});
+
+describe('deserializeRows — resposta vazia/malformada (CORE-03)', () => {
+  it('deve logar warning para null', () => {
+    const mockLogger = createMockLogger();
+    deserializeRows(null, mockLogger);
+    expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringMatching(/vazio ou invalido/));
+  });
+
+  it('deve logar warning para objeto sem entities', () => {
+    const mockLogger = createMockLogger();
+    deserializeRows({}, mockLogger);
+    expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringMatching(/entities/));
+  });
+
+  it('deve logar warning para undefined', () => {
+    const mockLogger = createMockLogger();
+    deserializeRows(undefined, mockLogger);
+    expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringMatching(/vazio ou invalido/));
   });
 });
