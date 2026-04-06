@@ -33,7 +33,8 @@ export interface Contato {
 }
 
 export interface Cliente {
-  codigoCliente: number;
+  /** Sandbox retorna string (ex: "169"), não number */
+  codigoCliente: number | string;
   tipo: TipoPessoa;
   cnpjCpf: string;
   ieRg?: string;
@@ -42,7 +43,8 @@ export interface Cliente {
   email?: string;
   telefoneDdd?: string;
   telefoneNumero?: string;
-  limiteCredito?: number;
+  /** Sandbox retorna string (ex: "" ou "1000.00"), não number */
+  limiteCredito?: number | string;
   grupoAutorizacao?: string;
   endereco: Endereco;
   contatos?: Contato[];

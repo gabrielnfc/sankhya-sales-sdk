@@ -23,7 +23,12 @@ export class ProdutosResource {
   }
 
   async buscar(codigoProduto: number): Promise<Produto> {
-    return this.http.restGet(`/produtos/${codigoProduto}`);
+    /** Sandbox retorna { produtos: { ...campos } } — precisa extrair o objeto interno */
+    const raw = await this.http.restGet<Record<string, unknown>>(`/produtos/${codigoProduto}`);
+    if (raw && typeof raw === 'object' && 'produtos' in raw) {
+      return raw.produtos as Produto;
+    }
+    return raw as unknown as Produto;
   }
 
   async componentes(codigoProduto: number): Promise<ComponenteProduto[]> {

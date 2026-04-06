@@ -16,7 +16,12 @@ export class VendedoresResource {
   }
 
   async buscar(codigoVendedor: number): Promise<Vendedor> {
-    return this.http.restGet(`/vendedores/${codigoVendedor}`);
+    /** Sandbox retorna { vendedores: { ...campos } } — precisa extrair o objeto interno */
+    const raw = await this.http.restGet<Record<string, unknown>>(`/vendedores/${codigoVendedor}`);
+    if (raw && typeof raw === 'object' && 'vendedores' in raw) {
+      return raw.vendedores as Vendedor;
+    }
+    return raw as unknown as Vendedor;
   }
 
   listarTodos(params?: Omit<ListarVendedoresParams, 'page'>): AsyncGenerator<Vendedor> {
