@@ -7,7 +7,7 @@ The SDK core is complete (OAuth 2.0, HTTP client, 10 resources, dual ESM/CJS bui
 ## Phases
 
 - [ ] **Phase 1: Core Hardening** - Fix three known bugs in the serializer, retry, and auth token layers; configure coverage enforcement
-- [ ] **Phase 2: Read-Path Resource Validation** - Validate all read-only resources against sandbox; verify TypeScript types match real API fields
+- [x] **Phase 2: Read-Path Resource Validation** - Validate all read-only resources against sandbox; verify TypeScript types match real API fields (completed 2026-04-06)
 - [ ] **Phase 3: Write-Path & E2E Validation** - Validate write operations for pedidos, financeiros, fiscal, gateway; run complete B2B order flow e2e
 - [ ] **Phase 4: Public API Surface** - Add type guards, SankhyaErrorCode union, listarTodos() on all resources, idempotency keys, per-call timeout, internal audit
 - [ ] **Phase 5: Test Coverage Hardening** - Enforce 90% unit coverage, add edge case tests, write integration test suite, CJS/ESM smoke tests
@@ -46,7 +46,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 - [x] 02-01-PLAN.md — Validate clientes, vendedores, produtos types and add field-level integration tests
-- [ ] 02-02-PLAN.md — Validate precos, estoque, cadastros types, fix TAXAJURO, add field-level integration tests
+- [x] 02-02-PLAN.md — Validate precos, estoque, cadastros types, fix TAXAJURO, add field-level integration tests
 
 ### Phase 3: Write-Path & E2E Validation
 **Goal**: All write operations are safe against duplicate mutations and verified against sandbox; complete B2B order flow runs end-to-end
@@ -137,7 +137,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Core Hardening | 3/3 | Complete |  |
-| 2. Read-Path Resource Validation | 1/2 | In Progress|  |
+| 2. Read-Path Resource Validation | 2/2 | Complete   | 2026-04-06 |
 | 3. Write-Path & E2E Validation | 0/TBD | Not started | - |
 | 4. Public API Surface | 0/TBD | Not started | - |
 | 5. Test Coverage Hardening | 0/TBD | Not started | - |
