@@ -1,4 +1,15 @@
 import type { GatewayEntities } from '../types/common.js';
+import type { Logger } from '../types/config.js';
+
+/**
+ * Unwraps a Gateway "$" value safely.
+ * Handles: string, number, boolean, null, undefined, empty object (TAXAJURO { "$": {} }).
+ */
+function unwrapDollarValue(raw: unknown): string {
+  if (raw === null || raw === undefined) return '';
+  if (typeof raw === 'object') return '';
+  return String(raw);
+}
 
 /**
  * Serializa dados para o formato Gateway do Sankhya: { CAMPO: valor } → { CAMPO: { "$": "valor" } }
@@ -30,7 +41,7 @@ export function deserialize(data: Record<string, unknown>): Record<string, strin
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(data)) {
     if (value !== null && typeof value === 'object' && '$' in (value as Record<string, unknown>)) {
-      result[key] = String((value as Record<string, unknown>).$);
+      result[key] = unwrapDollarValue((value as Record<string, unknown>).$);
     } else if (typeof value === 'string') {
       result[key] = value;
     } else {
@@ -69,8 +80,9 @@ export interface DeserializedRows {
  *
  * Retorna linhas com nomes de campos reais mapeados a partir do metadata.
  */
-export function deserializeRows(responseBody: unknown): DeserializedRows {
+export function deserializeRows(responseBody: unknown, logger?: Logger): DeserializedRows {
   if (!responseBody || typeof responseBody !== 'object') {
+    logger?.warn('deserializeRows: responseBody vazio ou invalido');
     return { rows: [], totalRecords: 0, hasMore: false, page: 0 };
   }
 
@@ -78,6 +90,7 @@ export function deserializeRows(responseBody: unknown): DeserializedRows {
   const entities = body.entities;
 
   if (!entities) {
+    logger?.warn('deserializeRows: campo "entities" ausente na resposta');
     return { rows: [], totalRecords: 0, hasMore: false, page: 0 };
   }
 
@@ -115,15 +128,22 @@ export function deserializeRows(responseBody: unknown): DeserializedRows {
         if (fieldName === undefined) continue;
 
         if (value !== null && value !== undefined && typeof value === 'object' && '$' in value) {
-          const raw = value.$;
-          row[fieldName] =
-            raw === null || raw === undefined
-              ? ''
-              : typeof raw === 'object'
-                ? JSON.stringify(raw)
-                : String(raw);
+          row[fieldName] = unwrapDollarValue(value.$);
         } else if (value !== null && value !== undefined) {
           row[fieldName] = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        }
+      }
+
+      // CORE-02: Detectar campos extras alem do metadata (ex: DHALTER)
+      for (const key of Object.keys(entity)) {
+        if (key === '_rmd') continue;
+        if (/^f\d+$/.test(key)) {
+          const idx = Number.parseInt(key.slice(1), 10);
+          if (idx >= fieldNames.length) {
+            logger?.warn(
+              `deserializeRows: Campo extra no Gateway: ${key} (indice ${idx} alem de ${fieldNames.length} campos no metadata)`,
+            );
+          }
         }
       }
     } else {
@@ -135,7 +155,7 @@ export function deserializeRows(responseBody: unknown): DeserializedRows {
           typeof value === 'object' &&
           '$' in (value as Record<string, unknown>)
         ) {
-          row[key] = String((value as Record<string, unknown>).$);
+          row[key] = unwrapDollarValue((value as Record<string, unknown>).$);
         }
       }
     }
