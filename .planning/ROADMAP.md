@@ -27,7 +27,11 @@ The SDK core is complete (OAuth 2.0, HTTP client, 10 resources, dual ESM/CJS bui
   3. Token refresh with `expires_in < 60` produces a valid positive TTL (minimum 10 seconds), not negative or zero
   4. Retry on POST/PUT (pedidos, financeiros) does not duplicate mutations — either per-method disabled or guarded by idempotency
   5. `vitest run --coverage` enforces >= 90% thresholds and fails CI if not met
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
+- [ ] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
+- [ ] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
 
 ### Phase 2: Read-Path Resource Validation
 **Goal**: All read-only resources produce correct TypeScript types and working methods verified against the real Sankhya sandbox
@@ -39,7 +43,11 @@ The SDK core is complete (OAuth 2.0, HTTP client, 10 resources, dual ESM/CJS bui
   3. `client.estoque.porProduto()` and `client.precos.porTabela()` return typed results without any implicit `any`
   4. `client.cadastros.tiposNegociacao()` and `client.cadastros.modelosNota()` (Gateway-only routes) return data from sandbox
   5. TypeScript interfaces for each of the 7 resources in this phase have zero field name mismatches against real API responses
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
+- [ ] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
+- [ ] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
 
 ### Phase 3: Write-Path & E2E Validation
 **Goal**: All write operations are safe against duplicate mutations and verified against sandbox; complete B2B order flow runs end-to-end
@@ -51,7 +59,11 @@ The SDK core is complete (OAuth 2.0, HTTP client, 10 resources, dual ESM/CJS bui
   3. `client.gateway.saveRecord()` persists a record and `loadRecord()` retrieves it with correct field mapping
   4. The complete B2B flow (criar cliente → consultar produto → checar estoque → criar pedido → adicionar itens → confirmar → faturar) executes successfully against sandbox
   5. No write operation retries on timeout without idempotency protection — duplicate entries do not appear in sandbox after a simulated timeout + retry
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
+- [ ] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
+- [ ] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
 
 ### Phase 4: Public API Surface
 **Goal**: The public API exported from sankhya-sales-sdk is complete, consistent, and stable for v1.0.0 consumers
@@ -63,7 +75,11 @@ The SDK core is complete (OAuth 2.0, HTTP client, 10 resources, dual ESM/CJS bui
   3. Every resource with list methods exposes `listarTodos()` returning an AsyncGenerator usable with `for await...of`
   4. `client.pedidos.criar({ ..., idempotencyKey: 'uuid' })` and equivalent financeiros mutations accept optional idempotency keys
   5. Internal utilities (`withRetry`, `createPaginator`, `deserializeRows`) are marked `@internal` and excluded from the public type surface; per-call timeout override works via `RequestOptions`
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
+- [ ] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
+- [ ] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
 
 ### Phase 5: Test Coverage Hardening
 **Goal**: The entire codebase is covered by >= 90% unit tests plus integration tests for every resource and a verified CJS/ESM dual-format build
@@ -76,7 +92,11 @@ The SDK core is complete (OAuth 2.0, HTTP client, 10 resources, dual ESM/CJS bui
   4. `node -e "const sdk = require('sankhya-sales-sdk'); console.log(sdk.SankhyaClient)"` prints the constructor, proving CJS works and `instanceof` is preserved
   5. `node --input-type=module -e "import { SankhyaClient } from 'sankhya-sales-sdk'; console.log(SankhyaClient)"` prints the constructor, proving ESM works
   6. Unit tests cover TAXAJURO empty object, DHALTER extra field, pagination string values, and TipoPessoa F/J edge cases explicitly
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
+- [ ] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
+- [ ] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
 
 ### Phase 6: Documentation
 **Goal**: Any Node.js developer can use sankhya-sales-sdk within 5 minutes using only the README, TSDoc tooltips in their IDE, and the generated API reference
@@ -89,7 +109,11 @@ The SDK core is complete (OAuth 2.0, HTTP client, 10 resources, dual ESM/CJS bui
   4. A developer catching an `ApiError` can find a copy-pasteable try/catch example in the error handling guide that covers all 5 error classes
   5. Running any code file in `examples/` against sandbox produces real API output without modification
   6. CHANGELOG.md exists with a v0.1.0 entry and a v1.0.0-preview entry following Keep a Changelog format
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
+- [ ] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
+- [ ] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
 
 ### Phase 7: Package Validation
 **Goal**: The npm package passes all automated package validators and is structurally correct for every TypeScript and Node.js consumer configuration
@@ -102,7 +126,11 @@ The SDK core is complete (OAuth 2.0, HTTP client, 10 resources, dual ESM/CJS bui
   4. `npm pack --dry-run` lists only `dist/`, `README.md`, `CHANGELOG.md`, `LICENSE`, and `package.json` — no source files, test files, or `.planning/` leak into the tarball
   5. `grep -r "any" src/ --include="*.ts"` returns zero matches (excluding comments and type assertions with explanations)
   6. `tsc --noEmit` passes with `strict: true`, `noUncheckedIndexedAccess: true`, and all strict-family flags enabled
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
+- [ ] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
+- [ ] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
 
 ### Phase 8: CI/CD & Release
 **Goal**: Every push to main runs automated quality gates; v1.0.0 is published to npm with provenance attestation and a GitHub Release
