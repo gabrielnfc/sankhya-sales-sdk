@@ -22,21 +22,13 @@ export {
   ApiError,
   GatewayError,
   TimeoutError,
+  isSankhyaError,
+  isAuthError,
+  isApiError,
+  isGatewayError,
+  isTimeoutError,
 } from './core/errors.js';
-
-// Core utilities
-export { createLogger } from './core/logger.js';
-export { serialize, deserialize, deserializeRows } from './core/gateway-serializer.js';
-export {
-  normalizeRestPagination,
-  normalizeGatewayPagination,
-  extractRestData,
-  createPaginator,
-} from './core/pagination.js';
-export type { FetchPage } from './core/pagination.js';
-export { withRetry } from './core/retry.js';
-export type { RetryOptions } from './core/retry.js';
-export { toSankhyaDate, toSankhyaDateTime, toISODate } from './core/date.js';
+export type { SankhyaErrorCode } from './core/errors.js';
 
 // Types
 export type {
@@ -45,6 +37,7 @@ export type {
   LoggerOptions,
   LogLevel,
   Logger,
+  RequestOptions,
   AuthResponse,
   TokenData,
   PaginationParams,

@@ -4,6 +4,7 @@ export type {
   LoggerOptions,
   LogLevel,
   Logger,
+  RequestOptions,
 } from './config.js';
 
 export type { AuthResponse, TokenData } from './auth.js';

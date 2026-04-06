@@ -69,3 +69,31 @@ export class TimeoutError extends SankhyaError {
     this.name = 'TimeoutError';
   }
 }
+
+/** Union of all SDK error codes for exhaustive switch handling */
+export type SankhyaErrorCode = 'AUTH_ERROR' | 'API_ERROR' | 'GATEWAY_ERROR' | 'TIMEOUT_ERROR';
+
+/** Type guard: narrows unknown to SankhyaError */
+export function isSankhyaError(err: unknown): err is SankhyaError {
+  return err instanceof SankhyaError;
+}
+
+/** Type guard: narrows unknown to AuthError */
+export function isAuthError(err: unknown): err is AuthError {
+  return err instanceof AuthError;
+}
+
+/** Type guard: narrows unknown to ApiError */
+export function isApiError(err: unknown): err is ApiError {
+  return err instanceof ApiError;
+}
+
+/** Type guard: narrows unknown to GatewayError */
+export function isGatewayError(err: unknown): err is GatewayError {
+  return err instanceof GatewayError;
+}
+
+/** Type guard: narrows unknown to TimeoutError */
+export function isTimeoutError(err: unknown): err is TimeoutError {
+  return err instanceof TimeoutError;
+}

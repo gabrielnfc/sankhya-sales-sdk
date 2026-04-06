@@ -5,7 +5,13 @@ import {
   GatewayError,
   SankhyaError,
   TimeoutError,
+  isSankhyaError,
+  isAuthError,
+  isApiError,
+  isGatewayError,
+  isTimeoutError,
 } from '../../src/core/errors.js';
+import type { SankhyaErrorCode } from '../../src/core/errors.js';
 
 describe('SankhyaError', () => {
   it('deve criar erro base com code e statusCode', () => {
@@ -71,6 +77,110 @@ describe('TimeoutError', () => {
     expect(error.name).toBe('TimeoutError');
     expect(error).toBeInstanceOf(SankhyaError);
     expect(error).toBeInstanceOf(TimeoutError);
+  });
+});
+
+describe('type guards', () => {
+  describe('isSankhyaError', () => {
+    it('returns true for SankhyaError', () => {
+      expect(isSankhyaError(new SankhyaError('x', 'CODE'))).toBe(true);
+    });
+
+    it('returns true for subclasses', () => {
+      expect(isSankhyaError(new AuthError('x'))).toBe(true);
+      expect(isSankhyaError(new ApiError('x', '/', 'GET'))).toBe(true);
+      expect(isSankhyaError(new GatewayError('x', 'svc'))).toBe(true);
+      expect(isSankhyaError(new TimeoutError('x'))).toBe(true);
+    });
+
+    it('returns false for plain Error', () => {
+      expect(isSankhyaError(new Error('x'))).toBe(false);
+    });
+
+    it('returns false for null, undefined, string, plain object', () => {
+      expect(isSankhyaError(null)).toBe(false);
+      expect(isSankhyaError(undefined)).toBe(false);
+      expect(isSankhyaError('string')).toBe(false);
+      expect(isSankhyaError({ code: 'AUTH_ERROR' })).toBe(false);
+    });
+  });
+
+  describe('isAuthError', () => {
+    it('returns true for AuthError', () => {
+      expect(isAuthError(new AuthError('x'))).toBe(true);
+    });
+
+    it('returns false for other error types', () => {
+      expect(isAuthError(new ApiError('x', '/', 'GET'))).toBe(false);
+      expect(isAuthError(new GatewayError('x', 'svc'))).toBe(false);
+      expect(isAuthError(new TimeoutError('x'))).toBe(false);
+      expect(isAuthError(null)).toBe(false);
+      expect(isAuthError('string')).toBe(false);
+    });
+  });
+
+  describe('isApiError', () => {
+    it('returns true for ApiError', () => {
+      expect(isApiError(new ApiError('x', '/test', 'GET'))).toBe(true);
+    });
+
+    it('returns false for other error types', () => {
+      expect(isApiError(new AuthError('x'))).toBe(false);
+      expect(isApiError(new GatewayError('x', 'svc'))).toBe(false);
+      expect(isApiError(null)).toBe(false);
+    });
+  });
+
+  describe('isGatewayError', () => {
+    it('returns true for GatewayError', () => {
+      expect(isGatewayError(new GatewayError('x', 'svc'))).toBe(true);
+    });
+
+    it('returns false for other error types', () => {
+      expect(isGatewayError(new AuthError('x'))).toBe(false);
+      expect(isGatewayError(new ApiError('x', '/', 'GET'))).toBe(false);
+      expect(isGatewayError(null)).toBe(false);
+    });
+  });
+
+  describe('isTimeoutError', () => {
+    it('returns true for TimeoutError', () => {
+      expect(isTimeoutError(new TimeoutError('x'))).toBe(true);
+    });
+
+    it('returns false for other error types', () => {
+      expect(isTimeoutError(new AuthError('x'))).toBe(false);
+      expect(isTimeoutError(new ApiError('x', '/', 'GET'))).toBe(false);
+      expect(isTimeoutError(null)).toBe(false);
+      expect(isTimeoutError(undefined)).toBe(false);
+      expect(isTimeoutError('string')).toBe(false);
+    });
+  });
+
+  describe('SankhyaErrorCode', () => {
+    it('covers all error codes in exhaustive switch', () => {
+      const codes: SankhyaErrorCode[] = [
+        'AUTH_ERROR',
+        'API_ERROR',
+        'GATEWAY_ERROR',
+        'TIMEOUT_ERROR',
+      ];
+
+      for (const code of codes) {
+        switch (code) {
+          case 'AUTH_ERROR':
+          case 'API_ERROR':
+          case 'GATEWAY_ERROR':
+          case 'TIMEOUT_ERROR':
+            expect(code).toBeTruthy();
+            break;
+          default: {
+            const _exhaustive: never = code;
+            throw new Error(`Unhandled code: ${_exhaustive}`);
+          }
+        }
+      }
+    });
   });
 });
 
