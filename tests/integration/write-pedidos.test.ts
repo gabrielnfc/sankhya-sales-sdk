@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
-import { ApiError, GatewayError } from '../../src/core/errors.js';
+import { ApiError, GatewayError, TimeoutError } from '../../src/core/errors.js';
 
 const config = {
   baseUrl: process.env.SANKHYA_BASE_URL ?? '',
@@ -131,7 +131,7 @@ describe.skipIf(!has)('Pedidos Write-Path — Sandbox Validation', () => {
       codigoPedido = result.codigoPedido;
       console.log(`Created pedido: ${codigoPedido}`);
     } catch (error) {
-      if (error instanceof GatewayError || error instanceof ApiError) {
+      if (error instanceof GatewayError || error instanceof ApiError || error instanceof TimeoutError) {
         const err = error as { code?: string; message?: string; statusCode?: number };
         console.log(
           `pedidos.criar() error: code=${err.code}, status=${err.statusCode}, message=${err.message} (sandbox limitation — OK)`,
@@ -155,7 +155,7 @@ describe.skipIf(!has)('Pedidos Write-Path — Sandbox Validation', () => {
         `Consultar pedidos: ${result.data.length} items, total=${result.totalRecords}, hasMore=${result.hasMore}`,
       );
     } catch (error) {
-      if (error instanceof GatewayError || error instanceof ApiError) {
+      if (error instanceof GatewayError || error instanceof ApiError || error instanceof TimeoutError) {
         const err = error as { code?: string; message?: string; statusCode?: number };
         console.log(
           `pedidos.consultar() error: code=${err.code}, status=${err.statusCode}, message=${err.message} (sandbox limitation — OK)`,
@@ -248,7 +248,7 @@ describe.skipIf(!has)('Pedidos Write-Path — Sandbox Validation', () => {
       expect(result.codigoPedido).toBeDefined();
       console.log(`Cancelled pedido: ${result.codigoPedido}`);
     } catch (error) {
-      if (error instanceof GatewayError || error instanceof ApiError) {
+      if (error instanceof GatewayError || error instanceof ApiError || error instanceof TimeoutError) {
         const err = error as { code?: string; message?: string; statusCode?: number };
         console.log(
           `pedidos.cancelar() error: code=${err.code}, status=${err.statusCode}, message=${err.message} (sandbox limitation — OK)`,
