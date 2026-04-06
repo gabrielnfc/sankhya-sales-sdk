@@ -23,13 +23,17 @@ Qualquer desenvolvedor Node.js consegue integrar com o Sankhya ERP sem precisar 
 - SankhyaClient entry point com lazy-loading de resources — existing (Fase 4)
 - 10 resources implementados (clientes, vendedores, produtos, precos, estoque, pedidos, financeiros, cadastros, fiscal, gateway) — existing (Fase 5 parcial)
 - 75 testes unitarios + 15 testes de integracao passando — existing (curadoria)
+- Serializer hardening (TAXAJURO, DHALTER, empty responses) — validated (Fase 1)
+- Auth TTL lower-bound guard (minimum 10s) — validated (Fase 1)
+- Retry com full jitter e method-awareness (POST/PUT safe) — validated (Fase 1)
+- Coverage enforcement >= 90% com @vitest/coverage-v8 — validated (Fase 1)
 
 ### Active
 
 - [ ] Validacao e2e do core (auth, http, retry, pagination) contra sandbox real
 - [ ] Validacao e2e de cada resource contra sandbox real — CRUD completo
 - [ ] Auditoria critica dos resources: metodos faltantes, tipagem, edge cases
-- [ ] Cobertura de testes >= 90% em todo o SDK
+- [x] Cobertura de testes >= 90% em todo o SDK — Validated in Phase 1: Core Hardening
 - [ ] Documentacao completa (README, API reference, exemplos)
 - [ ] Publicacao npm (v1.0.0) com exports corretos (ESM + CJS)
 - [ ] Zero `any` no codigo fonte
@@ -59,7 +63,7 @@ Qualquer desenvolvedor Node.js consegue integrar com o Sankhya ERP sem precisar 
 **Brownfield state:**
 - Build funcional: `npm run build` gera ESM + CJS via tsup
 - Lint: Biome configurado
-- Test: Vitest configurado com 90 testes existentes
+- Test: Vitest configurado com 163 testes (90 originais + 73 da Fase 1)
 - CI: nao configurado ainda
 
 ## Constraints
@@ -100,4 +104,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-06 after initialization*
+*Last updated: 2026-04-06 after Phase 1 completion*
