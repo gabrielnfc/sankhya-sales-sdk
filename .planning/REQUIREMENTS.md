@@ -109,13 +109,60 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated during roadmap creation) | | |
+| CORE-01 | Phase 1 | Pending |
+| CORE-02 | Phase 1 | Pending |
+| CORE-03 | Phase 1 | Pending |
+| CORE-04 | Phase 1 | Pending |
+| CORE-05 | Phase 1 | Pending |
+| CORE-06 | Phase 1 | Pending |
+| CORE-07 | Phase 1 | Pending |
+| RVAL-01 | Phase 2 | Pending |
+| RVAL-02 | Phase 2 | Pending |
+| RVAL-03 | Phase 2 | Pending |
+| RVAL-04 | Phase 2 | Pending |
+| RVAL-05 | Phase 2 | Pending |
+| RVAL-08 | Phase 2 | Pending |
+| RVAL-11 | Phase 2 | Pending |
+| RVAL-06 | Phase 3 | Pending |
+| RVAL-07 | Phase 3 | Pending |
+| RVAL-09 | Phase 3 | Pending |
+| RVAL-10 | Phase 3 | Pending |
+| RVAL-12 | Phase 3 | Pending |
+| APIS-01 | Phase 4 | Pending |
+| APIS-02 | Phase 4 | Pending |
+| APIS-03 | Phase 4 | Pending |
+| APIS-04 | Phase 4 | Pending |
+| APIS-05 | Phase 4 | Pending |
+| APIS-06 | Phase 4 | Pending |
+| TEST-01 | Phase 5 | Pending |
+| TEST-02 | Phase 5 | Pending |
+| TEST-03 | Phase 5 | Pending |
+| TEST-04 | Phase 5 | Pending |
+| TEST-05 | Phase 5 | Pending |
+| TEST-06 | Phase 5 | Pending |
+| DOCS-01 | Phase 6 | Pending |
+| DOCS-02 | Phase 6 | Pending |
+| DOCS-03 | Phase 6 | Pending |
+| DOCS-04 | Phase 6 | Pending |
+| DOCS-05 | Phase 6 | Pending |
+| DOCS-06 | Phase 6 | Pending |
+| PKGP-01 | Phase 7 | Pending |
+| PKGP-02 | Phase 7 | Pending |
+| PKGP-03 | Phase 7 | Pending |
+| PKGP-04 | Phase 7 | Pending |
+| PKGP-05 | Phase 7 | Pending |
+| PKGP-06 | Phase 7 | Pending |
+| CICD-01 | Phase 8 | Pending |
+| CICD-02 | Phase 8 | Pending |
+| CICD-03 | Phase 8 | Pending |
+| CICD-04 | Phase 8 | Pending |
+| CICD-05 | Phase 8 | Pending |
 
 **Coverage:**
-- v1 requirements: 40 total
-- Mapped to phases: 0
-- Unmapped: 40
+- v1 requirements: 48 total (header said 40 — 8 were added after initial count; all 48 mapped)
+- Mapped to phases: 48
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-06*
-*Last updated: 2026-04-06 after initial definition*
+*Last updated: 2026-04-06 after roadmap creation — traceability populated*
