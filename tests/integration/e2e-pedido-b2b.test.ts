@@ -79,7 +79,7 @@ describe.skipIf(!has)('E2E Pedido B2B - Fluxo completo', { timeout: 120_000, seq
       codigoTipoOperacao,
       codigoTipoPagamento,
     });
-  });
+  }, 60_000);
 
   it('encontra cliente existente', async () => {
     const result = await sankhya.clientes.listar({ page: 0 });

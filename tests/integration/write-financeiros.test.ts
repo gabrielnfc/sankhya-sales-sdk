@@ -47,7 +47,7 @@ describe.skipIf(!has)('Financeiros Write — Sandbox Validation', { timeout: 60_
     codigoParceiro = Number(clientes.data[0].codigoCliente);
     codigoTipoPagamento = tiposPag.data[0].codigoTipoPagamento;
     codigoEmpresa = empresas.data[0].codigoEmpresa;
-  });
+  }, 60_000);
 
   it.sequential('financeiros.registrarReceita()', async () => {
     const hoje = new Date();

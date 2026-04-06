@@ -49,7 +49,7 @@ describe.skipIf(!has)('Fiscal Write — Sandbox Validation', { timeout: 60_000 }
       notaModelo = 55;
       console.log('listarModelosNota() failed in sandbox, using fallback notaModelo=55');
     }
-  });
+  }, 60_000);
 
   it('fiscal.calcularImpostos()', async () => {
     try {
