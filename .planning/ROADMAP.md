@@ -31,7 +31,7 @@ The SDK core is complete (OAuth 2.0, HTTP client, 10 resources, dual ESM/CJS bui
 Plans:
 - [x] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
 - [x] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
-- [ ] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
+- [x] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
 
 ### Phase 2: Read-Path Resource Validation
 **Goal**: All read-only resources produce correct TypeScript types and working methods verified against the real Sankhya sandbox
@@ -43,11 +43,10 @@ Plans:
   3. `client.estoque.porProduto()` and `client.precos.porTabela()` return typed results without any implicit `any`
   4. `client.cadastros.tiposNegociacao()` and `client.cadastros.modelosNota()` (Gateway-only routes) return data from sandbox
   5. TypeScript interfaces for each of the 7 resources in this phase have zero field name mismatches against real API responses
-**Plans**: 3 plans
+**Plans**: 2 plans
 Plans:
-- [x] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
-- [x] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
-- [ ] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
+- [ ] 02-01-PLAN.md — Validate clientes, vendedores, produtos types and add field-level integration tests
+- [ ] 02-02-PLAN.md — Validate precos, estoque, cadastros types, fix TAXAJURO, add field-level integration tests
 
 ### Phase 3: Write-Path & E2E Validation
 **Goal**: All write operations are safe against duplicate mutations and verified against sandbox; complete B2B order flow runs end-to-end
@@ -61,9 +60,7 @@ Plans:
   5. No write operation retries on timeout without idempotency protection — duplicate entries do not appear in sandbox after a simulated timeout + retry
 **Plans**: 3 plans
 Plans:
-- [x] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
-- [x] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
-- [ ] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
+- [ ] TBD
 
 ### Phase 4: Public API Surface
 **Goal**: The public API exported from sankhya-sales-sdk is complete, consistent, and stable for v1.0.0 consumers
@@ -77,9 +74,7 @@ Plans:
   5. Internal utilities (`withRetry`, `createPaginator`, `deserializeRows`) are marked `@internal` and excluded from the public type surface; per-call timeout override works via `RequestOptions`
 **Plans**: 3 plans
 Plans:
-- [ ] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
-- [ ] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
-- [ ] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
+- [ ] TBD
 
 ### Phase 5: Test Coverage Hardening
 **Goal**: The entire codebase is covered by >= 90% unit tests plus integration tests for every resource and a verified CJS/ESM dual-format build
@@ -94,9 +89,7 @@ Plans:
   6. Unit tests cover TAXAJURO empty object, DHALTER extra field, pagination string values, and TipoPessoa F/J edge cases explicitly
 **Plans**: 3 plans
 Plans:
-- [ ] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
-- [ ] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
-- [ ] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
+- [ ] TBD
 
 ### Phase 6: Documentation
 **Goal**: Any Node.js developer can use sankhya-sales-sdk within 5 minutes using only the README, TSDoc tooltips in their IDE, and the generated API reference
@@ -111,9 +104,7 @@ Plans:
   6. CHANGELOG.md exists with a v0.1.0 entry and a v1.0.0-preview entry following Keep a Changelog format
 **Plans**: 3 plans
 Plans:
-- [ ] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
-- [ ] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
-- [ ] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
+- [ ] TBD
 
 ### Phase 7: Package Validation
 **Goal**: The npm package passes all automated package validators and is structurally correct for every TypeScript and Node.js consumer configuration
@@ -128,9 +119,7 @@ Plans:
   6. `tsc --noEmit` passes with `strict: true`, `noUncheckedIndexedAccess: true`, and all strict-family flags enabled
 **Plans**: 3 plans
 Plans:
-- [ ] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
-- [ ] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
-- [ ] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
+- [ ] TBD
 
 ### Phase 8: CI/CD & Release
 **Goal**: Every push to main runs automated quality gates; v1.0.0 is published to npm with provenance attestation and a GitHub Release
@@ -147,8 +136,8 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core Hardening | 2/3 | In Progress|  |
-| 2. Read-Path Resource Validation | 0/TBD | Not started | - |
+| 1. Core Hardening | 3/3 | Complete |  |
+| 2. Read-Path Resource Validation | 0/2 | Not started | - |
 | 3. Write-Path & E2E Validation | 0/TBD | Not started | - |
 | 4. Public API Surface | 0/TBD | Not started | - |
 | 5. Test Coverage Hardening | 0/TBD | Not started | - |
