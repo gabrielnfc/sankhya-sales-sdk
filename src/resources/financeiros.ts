@@ -1,6 +1,7 @@
 import type { HttpClient } from '../core/http.js';
 import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
 import type { PaginatedResult } from '../types/common.js';
+import type { RequestOptions } from '../types/config.js';
 import type {
   AtualizarDespesaInput,
   AtualizarReceitaInput,
@@ -58,19 +59,20 @@ export class FinanceirosResource {
     return normalizeRestPagination(data, pagination);
   }
 
-  async registrarReceita(dados: RegistrarReceitaInput): Promise<RegistrarFinanceiroResponse> {
-    return this.http.restPost('/financeiros/receitas', dados);
+  async registrarReceita(dados: RegistrarReceitaInput, options?: RequestOptions): Promise<RegistrarFinanceiroResponse> {
+    return this.http.restPost('/financeiros/receitas', dados, options);
   }
 
   async atualizarReceita(
     codigoFinanceiro: number,
     dados: AtualizarReceitaInput,
+    options?: RequestOptions,
   ): Promise<RegistrarFinanceiroResponse> {
-    return this.http.restPut(`/financeiros/receitas/${codigoFinanceiro}`, dados);
+    return this.http.restPut(`/financeiros/receitas/${codigoFinanceiro}`, dados, options);
   }
 
-  async baixarReceita(dados: BaixarReceitaInput): Promise<unknown> {
-    return this.http.restPost('/financeiros/receitas/baixa', dados);
+  async baixarReceita(dados: BaixarReceitaInput, options?: RequestOptions): Promise<unknown> {
+    return this.http.restPost('/financeiros/receitas/baixa', dados, options);
   }
 
   // --- Despesas ---
@@ -82,19 +84,20 @@ export class FinanceirosResource {
     return normalizeRestPagination(data, pagination);
   }
 
-  async registrarDespesa(dados: RegistrarDespesaInput): Promise<RegistrarFinanceiroResponse> {
-    return this.http.restPost('/financeiros/despesas', dados);
+  async registrarDespesa(dados: RegistrarDespesaInput, options?: RequestOptions): Promise<RegistrarFinanceiroResponse> {
+    return this.http.restPost('/financeiros/despesas', dados, options);
   }
 
   async atualizarDespesa(
     codigoFinanceiro: number,
     dados: AtualizarDespesaInput,
+    options?: RequestOptions,
   ): Promise<RegistrarFinanceiroResponse> {
-    return this.http.restPut(`/financeiros/despesas/${codigoFinanceiro}`, dados);
+    return this.http.restPut(`/financeiros/despesas/${codigoFinanceiro}`, dados, options);
   }
 
-  async baixarDespesa(dados: BaixarDespesaInput): Promise<unknown> {
-    return this.http.restPost('/financeiros/despesas/baixa', dados);
+  async baixarDespesa(dados: BaixarDespesaInput, options?: RequestOptions): Promise<unknown> {
+    return this.http.restPost('/financeiros/despesas/baixa', dados, options);
   }
 
   // --- Moedas ---
