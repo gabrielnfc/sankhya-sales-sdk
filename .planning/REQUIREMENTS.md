@@ -23,9 +23,9 @@
 - [x] **RVAL-04**: Resource `precos` — leitura validada contra sandbox (porProduto, porTabela, contextualizado)
 - [x] **RVAL-05**: Resource `estoque` — leitura validada contra sandbox (porProduto, listar, locais, detalhesGateway)
 - [ ] **RVAL-06**: Resource `pedidos` — fluxo completo validado contra sandbox (criar → item → confirmar → faturar)
-- [ ] **RVAL-07**: Resource `financeiros` — CRUD validado contra sandbox (tipos pagamento, receitas, despesas, moedas, contas, TEF)
+- [x] **RVAL-07**: Resource `financeiros` — CRUD validado contra sandbox (tipos pagamento, receitas, despesas, moedas, contas, TEF)
 - [x] **RVAL-08**: Resource `cadastros` — leitura validada contra sandbox (TOPs, naturezas, projetos, centros, empresas, usuarios, tiposNegociacao, modelosNota)
-- [ ] **RVAL-09**: Resource `fiscal` — validado contra sandbox (calcularImpostos, importarNfse)
+- [x] **RVAL-09**: Resource `fiscal` — validado contra sandbox (calcularImpostos, importarNfse)
 - [ ] **RVAL-10**: Resource `gateway` — CRUD genérico validado contra sandbox (loadRecords, loadRecord, saveRecord)
 - [x] **RVAL-11**: Tipos TypeScript de cada resource correspondem exatamente aos campos retornados pela API real
 - [ ] **RVAL-12**: Fluxo e2e completo de pedido B2B validado no sandbox (criar cliente → consultar produto → checar estoque → criar pedido → adicionar itens → confirmar → faturar)
@@ -124,8 +124,8 @@
 | RVAL-08 | Phase 2 | Complete |
 | RVAL-11 | Phase 2 | Complete |
 | RVAL-06 | Phase 3 | Pending |
-| RVAL-07 | Phase 3 | Pending |
-| RVAL-09 | Phase 3 | Pending |
+| RVAL-07 | Phase 3 | Complete |
+| RVAL-09 | Phase 3 | Complete |
 | RVAL-10 | Phase 3 | Pending |
 | RVAL-12 | Phase 3 | Pending |
 | APIS-01 | Phase 4 | Pending |

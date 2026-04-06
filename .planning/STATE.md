@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-04-06T16:04:11.283Z"
+status: executing
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-04-06T18:56:31.067Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 8
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 8
+  completed_plans: 6
   percent: 0
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-06)
 
 **Core value:** Qualquer dev Node.js integra com Sankhya ERP sem estudar a API — tipos seguros, métodos intuitivos, peculiaridades abstraídas.
-**Current focus:** Phase 02 — read-path-resource-validation
+**Current focus:** Phase 03 — write-path-e2e-validation
 
 ## Current Position
 
-Phase: 02 (read-path-resource-validation) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
+Phase: 03 (write-path-e2e-validation) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 Last activity: 2026-04-06
 
 Progress: [░░░░░░░░░░] 0%
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P03 | 2m30s | 1 tasks | 3 files |
 | Phase 02 P01 | 3m12s | 2 tasks | 6 files |
 | Phase 02 P02 | 2m07s | 2 tasks | 2 files |
+| Phase 03 P02 | 2m09s | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,7 @@ Recent decisions affecting current work:
 - [Phase 02]: buscar() methods unwrap { resource: {...} } wrapper from REST v1 single-item responses
 - [Phase 02]: Vendedor/Produto interfaces extended with fields discovered from sandbox (not in documentation)
 - [Phase 02]: TAXAJURO parsed from Gateway response with Number() || 0 fallback for empty object values
+- [Phase 03]: BaixarReceita/BaixarDespesa return Promise<unknown> — baixa response shape uncertain until sandbox validation
 
 ### Pending Todos
 
@@ -89,6 +91,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T16:04:11.280Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-04-06T18:56:31.064Z
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None
