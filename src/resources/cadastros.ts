@@ -114,7 +114,7 @@ export class CadastrosResource {
           offsetPage: String(params?.page ?? 0),
           criteria: { expression: criteria },
           entity: {
-            fieldset: { list: 'CODTIPVENDA,DESCRTIPVENDA,ATIVO' },
+            fieldset: { list: 'CODTIPVENDA,DESCRTIPVENDA,ATIVO,TAXAJURO' },
           },
         },
       },
@@ -124,7 +124,7 @@ export class CadastrosResource {
     return rows.map((row) => ({
       codigoTipoNegociacao: Number(row.CODTIPVENDA) || 0,
       descricao: row.DESCRTIPVENDA ?? '',
-      taxaJuro: 0,
+      taxaJuro: row.TAXAJURO ? Number(row.TAXAJURO) || 0 : 0,
       ativo: row.ATIVO === 'S',
     }));
   }
