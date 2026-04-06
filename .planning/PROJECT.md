@@ -27,11 +27,15 @@ Qualquer desenvolvedor Node.js consegue integrar com o Sankhya ERP sem precisar 
 - Auth TTL lower-bound guard (minimum 10s) — validated (Fase 1)
 - Retry com full jitter e method-awareness (POST/PUT safe) — validated (Fase 1)
 - Coverage enforcement >= 90% com @vitest/coverage-v8 — validated (Fase 1)
+- Read-path resources validados contra sandbox: clientes, vendedores, produtos, precos, estoque, cadastros — validated (Fase 2)
+- TypeScript interfaces alinhadas com campos reais da API (18+ campos descobertos/corrigidos) — validated (Fase 2)
+- TAXAJURO parse dinâmico no Gateway (antes hardcoded-to-0) — validated (Fase 2)
+- 168 testes passando (22 de integração field-level) — validated (Fase 2)
 
 ### Active
 
 - [ ] Validacao e2e do core (auth, http, retry, pagination) contra sandbox real
-- [ ] Validacao e2e de cada resource contra sandbox real — CRUD completo
+- [ ] Validacao e2e de cada resource contra sandbox real — CRUD completo (write-path pendente)
 - [ ] Auditoria critica dos resources: metodos faltantes, tipagem, edge cases
 - [x] Cobertura de testes >= 90% em todo o SDK — Validated in Phase 1: Core Hardening
 - [ ] Documentacao completa (README, API reference, exemplos)
@@ -104,4 +108,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-06 after Phase 1 completion*
+*Last updated: 2026-04-06 after Phase 2 completion*
