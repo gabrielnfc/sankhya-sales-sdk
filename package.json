@@ -31,6 +31,8 @@
     "test:coverage": "vitest run --coverage",
     "lint": "biome check src/ tests/",
     "lint:fix": "biome check --write src/ tests/",
+    "test:integration": "vitest run --include='tests/integration/**'",
+    "test:smoke": "tsup && node tests/smoke/cjs.cjs && node tests/smoke/esm.mjs",
     "typecheck": "tsc --noEmit",
     "dev": "tsup --watch"
   },
