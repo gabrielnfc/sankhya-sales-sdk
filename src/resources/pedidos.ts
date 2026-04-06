@@ -1,6 +1,6 @@
 import { serialize } from '../core/gateway-serializer.js';
 import type { HttpClient } from '../core/http.js';
-import { extractRestData, normalizeRestPagination } from '../core/pagination.js';
+import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
 import type { PaginatedResult } from '../types/common.js';
 import type {
   CancelarPedidoInput,
@@ -40,6 +40,12 @@ export class PedidosResource {
     const raw = await this.http.restGet<Record<string, unknown>>('/vendas/pedidos', query);
     const { data, pagination } = extractRestData<PedidoVenda>(raw);
     return normalizeRestPagination(data, pagination);
+  }
+
+  consultarTodos(
+    params: Omit<ConsultarPedidosParams, 'page'>,
+  ): AsyncGenerator<PedidoVenda> {
+    return createPaginator((page) => this.consultar({ ...params, page }));
   }
 
   async criar(pedido: PedidoVendaInput): Promise<{ codigoPedido: number }> {

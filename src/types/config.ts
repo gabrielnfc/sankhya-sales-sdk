@@ -29,12 +29,8 @@ export interface Logger {
   error(message: string, ...args: unknown[]): void;
 }
 
-/** Per-request options for overriding client defaults */
 export interface RequestOptions {
-  /** Override default timeout for this request (ms) */
   timeout?: number;
-  /** External AbortSignal for cancellation */
   signal?: AbortSignal;
-  /** Idempotency key for mutation safety (forwarded as X-Idempotency-Key header) */
   idempotencyKey?: string;
 }

@@ -1,5 +1,5 @@
 import type { GatewayResponse } from '../types/common.js';
-import type { Logger } from '../types/config.js';
+import type { Logger, RequestOptions } from '../types/config.js';
 import type { AuthManager } from './auth.js';
 import { ApiError, GatewayError, TimeoutError } from './errors.js';
 
@@ -18,25 +18,30 @@ export class HttpClient {
     this.auth = auth;
   }
 
-  async restGet<T>(path: string, params?: Record<string, string>): Promise<T> {
+  async restGet<T>(
+    path: string,
+    params?: Record<string, string>,
+    options?: RequestOptions,
+  ): Promise<T> {
     const url = this.buildUrl(`/v1${path}`, params);
-    return this.requestWithRetry<T>(url, 'GET', path);
+    return this.requestWithRetry<T>(url, 'GET', path, undefined, false, options);
   }
 
-  async restPost<T>(path: string, body: unknown): Promise<T> {
+  async restPost<T>(path: string, body: unknown, options?: RequestOptions): Promise<T> {
     const url = this.buildUrl(`/v1${path}`);
-    return this.requestWithRetry<T>(url, 'POST', path, body);
+    return this.requestWithRetry<T>(url, 'POST', path, body, false, options);
   }
 
-  async restPut<T>(path: string, body: unknown): Promise<T> {
+  async restPut<T>(path: string, body: unknown, options?: RequestOptions): Promise<T> {
     const url = this.buildUrl(`/v1${path}`);
-    return this.requestWithRetry<T>(url, 'PUT', path, body);
+    return this.requestWithRetry<T>(url, 'PUT', path, body, false, options);
   }
 
   async gatewayCall<T>(
     modulo: string,
     serviceName: string,
     requestBody: Record<string, unknown>,
+    options?: RequestOptions,
   ): Promise<T> {
     const path = `/gateway/v1/${modulo}/service.sbr`;
     const url = this.buildUrl(path, {
@@ -46,9 +51,14 @@ export class HttpClient {
 
     this.logger.debug(`Gateway: ${serviceName}`);
 
-    const result = await this.requestWithRetry<GatewayResponse<T>>(url, 'POST', path, {
-      requestBody,
-    });
+    const result = await this.requestWithRetry<GatewayResponse<T>>(
+      url,
+      'POST',
+      path,
+      { requestBody },
+      false,
+      options,
+    );
 
     if (result.status === '0') {
       throw new GatewayError(
@@ -81,10 +91,17 @@ export class HttpClient {
     path: string,
     body?: unknown,
     isRetry = false,
+    options?: RequestOptions,
   ): Promise<T> {
     const token = await this.auth.getToken();
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+    const timeoutMs = options?.timeout ?? this.timeout;
+    const internalController = new AbortController();
+    const timeoutId = setTimeout(() => internalController.abort(), timeoutMs);
+
+    const signals: AbortSignal[] = [internalController.signal];
+    if (options?.signal) signals.push(options.signal);
+    const combinedSignal =
+      signals.length === 1 ? signals[0] : AbortSignal.any(signals);
 
     try {
       const headers: Record<string, string> = {
@@ -97,19 +114,23 @@ export class HttpClient {
         headers['Content-Type'] = 'application/json';
       }
 
+      if (options?.idempotencyKey) {
+        headers['X-Idempotency-Key'] = options.idempotencyKey;
+      }
+
       this.logger.debug(`${method} ${url}`);
 
       const response = await fetch(url, {
         method,
         headers,
         body: body !== undefined ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
+        signal: combinedSignal,
       });
 
       if (response.status === 401 && !isRetry) {
         this.logger.warn('Token expirado, renovando...');
         await this.auth.invalidateToken();
-        return this.requestWithRetry<T>(url, method, path, body, true);
+        return this.requestWithRetry<T>(url, method, path, body, true, options);
       }
 
       if (!response.ok) {
@@ -129,7 +150,7 @@ export class HttpClient {
         throw error;
       }
       if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new TimeoutError(`Request timeout após ${this.timeout}ms: ${method} ${path}`);
+        throw new TimeoutError(`Request timeout após ${timeoutMs}ms: ${method} ${path}`);
       }
       throw error;
     } finally {

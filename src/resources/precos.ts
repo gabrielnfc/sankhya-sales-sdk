@@ -1,5 +1,5 @@
 import type { HttpClient } from '../core/http.js';
-import { extractRestData, normalizeRestPagination } from '../core/pagination.js';
+import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
 import type { PaginatedResult } from '../types/common.js';
 import type {
   Preco,
@@ -37,6 +37,10 @@ export class PrecosResource {
     );
     const { data, pagination } = extractRestData<Preco>(raw);
     return normalizeRestPagination(data, pagination);
+  }
+
+  todosPorTabela(params: Omit<PrecosPorTabelaParams, 'pagina'>): AsyncGenerator<Preco> {
+    return createPaginator((page) => this.porTabela({ ...params, pagina: page }), 1);
   }
 
   async contextualizado(input: PrecoContextualizadoInput): Promise<Preco[]> {
