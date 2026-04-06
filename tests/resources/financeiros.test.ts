@@ -114,7 +114,10 @@ describe('FinanceirosResource', () => {
 
       const result = await fin.registrarReceita(dados);
 
-      expect(http.restPost).toHaveBeenCalledWith('/financeiros/receitas', dados);
+      expect(http.restPost).toHaveBeenCalledTimes(1);
+      const [path, body] = http.restPost.mock.calls[0];
+      expect(path).toBe('/financeiros/receitas');
+      expect(body).toEqual(dados);
       expect(result).toEqual({ id: 1 });
     });
   });
@@ -128,7 +131,10 @@ describe('FinanceirosResource', () => {
 
       const result = await fin.atualizarReceita(5, dados);
 
-      expect(http.restPut).toHaveBeenCalledWith('/financeiros/receitas/5', dados);
+      expect(http.restPut).toHaveBeenCalledTimes(1);
+      const [path, body] = http.restPut.mock.calls[0];
+      expect(path).toBe('/financeiros/receitas/5');
+      expect(body).toEqual(dados);
       expect(result).toEqual({ id: 5 });
     });
   });
@@ -142,7 +148,10 @@ describe('FinanceirosResource', () => {
 
       const result = await fin.baixarReceita(dados);
 
-      expect(http.restPost).toHaveBeenCalledWith('/financeiros/receitas/baixa', dados);
+      expect(http.restPost).toHaveBeenCalledTimes(1);
+      const [path, body] = http.restPost.mock.calls[0];
+      expect(path).toBe('/financeiros/receitas/baixa');
+      expect(body).toEqual(dados);
       expect(result).toEqual({ ok: true });
     });
   });
@@ -171,7 +180,10 @@ describe('FinanceirosResource', () => {
 
       await fin.registrarDespesa(dados);
 
-      expect(http.restPost).toHaveBeenCalledWith('/financeiros/despesas', dados);
+      expect(http.restPost).toHaveBeenCalledTimes(1);
+      const [path, body] = http.restPost.mock.calls[0];
+      expect(path).toBe('/financeiros/despesas');
+      expect(body).toEqual(dados);
     });
   });
 
@@ -183,7 +195,10 @@ describe('FinanceirosResource', () => {
 
       await fin.atualizarDespesa(7, { valor: 75 });
 
-      expect(http.restPut).toHaveBeenCalledWith('/financeiros/despesas/7', { valor: 75 });
+      expect(http.restPut).toHaveBeenCalledTimes(1);
+      const [path, body] = http.restPut.mock.calls[0];
+      expect(path).toBe('/financeiros/despesas/7');
+      expect(body).toEqual({ valor: 75 });
     });
   });
 
@@ -195,9 +210,10 @@ describe('FinanceirosResource', () => {
 
       await fin.baixarDespesa({ codigoFinanceiro: 3 });
 
-      expect(http.restPost).toHaveBeenCalledWith('/financeiros/despesas/baixa', {
-        codigoFinanceiro: 3,
-      });
+      expect(http.restPost).toHaveBeenCalledTimes(1);
+      const [path, body] = http.restPost.mock.calls[0];
+      expect(path).toBe('/financeiros/despesas/baixa');
+      expect(body).toEqual({ codigoFinanceiro: 3 });
     });
   });
 

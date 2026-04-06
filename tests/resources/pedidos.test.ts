@@ -103,7 +103,10 @@ describe('PedidosResource', () => {
 
       const result = await pedidos.criar(input);
 
-      expect(http.restPost).toHaveBeenCalledWith('/vendas/pedidos', input);
+      expect(http.restPost).toHaveBeenCalledTimes(1);
+      const [path, body] = http.restPost.mock.calls[0];
+      expect(path).toBe('/vendas/pedidos');
+      expect(body).toEqual(input);
       expect(result.codigoPedido).toBe(42);
     });
   });
@@ -117,7 +120,10 @@ describe('PedidosResource', () => {
 
       const result = await pedidos.atualizar(42, input);
 
-      expect(http.restPut).toHaveBeenCalledWith('/vendas/pedidos/42', input);
+      expect(http.restPut).toHaveBeenCalledTimes(1);
+      const [path, body] = http.restPut.mock.calls[0];
+      expect(path).toBe('/vendas/pedidos/42');
+      expect(body).toEqual(input);
       expect(result.codigoPedido).toBe(42);
     });
   });
@@ -130,9 +136,10 @@ describe('PedidosResource', () => {
 
       const result = await pedidos.cancelar({ codigoPedido: 42, motivo: 'teste' });
 
-      expect(http.restPost).toHaveBeenCalledWith('/vendas/pedidos/42/cancela', {
-        motivo: 'teste',
-      });
+      expect(http.restPost).toHaveBeenCalledTimes(1);
+      const [path, body] = http.restPost.mock.calls[0];
+      expect(path).toBe('/vendas/pedidos/42/cancela');
+      expect(body).toEqual({ motivo: 'teste' });
       expect(result.codigoPedido).toBe(42);
     });
   });
@@ -147,11 +154,11 @@ describe('PedidosResource', () => {
 
       await pedidos.confirmar({ codigoPedido: 123 });
 
-      expect(http.gatewayCall).toHaveBeenCalledWith(
-        'mgecom',
-        'ServicosNfeSP.confirmarNota',
-        { nota: { NUNOTA: { $: '123' } } },
-      );
+      expect(http.gatewayCall).toHaveBeenCalledTimes(1);
+      const [modulo, service, requestBody] = http.gatewayCall.mock.calls[0];
+      expect(modulo).toBe('mgecom');
+      expect(service).toBe('ServicosNfeSP.confirmarNota');
+      expect(requestBody).toEqual({ nota: { NUNOTA: { $: '123' } } });
     });
 
     it('includes COMPENSAR: { $: "S" } when compensarAutomaticamente=true', async () => {
@@ -212,19 +219,19 @@ describe('PedidosResource', () => {
         dataFaturamento: '2024-06-01',
       });
 
-      expect(http.gatewayCall).toHaveBeenCalledWith(
-        'mgecom',
-        'SelecaoDocumentoSP.faturar',
-        {
-          notas: {
-            codTipOper: 1,
-            dtFatur: '2024-06-01',
-            tipoFaturamento: 'FaturamentoNormal',
-            faturarTodosItens: true,
-            nota: { NUNOTA: { $: '99' } },
-          },
+      expect(http.gatewayCall).toHaveBeenCalledTimes(1);
+      const [modulo, service, requestBody] = http.gatewayCall.mock.calls[0];
+      expect(modulo).toBe('mgecom');
+      expect(service).toBe('SelecaoDocumentoSP.faturar');
+      expect(requestBody).toEqual({
+        notas: {
+          codTipOper: 1,
+          dtFatur: '2024-06-01',
+          tipoFaturamento: 'FaturamentoNormal',
+          faturarTodosItens: true,
+          nota: { NUNOTA: { $: '99' } },
         },
-      );
+      });
     });
 
     it('uses custom tipoFaturamento and faturarTodosItens when provided', async () => {
@@ -267,9 +274,11 @@ describe('PedidosResource', () => {
       });
 
       expect(result).toEqual({ codigoPedido: 42 });
-      expect(http.gatewayCall).toHaveBeenCalledWith(
-        'mgecom',
-        'CACSP.incluirNota',
+      expect(http.gatewayCall).toHaveBeenCalledTimes(1);
+      const [modulo, service, requestBody] = http.gatewayCall.mock.calls[0];
+      expect(modulo).toBe('mgecom');
+      expect(service).toBe('CACSP.incluirNota');
+      expect(requestBody).toEqual(
         expect.objectContaining({
           nota: expect.objectContaining({
             cabecalho: expect.objectContaining({
@@ -349,25 +358,25 @@ describe('PedidosResource', () => {
         { codigoProduto: 1, quantidade: 2, valorUnitario: 10, unidade: 'UN' },
       ]);
 
-      expect(http.gatewayCall).toHaveBeenCalledWith(
-        'mgecom',
-        'CACSP.incluirAlterarItemNota',
-        {
-          nota: {
-            NUNOTA: { $: '99' },
-            itens: {
-              item: [
-                {
-                  CODPROD: { $: '1' },
-                  QTDNEG: { $: '2' },
-                  VLRUNIT: { $: '10' },
-                  CODVOL: { $: 'UN' },
-                },
-              ],
-            },
+      expect(http.gatewayCall).toHaveBeenCalledTimes(1);
+      const [modulo, service, requestBody] = http.gatewayCall.mock.calls[0];
+      expect(modulo).toBe('mgecom');
+      expect(service).toBe('CACSP.incluirAlterarItemNota');
+      expect(requestBody).toEqual({
+        nota: {
+          NUNOTA: { $: '99' },
+          itens: {
+            item: [
+              {
+                CODPROD: { $: '1' },
+                QTDNEG: { $: '2' },
+                VLRUNIT: { $: '10' },
+                CODVOL: { $: 'UN' },
+              },
+            ],
           },
         },
-      );
+      });
     });
   });
 
@@ -379,16 +388,16 @@ describe('PedidosResource', () => {
 
       await pedidos.excluirItem(99, 3);
 
-      expect(http.gatewayCall).toHaveBeenCalledWith(
-        'mgecom',
-        'CACSP.excluirItemNota',
-        {
-          nota: {
-            NUNOTA: { $: '99' },
-            SEQUENCIA: { $: '3' },
-          },
+      expect(http.gatewayCall).toHaveBeenCalledTimes(1);
+      const [modulo, service, requestBody] = http.gatewayCall.mock.calls[0];
+      expect(modulo).toBe('mgecom');
+      expect(service).toBe('CACSP.excluirItemNota');
+      expect(requestBody).toEqual({
+        nota: {
+          NUNOTA: { $: '99' },
+          SEQUENCIA: { $: '3' },
         },
-      );
+      });
     });
   });
 });
