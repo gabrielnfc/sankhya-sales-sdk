@@ -215,6 +215,106 @@ describe('HttpClient', () => {
     });
   });
 
+  describe('RequestOptions', () => {
+    it('deve usar timeout customizado via options.timeout', async () => {
+      let capturedSignal: AbortSignal | undefined;
+      globalThis.fetch = vi.fn().mockImplementation(
+        (_url: string, init?: RequestInit) => {
+          capturedSignal = init?.signal ?? undefined;
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ data: 'ok' }),
+          });
+        },
+      );
+
+      const client = createHttpClient(undefined, 30000);
+      await client.restGet('/test', undefined, { timeout: 5000 });
+
+      expect(capturedSignal).toBeDefined();
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve lançar TimeoutError quando signal externo é abortado', async () => {
+      const externalController = new AbortController();
+
+      globalThis.fetch = vi.fn().mockImplementation(
+        (_url: string, init?: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              reject(new DOMException('The operation was aborted.', 'AbortError'));
+            });
+          }),
+      );
+
+      const client = createHttpClient(undefined, 60000);
+      const promise = client.restGet('/slow', undefined, { signal: externalController.signal });
+
+      externalController.abort();
+
+      await expect(promise).rejects.toThrow(TimeoutError);
+    });
+
+    it('deve adicionar X-Idempotency-Key header quando idempotencyKey fornecido', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: 'ok' }),
+      });
+
+      const client = createHttpClient();
+      await client.restPost('/pedidos', { nome: 'Teste' }, { idempotencyKey: 'key-123' });
+
+      const call = vi.mocked(globalThis.fetch).mock.calls[0];
+      expect(call[1]?.headers).toEqual(
+        expect.objectContaining({ 'X-Idempotency-Key': 'key-123' }),
+      );
+    });
+
+    it('deve usar timeout padrão quando options não fornecido', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: 'ok' }),
+      });
+
+      const client = createHttpClient(undefined, 30000);
+      await client.restGet('/test');
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('deve aceitar options em restPut', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: 'ok' }),
+      });
+
+      const client = createHttpClient();
+      await client.restPut('/pedidos/1', { nome: 'Atualizado' }, { idempotencyKey: 'put-key' });
+
+      const call = vi.mocked(globalThis.fetch).mock.calls[0];
+      expect(call[1]?.headers).toEqual(
+        expect.objectContaining({ 'X-Idempotency-Key': 'put-key' }),
+      );
+    });
+
+    it('deve aceitar options em gatewayCall', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            status: '1',
+            statusMessage: 'OK',
+            responseBody: { records: [] },
+          }),
+      });
+
+      const client = createHttpClient();
+      await client.gatewayCall('mge', 'CRUDServiceProvider.loadRecords', {}, { timeout: 5000 });
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('erros HTTP', () => {
     it('deve lançar ApiError para 500', async () => {
       globalThis.fetch = vi.fn().mockResolvedValue({

@@ -28,3 +28,9 @@ export interface Logger {
   warn(message: string, ...args: unknown[]): void;
   error(message: string, ...args: unknown[]): void;
 }
+
+export interface RequestOptions {
+  timeout?: number;
+  signal?: AbortSignal;
+  idempotencyKey?: string;
+}
