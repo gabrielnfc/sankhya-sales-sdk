@@ -60,7 +60,9 @@ Plans:
   5. No write operation retries on timeout without idempotency protection — duplicate entries do not appear in sandbox after a simulated timeout + retry
 **Plans**: 3 plans
 Plans:
-- [ ] TBD
+- [ ] 03-01-PLAN.md — Validate pedidos write-path and gateway CRUD against sandbox
+- [ ] 03-02-PLAN.md — Type financeiros write methods and validate financeiros + fiscal against sandbox
+- [ ] 03-03-PLAN.md — E2E B2B order flow integration test
 
 ### Phase 4: Public API Surface
 **Goal**: The public API exported from sankhya-sales-sdk is complete, consistent, and stable for v1.0.0 consumers
@@ -138,7 +140,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Core Hardening | 3/3 | Complete |  |
 | 2. Read-Path Resource Validation | 2/2 | Complete   | 2026-04-06 |
-| 3. Write-Path & E2E Validation | 0/TBD | Not started | - |
+| 3. Write-Path & E2E Validation | 0/3 | Planning complete | - |
 | 4. Public API Surface | 0/TBD | Not started | - |
 | 5. Test Coverage Hardening | 0/TBD | Not started | - |
 | 6. Documentation | 0/TBD | Not started | - |
