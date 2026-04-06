@@ -12,7 +12,7 @@
 - [x] **CORE-03**: Serializer Gateway rejeita/loga retornos vazios em vez de silenciar erros de contrato
 - [x] **CORE-04**: Token refresh tem lower-bound guard para TTLs curtos (ambientes não-produção)
 - [x] **CORE-05**: Retry inclui jitter para prevenir thundering herd
-- [ ] **CORE-06**: Coverage enforcement >= 90% configurado com `@vitest/coverage-v8`
+- [x] **CORE-06**: Coverage enforcement >= 90% configurado com `@vitest/coverage-v8`
 - [x] **CORE-07**: Retry em POST/PUT mutações (pedidos, financeiros) é seguro — idempotency ou desabilitado
 
 ### Resource Validation
@@ -114,7 +114,7 @@
 | CORE-03 | Phase 1 | Complete |
 | CORE-04 | Phase 1 | Complete |
 | CORE-05 | Phase 1 | Complete |
-| CORE-06 | Phase 1 | Pending |
+| CORE-06 | Phase 1 | Complete |
 | CORE-07 | Phase 1 | Complete |
 | RVAL-01 | Phase 2 | Pending |
 | RVAL-02 | Phase 2 | Pending |

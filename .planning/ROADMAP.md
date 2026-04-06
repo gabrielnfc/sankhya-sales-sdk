@@ -61,8 +61,8 @@ Plans:
   5. No write operation retries on timeout without idempotency protection — duplicate entries do not appear in sandbox after a simulated timeout + retry
 **Plans**: 3 plans
 Plans:
-- [ ] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
-- [ ] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
+- [x] 01-01-PLAN.md — Fix Gateway serializer bugs (TAXAJURO, DHALTER, empty response)
+- [x] 01-02-PLAN.md — Fix auth TTL guard, retry jitter, and method-aware retry
 - [ ] 01-03-PLAN.md — Install coverage provider and configure 90% thresholds
 
 ### Phase 4: Public API Surface
