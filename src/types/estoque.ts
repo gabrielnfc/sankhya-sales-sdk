@@ -8,6 +8,9 @@ export interface Estoque {
 
 export interface LocalEstoque {
   codigoLocal: number;
-  nome: string;
+  codigoLocalPai: number;
+  descricaoLocal: string;
+  grau: number;
+  analitico: boolean;
   ativo: boolean;
 }

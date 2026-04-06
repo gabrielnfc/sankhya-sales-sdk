@@ -28,7 +28,25 @@ export interface CentroResultado {
 
 export interface Empresa {
   codigoEmpresa: number;
-  nome: string;
+  nomeFantasia: string;
+  razaoSocial: string;
+  razaoAbreviada: string;
+  cnpjCpf: string;
+  inscricaoEstadual: string;
+  inscricaoMunicipal: string;
+  telefone: string;
+  email: string;
+  homepage: string;
+  codigoLogradouro: number;
+  nomeLogradouro: string;
+  numero: string;
+  complemento: string;
+  codigoBairro: number;
+  nomeBairro: string;
+  codigoCidade: number;
+  nomeCidade: string;
+  cep: string;
+  codigoEmpresaMatriz: number | null;
 }
 
 export interface Usuario {
