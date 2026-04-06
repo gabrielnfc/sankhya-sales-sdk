@@ -1,6 +1,6 @@
 import { deserializeRows } from '../core/gateway-serializer.js';
 import type { HttpClient } from '../core/http.js';
-import { extractRestData, normalizeRestPagination } from '../core/pagination.js';
+import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
 import type {
   CentroResultado,
   Empresa,
@@ -94,6 +94,30 @@ export class CadastrosResource {
     const raw = await this.http.restGet<Record<string, unknown>>('/usuarios');
     const { data } = extractRestData<Usuario>(raw);
     return data;
+  }
+
+  // --- Iteradores ---
+
+  listarTodosTiposOperacao(
+    params?: Omit<{ page?: number; tipoMovimento?: number }, 'page'>,
+  ): AsyncGenerator<TipoOperacao> {
+    return createPaginator((page) => this.listarTiposOperacao({ ...params, page }));
+  }
+
+  listarTodasNaturezas(): AsyncGenerator<Natureza> {
+    return createPaginator((page) => this.listarNaturezas({ page }));
+  }
+
+  listarTodosProjetos(): AsyncGenerator<Projeto> {
+    return createPaginator((page) => this.listarProjetos({ page }));
+  }
+
+  listarTodosCentrosResultado(): AsyncGenerator<CentroResultado> {
+    return createPaginator((page) => this.listarCentrosResultado({ page }));
+  }
+
+  listarTodasEmpresas(): AsyncGenerator<Empresa> {
+    return createPaginator((page) => this.listarEmpresas({ page }));
   }
 
   // --- Gateway: Tipos de Negociação ---

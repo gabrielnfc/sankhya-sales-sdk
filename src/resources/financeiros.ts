@@ -120,4 +120,18 @@ export class FinanceirosResource {
   listarTodasReceitas(filtro?: Omit<ReceitasFiltro, 'page'>): AsyncGenerator<Receita> {
     return createPaginator((page) => this.listarReceitas({ ...filtro, page }));
   }
+
+  listarTodosTiposPagamento(
+    params?: Omit<{ page?: number; subTipoPagamento?: number }, 'page'>,
+  ): AsyncGenerator<TipoPagamento> {
+    return createPaginator((page) => this.listarTiposPagamento({ ...params, page }));
+  }
+
+  listarTodasDespesas(): AsyncGenerator<Receita> {
+    return createPaginator((page) => this.listarDespesas({ page }));
+  }
+
+  listarTodasMoedas(): AsyncGenerator<Moeda> {
+    return createPaginator((page) => this.listarMoedas({ page }));
+  }
 }
