@@ -42,10 +42,10 @@
 ### Testing
 
 - [x] **TEST-01**: Testes unitários cobrindo >= 90% de todo o código fonte
-- [ ] **TEST-02**: Testes de integração para cada resource contra sandbox real
-- [ ] **TEST-03**: Teste e2e do fluxo completo de pedido B2B contra sandbox real
-- [ ] **TEST-04**: Smoke test CJS — `require('sankhya-sales-sdk')` funciona e `instanceof` preservado
-- [ ] **TEST-05**: Smoke test ESM — `import { SankhyaClient } from 'sankhya-sales-sdk'` funciona
+- [x] **TEST-02**: Testes de integração para cada resource contra sandbox real
+- [x] **TEST-03**: Teste e2e do fluxo completo de pedido B2B contra sandbox real
+- [x] **TEST-04**: Smoke test CJS — `require('sankhya-sales-sdk')` funciona e `instanceof` preservado
+- [x] **TEST-05**: Smoke test ESM — `import { SankhyaClient } from 'sankhya-sales-sdk'` funciona
 - [x] **TEST-06**: Testes de edge cases documentados (TAXAJURO vazio, campo extra, paginação string, TipoPessoa F/J)
 
 ### Documentation
@@ -135,10 +135,10 @@
 | APIS-05 | Phase 4 | Pending |
 | APIS-06 | Phase 4 | Complete |
 | TEST-01 | Phase 5 | Complete |
-| TEST-02 | Phase 5 | Pending |
-| TEST-03 | Phase 5 | Pending |
-| TEST-04 | Phase 5 | Pending |
-| TEST-05 | Phase 5 | Pending |
+| TEST-02 | Phase 5 | Complete |
+| TEST-03 | Phase 5 | Complete |
+| TEST-04 | Phase 5 | Complete |
+| TEST-05 | Phase 5 | Complete |
 | TEST-06 | Phase 5 | Complete |
 | DOCS-01 | Phase 6 | Pending |
 | DOCS-02 | Phase 6 | Pending |
