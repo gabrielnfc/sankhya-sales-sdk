@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
 
 const config = {
@@ -24,10 +24,9 @@ describe.skipIf(!has)('Fiscal Write — Sandbox Validation', { timeout: 60_000 }
     await sankhya.authenticate();
 
     // Discover valid sandbox values
-    const [produtos, clientes, modelos] = await Promise.all([
+    const [produtos, clientes] = await Promise.all([
       sankhya.produtos.listar(),
       sankhya.clientes.listar({ page: 0 }),
-      sankhya.cadastros.listarModelosNota(),
     ]);
 
     expect(produtos.data.length).toBeGreaterThan(0);
@@ -37,13 +36,18 @@ describe.skipIf(!has)('Fiscal Write — Sandbox Validation', { timeout: 60_000 }
     valorUnitario = produtos.data[0].precoVenda ?? 10.0;
     codigoCliente = Number(clientes.data[0].codigoCliente);
 
-    // ModelosNota may return empty array in some sandbox configurations
-    if (modelos.length > 0) {
-      notaModelo = modelos[0].codigoModeloNota;
-    } else {
-      // Fallback to common model (NF-e = 55)
+    // ModelosNota may throw NPE in some sandbox configurations
+    try {
+      const modelos = await sankhya.cadastros.listarModelosNota();
+      if (modelos.length > 0) {
+        notaModelo = modelos[0].codigoModeloNota;
+      } else {
+        notaModelo = 55;
+        console.log('No modelos de nota found in sandbox, using fallback notaModelo=55');
+      }
+    } catch {
       notaModelo = 55;
-      console.log('No modelos de nota found in sandbox, using fallback notaModelo=55');
+      console.log('listarModelosNota() failed in sandbox, using fallback notaModelo=55');
     }
   });
 
