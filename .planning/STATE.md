@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-04-06T19:54:51.332Z"
+status: verifying
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-04-06T20:00:57.014Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 8
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 1
+  completed_phases: 4
+  total_plans: 11
+  completed_plans: 11
   percent: 0
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-06)
 
 Phase: 04 (public-api-surface) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-06
 
 Progress: [░░░░░░░░░░] 0%
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03 P01 | 2min | 2 tasks | 2 files |
 | Phase 03 P03 | 2min | 2 tasks | 1 files |
 | Phase 04 P02 | 4m52s | 2 tasks | 7 files |
+| Phase 04 P03 | 3m30s | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,7 @@ Recent decisions affecting current work:
 - [Phase 03]: E2E B2B flow uses parallel sandbox discovery and graceful GatewayError handling for fiscal limitations
 - [Phase 04]: AbortSignal.any combines internal timeout with external signal (Node 20+ native)
 - [Phase 04]: Per-call timeout uses options.timeout ?? this.timeout fallback pattern
+- [Phase 04]: RequestOptions with idempotencyKey threaded to all 14 mutation methods in pedidos and financeiros
 
 ### Pending Todos
 
@@ -98,6 +100,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T19:54:51.327Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-04-06T20:00:57.008Z
+Stopped at: Completed 04-03-PLAN.md
 Resume file: None

@@ -35,7 +35,7 @@
 - [ ] **APIS-01**: Type guard helpers exportados: `isSankhyaError()`, `isAuthError()`, `isApiError()`, `isGatewayError()`, `isTimeoutError()`
 - [ ] **APIS-02**: Union type `SankhyaErrorCode` exportado com todos os códigos de erro possíveis
 - [x] **APIS-03**: `listarTodos()` AsyncGenerator disponível em todos os resources com listagem paginada
-- [ ] **APIS-04**: Mutations em `pedidos` e `financeiros` aceitam `idempotencyKey` opcional para prevenir duplicações
+- [x] **APIS-04**: Mutations em `pedidos` e `financeiros` aceitam `idempotencyKey` opcional para prevenir duplicações
 - [ ] **APIS-05**: Exports públicos auditados — utilitários internos marcados como `@internal` e não expostos na API pública
 - [x] **APIS-06**: Per-call timeout override disponível via `RequestOptions` opcional em cada método
 
@@ -131,7 +131,7 @@
 | APIS-01 | Phase 4 | Pending |
 | APIS-02 | Phase 4 | Pending |
 | APIS-03 | Phase 4 | Complete |
-| APIS-04 | Phase 4 | Pending |
+| APIS-04 | Phase 4 | Complete |
 | APIS-05 | Phase 4 | Pending |
 | APIS-06 | Phase 4 | Complete |
 | TEST-01 | Phase 5 | Pending |

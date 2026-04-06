@@ -76,9 +76,9 @@ Plans:
   5. Internal utilities (`withRetry`, `createPaginator`, `deserializeRows`) are marked `@internal` and excluded from the public type surface; per-call timeout override works via `RequestOptions`
 **Plans**: 3 plans
 Plans:
-- [ ] 04-01-PLAN.md -- Type guards, SankhyaErrorCode union, RequestOptions interface, export audit
-- [ ] 04-02-PLAN.md -- listarTodos() gap fill on all resources + per-call timeout in HttpClient
-- [ ] 04-03-PLAN.md -- Idempotency key support for pedidos and financeiros mutations
+- [x] 04-01-PLAN.md -- Type guards, SankhyaErrorCode union, RequestOptions interface, export audit
+- [x] 04-02-PLAN.md -- listarTodos() gap fill on all resources + per-call timeout in HttpClient
+- [x] 04-03-PLAN.md -- Idempotency key support for pedidos and financeiros mutations
 
 ### Phase 5: Test Coverage Hardening
 **Goal**: The entire codebase is covered by >= 90% unit tests plus integration tests for every resource and a verified CJS/ESM dual-format build
