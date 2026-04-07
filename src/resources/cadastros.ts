@@ -332,7 +332,9 @@ export class CadastrosResource {
       codigoTipoNegociacao: safeParseNumber(row.CODTIPVENDA, 'CODTIPVENDA'),
       codigoEmpresa: safeParseNumber(row.CODEMP, 'CODEMP'),
       codigoNatureza: row.CODNAT ? safeParseNumber(row.CODNAT, 'CODNAT') : undefined,
-      codigoCentroResultado: row.CODCENCUS ? safeParseNumber(row.CODCENCUS, 'CODCENCUS') : undefined,
+      codigoCentroResultado: row.CODCENCUS
+        ? safeParseNumber(row.CODCENCUS, 'CODCENCUS')
+        : undefined,
     }));
   }
 }

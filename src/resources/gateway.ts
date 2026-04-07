@@ -4,6 +4,7 @@ import type { HttpClient } from '../core/http.js';
 import type { LoadRecordParams, LoadRecordsParams, SaveRecordParams } from '../types/gateway.js';
 
 const VALID_FIELD_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const BLOCKED_FIELD_NAMES = new Set(['__proto__', 'constructor', 'prototype']);
 
 /**
  * Acesso direto ao Gateway Sankhya para operacoes genericas (CRUD).
@@ -68,7 +69,7 @@ export class GatewayResource {
    */
   async loadRecord(params: LoadRecordParams): Promise<Record<string, string> | null> {
     for (const key of Object.keys(params.primaryKey)) {
-      if (!VALID_FIELD_NAME.test(key)) {
+      if (!VALID_FIELD_NAME.test(key) || BLOCKED_FIELD_NAMES.has(key)) {
         throw new SankhyaError(
           `Nome de campo invalido na primaryKey: '${key}'. Apenas letras, numeros e underscore sao permitidos.`,
           'VALIDATION_ERROR',
