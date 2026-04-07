@@ -8,7 +8,6 @@ jobs:
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    if: ${{ secrets.SANKHYA_BASE_URL != '' }}
     env:
       SANKHYA_BASE_URL: ${{ secrets.SANKHYA_BASE_URL }}
       SANKHYA_CLIENT_ID: ${{ secrets.SANKHYA_CLIENT_ID }}
@@ -21,4 +20,9 @@ jobs:
           node-version: 20
           cache: 'npm'
       - run: npm ci
-      - run: npm run test:integration
+      - name: Run integration tests
+        if: ${{ env.SANKHYA_BASE_URL != '' }}
+        run: npm run test:integration
+      - name: Skip notice
+        if: ${{ env.SANKHYA_BASE_URL == '' }}
+        run: echo "Skipping integration tests — SANKHYA secrets not configured"
