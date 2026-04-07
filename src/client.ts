@@ -34,7 +34,6 @@ import type { Logger, SankhyaConfig } from './types/config.js';
  * ```
  */
 export class SankhyaClient {
-  private readonly config: SankhyaConfig;
   private readonly logger: Logger;
   private readonly auth: AuthManager;
   private readonly http: HttpClient;
@@ -58,7 +57,6 @@ export class SankhyaClient {
    */
   constructor(config: SankhyaConfig) {
     this.validateConfig(config);
-    this.config = config;
     this.logger = createLogger(config.logger);
     this.auth = new AuthManager(
       config.baseUrl,
@@ -163,21 +161,6 @@ export class SankhyaClient {
   /** @internal */
   getHttpClient(): HttpClient {
     return this.http;
-  }
-
-  /** @internal */
-  getAuthManager(): AuthManager {
-    return this.auth;
-  }
-
-  /** @internal */
-  getLogger(): Logger {
-    return this.logger;
-  }
-
-  /** @internal */
-  getConfig(): SankhyaConfig {
-    return this.config;
   }
 
   private validateConfig(config: SankhyaConfig): void {

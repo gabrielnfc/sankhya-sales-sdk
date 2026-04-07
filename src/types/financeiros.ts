@@ -259,3 +259,12 @@ export interface RegistrarFinanceiroResponse {
   /** Codigo do titulo financeiro. */
   codigoFinanceiro: number;
 }
+
+/** Resultado de uma operacao de baixa (pagamento) de titulo financeiro. */
+export interface BaixaResult {
+  /** Indica se a baixa foi realizada com sucesso. */
+  sucesso: boolean;
+}
+
+/** Representa um titulo financeiro a pagar (despesa). Mesma estrutura de Receita. */
+export type Despesa = Receita;

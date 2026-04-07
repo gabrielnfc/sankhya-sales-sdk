@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
-import { AuthManager } from '../../src/core/auth.js';
 import { HttpClient } from '../../src/core/http.js';
 import { CadastrosResource } from '../../src/resources/cadastros.js';
 import { ClientesResource } from '../../src/resources/clientes.js';
@@ -108,29 +107,6 @@ describe('SankhyaClient', () => {
     it('getHttpClient() returns HttpClient instance', () => {
       const client = new SankhyaClient(validConfig);
       expect(client.getHttpClient()).toBeInstanceOf(HttpClient);
-    });
-
-    it('getAuthManager() returns AuthManager instance', () => {
-      const client = new SankhyaClient(validConfig);
-      expect(client.getAuthManager()).toBeInstanceOf(AuthManager);
-    });
-
-    it('getLogger() returns Logger with debug/info/warn/error methods', () => {
-      const client = new SankhyaClient(validConfig);
-      const logger = client.getLogger();
-      expect(typeof logger.debug).toBe('function');
-      expect(typeof logger.info).toBe('function');
-      expect(typeof logger.warn).toBe('function');
-      expect(typeof logger.error).toBe('function');
-    });
-
-    it('getConfig() returns the config object', () => {
-      const client = new SankhyaClient(validConfig);
-      const config = client.getConfig();
-      expect(config.baseUrl).toBe('https://api.test.com');
-      expect(config.clientId).toBe('test-id');
-      expect(config.clientSecret).toBe('test-secret');
-      expect(config.xToken).toBe('test-token');
     });
   });
 

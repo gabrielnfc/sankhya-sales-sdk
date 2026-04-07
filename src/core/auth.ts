@@ -94,6 +94,9 @@ export class AuthManager {
       client_secret: this.clientSecret,
     });
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
     let response: Response;
     try {
       response = await fetch(url, {
@@ -103,12 +106,18 @@ export class AuthManager {
           'X-Token': this.xToken,
         },
         body: body.toString(),
+        signal: controller.signal,
       });
     } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new AuthError('Timeout na autenticacao apos 30s');
+      }
       throw new AuthError(
-        `Falha na conexão com servidor de autenticação: ${error instanceof Error ? error.message : String(error)}`,
+        `Falha na conexao com servidor de autenticacao: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');

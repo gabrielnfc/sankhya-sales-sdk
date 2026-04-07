@@ -1,5 +1,9 @@
 import type { HttpClient } from '../core/http.js';
-import type { CalculoImpostoInput, ResultadoCalculoImposto } from '../types/fiscal.js';
+import type {
+  CalculoImpostoInput,
+  ImportNfseResult,
+  ResultadoCalculoImposto,
+} from '../types/fiscal.js';
 
 /** Operacoes fiscais no Sankhya ERP (impostos, NFS-e). Acesse via `sankhya.fiscal`. */
 export class FiscalResource {
@@ -35,7 +39,7 @@ export class FiscalResource {
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  async importarNfse(dados: Record<string, unknown>): Promise<unknown> {
+  async importarNfse(dados: Record<string, unknown>): Promise<ImportNfseResult> {
     return this.http.restPost('/fiscal/servicos-tomados/nfse', dados);
   }
 }

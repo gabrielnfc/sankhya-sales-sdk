@@ -83,3 +83,9 @@ export interface ResultadoCalculoImposto {
   /** Lista de impostos calculados. */
   impostos: ImpostoCalculado[];
 }
+
+/** Resultado da importacao de NFS-e. */
+export interface ImportNfseResult {
+  /** Numero da nota de servico importada. */
+  numeroNota?: number;
+}

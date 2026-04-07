@@ -142,7 +142,18 @@ export class HttpClient {
 
       if (response.status === 401 && !isRetry) {
         this.logger.warn('Token expirado, renovando...');
+        const failedToken = token;
         await this.auth.invalidateToken();
+        const newToken = await this.auth.getToken();
+        if (newToken === failedToken) {
+          throw new ApiError(
+            'API error: HTTP 401 — token refresh retornou o mesmo token',
+            path,
+            method,
+            401,
+            '',
+          );
+        }
         return this.requestWithRetry<T>(url, method, path, body, true, options);
       }
 

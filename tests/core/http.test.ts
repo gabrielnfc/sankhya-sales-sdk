@@ -156,6 +156,11 @@ describe('HttpClient', () => {
   describe('401 retry', () => {
     it('deve invalidar token e retentar em 401', async () => {
       const auth = createMockAuth();
+      // Return different token after invalidation to pass same-token check
+      auth.getToken = vi.fn()
+        .mockResolvedValueOnce('test-token')
+        .mockResolvedValueOnce('new-token')
+        .mockResolvedValueOnce('new-token');
       let callCount = 0;
 
       globalThis.fetch = vi.fn().mockImplementation(() => {
@@ -182,7 +187,7 @@ describe('HttpClient', () => {
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     });
 
-    it('deve lançar ApiError se retry também falha com 401', async () => {
+    it('deve lançar ApiError se token refresh retorna mesmo token', async () => {
       const auth = createMockAuth();
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,
@@ -194,7 +199,9 @@ describe('HttpClient', () => {
       const client = createHttpClient(auth);
 
       await expect(client.restGet('/test')).rejects.toThrow(ApiError);
-      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+      await expect(client.restGet('/test')).rejects.toThrow(
+        'token refresh retornou o mesmo token',
+      );
     });
   });
 

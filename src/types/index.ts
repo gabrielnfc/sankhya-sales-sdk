@@ -76,6 +76,8 @@ export type {
 export { SubTipoPagamento, StatusFinanceiro, TipoFinanceiro } from './financeiros.js';
 export type {
   Receita,
+  Despesa,
+  BaixaResult,
   TipoPagamento,
   Moeda,
   ContaBancaria,
@@ -108,6 +110,7 @@ export type {
   ResultadoCalculoImposto,
   ImpostoCalculado,
   TipoImposto,
+  ImportNfseResult,
 } from './fiscal.js';
 
 export type {

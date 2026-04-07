@@ -5,9 +5,11 @@ import type { RequestOptions } from '../types/config.js';
 import type {
   AtualizarDespesaInput,
   AtualizarReceitaInput,
+  BaixaResult,
   BaixarDespesaInput,
   BaixarReceitaInput,
   ContaBancaria,
+  Despesa,
   Moeda,
   Receita,
   ReceitasFiltro,
@@ -136,7 +138,7 @@ export class FinanceirosResource {
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  async baixarReceita(dados: BaixarReceitaInput, options?: RequestOptions): Promise<unknown> {
+  async baixarReceita(dados: BaixarReceitaInput, options?: RequestOptions): Promise<BaixaResult> {
     return this.http.restPost('/financeiros/receitas/baixa', dados, options);
   }
 
@@ -150,10 +152,10 @@ export class FinanceirosResource {
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  async listarDespesas(params?: { page?: number }): Promise<PaginatedResult<Receita>> {
+  async listarDespesas(params?: { page?: number }): Promise<PaginatedResult<Despesa>> {
     const query: Record<string, string> = { page: String(params?.page ?? 0) };
     const raw = await this.http.restGet<Record<string, unknown>>('/financeiros/despesas', query);
-    const { data, pagination } = extractRestData<Receita>(raw);
+    const { data, pagination } = extractRestData<Despesa>(raw);
     return normalizeRestPagination(data, pagination);
   }
 
@@ -200,7 +202,7 @@ export class FinanceirosResource {
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  async baixarDespesa(dados: BaixarDespesaInput, options?: RequestOptions): Promise<unknown> {
+  async baixarDespesa(dados: BaixarDespesaInput, options?: RequestOptions): Promise<BaixaResult> {
     return this.http.restPost('/financeiros/despesas/baixa', dados, options);
   }
 
@@ -295,7 +297,7 @@ export class FinanceirosResource {
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  listarTodasDespesas(): AsyncGenerator<Receita> {
+  listarTodasDespesas(): AsyncGenerator<Despesa> {
     return createPaginator((page) => this.listarDespesas({ page }));
   }
 
