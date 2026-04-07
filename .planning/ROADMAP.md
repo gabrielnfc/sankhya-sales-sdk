@@ -110,7 +110,7 @@ Plans:
   6. CHANGELOG.md exists with a v0.1.0 entry and a v1.0.0-preview entry following Keep a Changelog format
 **Plans**: 3 plans
 Plans:
-- [ ] 06-01-PLAN.md — TypeDoc setup and CHANGELOG.md
+- [x] 06-01-PLAN.md — TypeDoc setup and CHANGELOG.md
 - [ ] 06-02-PLAN.md — TSDoc annotations on all public exports
 - [ ] 06-03-PLAN.md — README polish, error guide update, examples directory
 
