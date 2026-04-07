@@ -181,8 +181,95 @@ error.tsErrorCode  // string? — código de erro do Sankhya
 error.tsErrorLevel // string? — 'ERROR', 'WARNING'
 ```
 
+## Type Guards
+
+O SDK exporta type guards para cada classe de erro. Use em blocos `catch` para narrowing seguro:
+
+```typescript
+import {
+  isSankhyaError,
+  isAuthError,
+  isApiError,
+  isGatewayError,
+  isTimeoutError,
+} from 'sankhya-sales-sdk';
+```
+
+### Tratamento completo com type guards
+
+```typescript
+try {
+  const pedido = await sankhya.pedidos.criar({
+    notaModelo: 1,
+    data: '01/04/2026',
+    hora: '10:00:00',
+    codigoCliente: 123,
+    codigoVendedor: 10,
+    valorTotal: 255.00,
+    itens: [
+      { codigoProduto: 1001, quantidade: 10, valorUnitario: 25.50, unidade: 'UN' },
+    ],
+    financeiros: [
+      { codigoTipoPagamento: 1, valor: 255.00, dataVencimento: '01/05/2026', numeroParcela: 1 },
+    ],
+  });
+} catch (error) {
+  if (isAuthError(error)) {
+    // Credenciais invalidas ou token expirado
+    // error.code === 'AUTH_ERROR'
+    // error.statusCode pode ser 401 ou undefined
+    console.error('Falha na autenticacao:', error.message);
+  } else if (isTimeoutError(error)) {
+    // Timeout na requisicao (AbortController)
+    // error.code === 'TIMEOUT_ERROR'
+    console.error('Timeout:', error.message);
+  } else if (isGatewayError(error)) {
+    // Erro de negocio Sankhya (HTTP 200, mas erro no body)
+    // error.serviceName, error.tsErrorCode e error.tsErrorLevel disponiveis
+    console.error(`Erro Sankhya [${error.tsErrorCode}]: ${error.message}`);
+  } else if (isApiError(error)) {
+    // Erro HTTP (4xx/5xx)
+    // error.statusCode (number), error.endpoint (string), error.method (string)
+    console.error(`HTTP ${error.statusCode} em ${error.method} ${error.endpoint}`);
+  } else if (isSankhyaError(error)) {
+    // Qualquer outro erro do SDK
+    console.error(`Erro SDK [${error.code}]: ${error.message}`);
+  } else {
+    throw error; // Erro desconhecido, propagar
+  }
+}
+```
+
+### Switch com SankhyaErrorCode
+
+Para tratamento exaustivo baseado no codigo de erro:
+
+```typescript
+import type { SankhyaErrorCode } from 'sankhya-sales-sdk';
+
+function handleError(code: SankhyaErrorCode) {
+  switch (code) {
+    case 'AUTH_ERROR':
+      // renovar credenciais
+      break;
+    case 'API_ERROR':
+      // verificar endpoint e status
+      break;
+    case 'GATEWAY_ERROR':
+      // erro de regra de negocio Sankhya
+      break;
+    case 'TIMEOUT_ERROR':
+      // retry ou aumentar timeout
+      break;
+    default:
+      // exhaustive check
+      const _exhaustive: never = code;
+  }
+}
+```
+
 ## Links
 
 - [Tipos: SankhyaError, AuthError, ApiError, GatewayError, TimeoutError](../api-reference/tipos.md#errors)
-- [Início Rápido](./inicio-rapido.md)
+- [Inicio Rapido](./inicio-rapido.md)
 - [Pedidos](../api-reference/pedidos.md)
