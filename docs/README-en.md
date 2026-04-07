@@ -3,9 +3,14 @@
 [![npm version](https://img.shields.io/npm/v/sankhya-sales-sdk.svg)](https://www.npmjs.com/package/sankhya-sales-sdk)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-TypeScript SDK for **Sankhya ERP commercial APIs**. Full type safety, zero dependencies, normalized pagination, and automatic authentication management.
+TypeScript SDK for integration with the **Sankhya ERP commercial APIs**. Full type safety, zero dependencies, normalized pagination, and automatic authentication management.
 
-> **[Versao em portugues](./README.md)**
+> **[Versao em Portugues](../README.md)**
+
+## Prerequisites
+
+- Node.js >= 20
+- Sankhya OAuth 2.0 credentials (Client ID, Client Secret, X-Token)
 
 ## Scope
 
@@ -19,13 +24,22 @@ npm install sankhya-sales-sdk
 
 ## Quick Start
 
-### Setup
+### Environment variables
+
+```bash
+export SANKHYA_BASE_URL=https://api.sankhya.com.br
+export SANKHYA_CLIENT_ID=your-client-id
+export SANKHYA_CLIENT_SECRET=your-client-secret
+export SANKHYA_X_TOKEN=your-x-token
+```
+
+### Configuration
 
 ```typescript
 import { SankhyaClient } from 'sankhya-sales-sdk';
 
 const sankhya = new SankhyaClient({
-  baseUrl: 'https://api.sankhya.com.br',
+  baseUrl: process.env.SANKHYA_BASE_URL!,
   clientId: process.env.SANKHYA_CLIENT_ID!,
   clientSecret: process.env.SANKHYA_CLIENT_SECRET!,
   xToken: process.env.SANKHYA_X_TOKEN!,
@@ -45,7 +59,7 @@ for (const product of products.data) {
 ### Contextualized pricing + create order
 
 ```typescript
-// Get real price with business rules applied
+// Get the real price with business rules applied
 const prices = await sankhya.precos.contextualizado({
   codigoEmpresa: 1,
   codigoCliente: 123,
@@ -79,28 +93,77 @@ await sankhya.pedidos.confirmar({ codigoPedido });
 
 | Module | Methods | Description | Docs |
 |--------|---------|-------------|------|
-| `sankhya.clientes` | 5 | Customers and contacts | [clientes](./docs/api-reference/clientes.md) |
-| `sankhya.vendedores` | 2 | Sales representatives | [vendedores](./docs/api-reference/vendedores.md) |
-| `sankhya.produtos` | 9 | Product catalog, components, volumes, groups | [produtos](./docs/api-reference/produtos.md) |
-| `sankhya.precos` | 4 | Price tables and contextualized pricing | [precos](./docs/api-reference/precos.md) |
-| `sankhya.estoque` | 5 | Inventory and storage locations | [estoque](./docs/api-reference/estoque.md) |
-| `sankhya.pedidos` | 9 | Create, query, confirm, invoice orders | [pedidos](./docs/api-reference/pedidos.md) |
-| `sankhya.financeiros` | 13 | Revenue, expenses, payment types | [financeiros](./docs/api-reference/financeiros.md) |
-| `sankhya.cadastros` | 11 | Operations, natures, companies, negotiation types | [cadastros](./docs/api-reference/cadastros.md) |
-| `sankhya.fiscal` | 2 | Tax calculation, NFS-e import | [fiscal](./docs/api-reference/fiscal.md) |
-| `sankhya.gateway` | 3 | Generic CRUD (any entity) | [gateway](./docs/api-reference/gateway-crud.md) |
+| `sankhya.clientes` | 5 | Customers and contacts | [clientes](./api-reference/clientes.md) |
+| `sankhya.vendedores` | 2 | Sales representatives | [vendedores](./api-reference/vendedores.md) |
+| `sankhya.produtos` | 9 | Product catalog, components, volumes, groups | [produtos](./api-reference/produtos.md) |
+| `sankhya.precos` | 4 | Price tables and contextualized pricing | [precos](./api-reference/precos.md) |
+| `sankhya.estoque` | 5 | Inventory and storage locations | [estoque](./api-reference/estoque.md) |
+| `sankhya.pedidos` | 9 | Create, query, confirm, invoice orders | [pedidos](./api-reference/pedidos.md) |
+| `sankhya.financeiros` | 13 | Revenue, expenses, payment types | [financeiros](./api-reference/financeiros.md) |
+| `sankhya.cadastros` | 11 | Operations, natures, companies, negotiation types | [cadastros](./api-reference/cadastros.md) |
+| `sankhya.fiscal` | 2 | Tax calculation, NFS-e import | [fiscal](./api-reference/fiscal.md) |
+| `sankhya.gateway` | 3 | Generic CRUD (any entity) | [gateway](./api-reference/gateway-crud.md) |
 
 ## Features
 
-- **Zero dependencies** — native `fetch` only (Node 20+)
-- **Full type safety** — all inputs/outputs with strict TypeScript types
-- **Normalized pagination** — consistent interface across 3 API pagination patterns
-- **Automatic auth** — token cache, auto-refresh, mutex
-- **Injectable token cache** — in-memory (default) or Redis/custom
-- **Typed errors** — `AuthError`, `ApiError`, `GatewayError`, `TimeoutError`
-- **Gateway HTTP 200 errors** — automatically detected
-- **Retry with backoff** — for transient errors (429, 5xx)
-- **AsyncGenerator** — automatic pagination with `for await...of`
+- **Zero dependencies** -- native `fetch` only (Node 20+)
+- **Full type safety** -- all inputs/outputs with strict TypeScript types
+- **Normalized pagination** -- consistent interface across 3 API pagination patterns
+- **Automatic auth** -- token cache, auto-refresh, mutex
+- **Injectable token cache** -- in-memory (default) or Redis/custom
+- **Typed errors** -- `AuthError`, `ApiError`, `GatewayError`, `TimeoutError`
+- **Gateway HTTP 200 errors** -- automatically detected
+- **Retry with backoff** -- for transient errors (429, 5xx)
+- **AsyncGenerator** -- automatic pagination with `for await...of`
+
+## Error Handling
+
+The SDK exports type guards to identify each error type:
+
+```typescript
+import { isApiError, isGatewayError, isAuthError, isTimeoutError } from 'sankhya-sales-sdk';
+
+try {
+  await sankhya.pedidos.criar({ /* ... */ });
+} catch (error) {
+  if (isAuthError(error)) {
+    // Invalid credentials or expired token
+    console.error('Authentication failure:', error.message);
+  } else if (isGatewayError(error)) {
+    // Sankhya business error (HTTP 200, but error in body)
+    console.error(`Sankhya error [${error.tsErrorCode}]: ${error.message}`);
+  } else if (isApiError(error)) {
+    // HTTP error (4xx/5xx)
+    console.error(`HTTP ${error.statusCode} at ${error.method} ${error.endpoint}`);
+  } else if (isTimeoutError(error)) {
+    // Request timeout
+    console.error('Timeout:', error.message);
+  }
+}
+```
+
+See the [complete error handling guide](./en/error-handling.md).
+
+## Examples
+
+Complete and runnable examples in [`examples/`](../examples/):
+
+| Example | Description |
+|---------|-------------|
+| [01-quick-start.ts](../examples/01-quick-start.ts) | Configuration and first call |
+| [02-listar-produtos.ts](../examples/02-listar-produtos.ts) | Pagination with listarTodos |
+| [03-criar-pedido.ts](../examples/03-criar-pedido.ts) | Complete order flow |
+| [04-error-handling.ts](../examples/04-error-handling.ts) | Handling each error type |
+| [05-gateway-generico.ts](../examples/05-gateway-generico.ts) | CRUD via generic Gateway |
+
+## API Reference
+
+Generate the full documentation locally:
+
+```bash
+npm run docs
+open docs/api/index.html
+```
 
 ## Requirements
 
@@ -112,21 +175,21 @@ await sankhya.pedidos.confirmar({ codigoPedido });
 
 | Type | Link |
 |------|------|
-| **Quick Start** | [docs/guia/inicio-rapido.md](./docs/guia/inicio-rapido.md) |
-| **Authentication** | [docs/guia/autenticacao.md](./docs/guia/autenticacao.md) |
-| **Pagination** | [docs/guia/paginacao.md](./docs/guia/paginacao.md) |
-| **Error Handling** | [docs/guia/tratamento-erros.md](./docs/guia/tratamento-erros.md) |
-| **Complete Sales Flow** | [docs/guia/fluxo-venda-completo.md](./docs/guia/fluxo-venda-completo.md) |
-| **API Reference** | [docs/api-reference/](./docs/api-reference/) |
-| **Architecture** | [docs/projeto/arquitetura.md](./docs/projeto/arquitetura.md) |
-| **Types** | [docs/api-reference/tipos.md](./docs/api-reference/tipos.md) |
+| **Quick Start** | [docs/guia/inicio-rapido.md](./guia/inicio-rapido.md) |
+| **Authentication** | [docs/guia/autenticacao.md](./guia/autenticacao.md) |
+| **Pagination** | [docs/guia/paginacao.md](./guia/paginacao.md) |
+| **Error Handling** | [docs/en/error-handling.md](./en/error-handling.md) |
+| **Complete Sales Flow** | [docs/guia/fluxo-venda-completo.md](./guia/fluxo-venda-completo.md) |
+| **API Reference** | [docs/api-reference/](./api-reference/) |
+| **Architecture** | [docs/projeto/arquitetura.md](./projeto/arquitetura.md) |
+| **Types** | [docs/api-reference/tipos.md](./api-reference/tipos.md) |
 
-> Note: Documentation is primarily in Portuguese (PT-BR) to align with the Sankhya ERP API naming conventions. Code examples use the SDK's Portuguese method names.
+> Note: Guide documentation is primarily in Portuguese (PT-BR) to align with the Sankhya ERP API naming conventions. Code examples use the SDK's Portuguese method names. The error handling guide is available in [English](./en/error-handling.md).
 
 ## Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for setup instructions, conventions, and PR process.
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for setup instructions, conventions, and PR process.
 
 ## License
 
-[MIT](./LICENSE)
+[MIT](../LICENSE)
