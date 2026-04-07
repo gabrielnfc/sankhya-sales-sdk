@@ -134,16 +134,43 @@ export class HttpClient {
 
       this.logger.debug(`${method} ${url}`);
 
-      const response = await withRetry(
-        () =>
-          fetch(url, {
+      let response: Response;
+      try {
+        response = await withRetry(
+          async () => {
+            const res = await fetch(url, {
+              method,
+              headers,
+              ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+              ...(combinedSignal ? { signal: combinedSignal } : {}),
+            });
+            if (!res.ok && [429, 500, 502, 503, 504].includes(res.status)) {
+              const err = new Error(`HTTP ${res.status}`) as Error & { statusCode: number };
+              err.statusCode = res.status;
+              throw err;
+            }
+            return res;
+          },
+          { maxRetries: this.retries, method },
+        );
+      } catch (retryErr) {
+        if (
+          retryErr &&
+          typeof retryErr === 'object' &&
+          'statusCode' in retryErr &&
+          typeof (retryErr as { statusCode: unknown }).statusCode === 'number'
+        ) {
+          const status = (retryErr as { statusCode: number }).statusCode;
+          throw new ApiError(
+            `API error: HTTP ${status} — ${retryErr instanceof Error ? retryErr.message : ''}`,
+            path,
             method,
-            headers,
-            ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-            ...(combinedSignal ? { signal: combinedSignal } : {}),
-          }),
-        { maxRetries: this.retries, method },
-      );
+            status,
+            '',
+          );
+        }
+        throw retryErr;
+      }
 
       if (response.status === 401 && !isRetry) {
         this.logger.warn('Token expirado, renovando...');
