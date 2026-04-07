@@ -19,7 +19,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=20.0.0"
@@ -35,7 +36,8 @@
     "test:smoke": "tsup && node tests/smoke/cjs.cjs && node tests/smoke/esm.mjs",
     "typecheck": "tsc --noEmit",
     "dev": "tsup --watch",
-    "docs": "typedoc"
+    "docs": "typedoc",
+    "prepublishOnly": "npm run lint && npm run typecheck && npm run test && npm run build && npx publint"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
@@ -56,5 +58,6 @@
     "vendas"
   ],
   "author": "Gabriel Nascimento",
-  "license": "MIT"
+  "license": "MIT",
+  "sideEffects": false
 }
