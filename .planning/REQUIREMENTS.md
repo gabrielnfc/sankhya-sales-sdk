@@ -60,10 +60,10 @@
 ### Package & Publishing
 
 - [x] **PKGP-01**: `sideEffects: false` no package.json para tree-shaking
-- [ ] **PKGP-02**: `publint` e `@arethetypeswrong/cli` passando sem erros
+- [x] **PKGP-02**: `publint` e `@arethetypeswrong/cli` passando sem erros
 - [x] **PKGP-03**: `prepublishOnly` script configurado como gate (lint + test + build + publint)
 - [x] **PKGP-04**: `npm pack` gera pacote limpo com apenas arquivos necessários
-- [ ] **PKGP-05**: Zero `any` no código fonte
+- [x] **PKGP-05**: Zero `any` no código fonte
 - [x] **PKGP-06**: TypeScript strict mode compliance total
 
 ### CI/CD & Release
@@ -147,10 +147,10 @@
 | DOCS-05 | Phase 6 | Complete |
 | DOCS-06 | Phase 6 | Complete |
 | PKGP-01 | Phase 7 | Complete |
-| PKGP-02 | Phase 7 | Pending |
+| PKGP-02 | Phase 7 | Complete |
 | PKGP-03 | Phase 7 | Complete |
 | PKGP-04 | Phase 7 | Complete |
-| PKGP-05 | Phase 7 | Pending |
+| PKGP-05 | Phase 7 | Complete |
 | PKGP-06 | Phase 7 | Complete |
 | CICD-01 | Phase 8 | Pending |
 | CICD-02 | Phase 8 | Pending |
