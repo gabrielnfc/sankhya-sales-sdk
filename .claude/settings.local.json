@@ -18,7 +18,8 @@
       "Bash(mkdir:*)",
       "Bash(npm run:*)",
       "WebSearch",
-      "Bash(npm pack:*)"
+      "Bash(npm pack:*)",
+      "Skill(gsd:fast)"
     ]
   }
 }

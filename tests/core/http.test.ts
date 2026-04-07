@@ -157,7 +157,8 @@ describe('HttpClient', () => {
     it('deve invalidar token e retentar em 401', async () => {
       const auth = createMockAuth();
       // Return different token after invalidation to pass same-token check
-      auth.getToken = vi.fn()
+      auth.getToken = vi
+        .fn()
         .mockResolvedValueOnce('test-token')
         .mockResolvedValueOnce('new-token')
         .mockResolvedValueOnce('new-token');
@@ -199,9 +200,7 @@ describe('HttpClient', () => {
       const client = createHttpClient(auth);
 
       await expect(client.restGet('/test')).rejects.toThrow(ApiError);
-      await expect(client.restGet('/test')).rejects.toThrow(
-        'token refresh retornou o mesmo token',
-      );
+      await expect(client.restGet('/test')).rejects.toThrow('token refresh retornou o mesmo token');
     });
   });
 
