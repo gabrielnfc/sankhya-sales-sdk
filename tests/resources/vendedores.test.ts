@@ -5,9 +5,7 @@ import { VendedoresResource } from '../../src/resources/vendedores.js';
 function createMockHttp() {
   return {
     restGet: vi.fn().mockResolvedValue({
-      vendedores: [
-        { codigoVendedor: 1, nomeVendedor: 'Carlos' },
-      ],
+      vendedores: [{ codigoVendedor: 1, nomeVendedor: 'Carlos' }],
       pagination: { page: '0', total: '1', hasMore: 'false', offset: '0' },
     }),
     restPost: vi.fn(),
@@ -39,9 +37,10 @@ describe('VendedoresResource', () => {
 
   it('buscar() calls restGet with /vendedores/{id}', async () => {
     const http = createMockHttp();
-    (http.restGet as ReturnType<typeof vi.fn>).mockResolvedValue(
-      { codigoVendedor: 7, nomeVendedor: 'Ana' },
-    );
+    (http.restGet as ReturnType<typeof vi.fn>).mockResolvedValue({
+      codigoVendedor: 7,
+      nomeVendedor: 'Ana',
+    });
     const resource = new VendedoresResource(http);
     const result = await resource.buscar(7);
 

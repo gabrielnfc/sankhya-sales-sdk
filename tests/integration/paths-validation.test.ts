@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
 
 const config = {
@@ -33,7 +33,11 @@ describe.skipIf(!has)('Validação de TODOS os paths REST v1', () => {
     { path: '/estoque/produtos', params: { page: '0' }, name: 'Listar estoque produtos' },
     { path: '/estoque/locais', params: { page: '0' }, name: 'Listar locais estoque' },
     // Pedidos
-    { path: '/vendas/pedidos', params: { page: '0', codigoEmpresa: '1' }, name: 'Consultar pedidos' },
+    {
+      path: '/vendas/pedidos',
+      params: { page: '0', codigoEmpresa: '1' },
+      name: 'Consultar pedidos',
+    },
     // Financeiros
     { path: '/financeiros/receitas', params: { page: '0' }, name: 'Listar receitas' },
     { path: '/financeiros/despesas', params: { page: '0' }, name: 'Listar despesas' },
@@ -60,7 +64,9 @@ describe.skipIf(!has)('Validação de TODOS os paths REST v1', () => {
         const result = await http.restGet<Record<string, unknown>>(path, params);
         const keys = Object.keys(result);
         const pagination = result.pagination;
-        console.log(`✅ ${name}: keys=${JSON.stringify(keys)}, pagination=${JSON.stringify(pagination)}`);
+        console.log(
+          `✅ ${name}: keys=${JSON.stringify(keys)}, pagination=${JSON.stringify(pagination)}`,
+        );
         expect(result).toBeDefined();
       } catch (e: unknown) {
         const err = e as { statusCode?: number; message?: string };

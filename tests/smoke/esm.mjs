@@ -1,4 +1,10 @@
-import { SankhyaClient, ApiError, AuthError, GatewayError, TimeoutError } from '../../dist/index.js';
+import {
+  ApiError,
+  AuthError,
+  GatewayError,
+  SankhyaClient,
+  TimeoutError,
+} from '../../dist/index.js';
 
 let failures = 0;
 

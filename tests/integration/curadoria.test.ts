@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
 
 const config = {
@@ -96,10 +96,9 @@ describe.skipIf(!hasCredentials)('Curadoria — Formatos de Resposta Reais', () 
   it('REST: estrutura da resposta de tipos de operação', async () => {
     const http = client.getHttpClient();
     try {
-      const result = await http.restGet<Record<string, unknown>>(
-        '/cadastros/tiposDeOperacao',
-        { page: '0' },
-      );
+      const result = await http.restGet<Record<string, unknown>>('/cadastros/tiposDeOperacao', {
+        page: '0',
+      });
       console.log('\n=== TIPOS OPERAÇÃO — KEYS ===');
       console.log('Top-level keys:', Object.keys(result));
       console.log('Response (500 chars):', JSON.stringify(result, null, 2).slice(0, 500));
@@ -112,10 +111,9 @@ describe.skipIf(!hasCredentials)('Curadoria — Formatos de Resposta Reais', () 
   it('REST: estrutura da resposta de preços por tabela', async () => {
     const http = client.getHttpClient();
     try {
-      const result = await http.restGet<Record<string, unknown>>(
-        '/precos/porTabela/1',
-        { pagina: '1' },
-      );
+      const result = await http.restGet<Record<string, unknown>>('/precos/porTabela/1', {
+        pagina: '1',
+      });
       console.log('\n=== PREÇOS POR TABELA — KEYS ===');
       console.log('Top-level keys:', Object.keys(result));
       console.log('Response (500 chars):', JSON.stringify(result, null, 2).slice(0, 500));

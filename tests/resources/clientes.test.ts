@@ -5,9 +5,7 @@ import { ClientesResource } from '../../src/resources/clientes.js';
 function createMockHttp(overrides?: Partial<HttpClient>) {
   return {
     restGet: vi.fn().mockResolvedValue({
-      clientes: [
-        { codigoCliente: 1, nomeCliente: 'Acme', tipoPessoa: 'J' },
-      ],
+      clientes: [{ codigoCliente: 1, nomeCliente: 'Acme', tipoPessoa: 'J' }],
       pagination: { page: '0', total: '1', hasMore: 'false', offset: '0' },
     }),
     restPost: vi.fn().mockResolvedValue({ codigoCliente: 99 }),
@@ -109,9 +107,7 @@ describe('ClientesResource', () => {
     it('handles TipoPessoa "F" (pessoa fisica) correctly', async () => {
       const http = createMockHttp({
         restGet: vi.fn().mockResolvedValue({
-          clientes: [
-            { codigoCliente: 2, nomeCliente: 'Maria Silva', tipoPessoa: 'F' },
-          ],
+          clientes: [{ codigoCliente: 2, nomeCliente: 'Maria Silva', tipoPessoa: 'F' }],
           pagination: { page: '0', total: '1', hasMore: 'false', offset: '0' },
         }),
       });
@@ -124,9 +120,7 @@ describe('ClientesResource', () => {
     it('handles TipoPessoa "J" (pessoa juridica) correctly', async () => {
       const http = createMockHttp({
         restGet: vi.fn().mockResolvedValue({
-          clientes: [
-            { codigoCliente: 3, nomeCliente: 'Empresa LTDA', tipoPessoa: 'J' },
-          ],
+          clientes: [{ codigoCliente: 3, nomeCliente: 'Empresa LTDA', tipoPessoa: 'J' }],
           pagination: { page: '0', total: '1', hasMore: 'false', offset: '0' },
         }),
       });

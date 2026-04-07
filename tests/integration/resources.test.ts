@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
 
 const config = {
@@ -25,7 +25,7 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
     const result = await sankhya.clientes.listar({ page: 1 });
     expect(result.data.length).toBeGreaterThan(0);
 
-    const cliente = result.data[0]!;
+    const cliente = result.data[0];
     expect(cliente).toHaveProperty('codigoCliente');
     expect(cliente).toHaveProperty('nome');
     expect(typeof cliente.nome).toBe('string');
@@ -46,7 +46,7 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
     const result = await sankhya.vendedores.listar();
     expect(result.data.length).toBeGreaterThan(0);
 
-    const vendedor = result.data[0]!;
+    const vendedor = result.data[0];
     expect(vendedor).toHaveProperty('codigoVendedor');
     expect(typeof vendedor.codigoVendedor).toBe('number');
     expect(vendedor).toHaveProperty('nome');
@@ -60,7 +60,7 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
 
   it('vendedores.buscar()', async () => {
     const list = await sankhya.vendedores.listar();
-    const code = list.data[0]!.codigoVendedor;
+    const code = list.data[0]?.codigoVendedor;
     const vendedor = await sankhya.vendedores.buscar(code);
     expect(vendedor.codigoVendedor).toBe(code);
     expect(typeof vendedor.nome).toBe('string');
@@ -73,7 +73,7 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
     const result = await sankhya.produtos.listar();
     expect(result.data.length).toBeGreaterThan(0);
 
-    const produto = result.data[0]!;
+    const produto = result.data[0];
     expect(produto).toHaveProperty('codigoProduto');
     expect(typeof produto.codigoProduto).toBe('number');
     expect(produto).toHaveProperty('nome');
@@ -88,7 +88,7 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
 
   it('produtos.buscar()', async () => {
     const list = await sankhya.produtos.listar();
-    const code = list.data[0]!.codigoProduto;
+    const code = list.data[0]?.codigoProduto;
     const produto = await sankhya.produtos.buscar(code);
     expect(produto.codigoProduto).toBe(code);
     expect(typeof produto.nome).toBe('string');
@@ -101,7 +101,7 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
     const result = await sankhya.produtos.listarGrupos();
     expect(result.data.length).toBeGreaterThan(0);
 
-    const grupo = result.data[0]!;
+    const grupo = result.data[0];
     expect(grupo).toHaveProperty('codigoGrupoProduto');
     expect(typeof grupo.codigoGrupoProduto).toBe('number');
     expect(grupo).toHaveProperty('nome');
@@ -120,7 +120,7 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
       const result = await sankhya.precos.porTabela({ codigoTabela: 1 });
       expect(result.data).toBeDefined();
       if (result.data.length > 0) {
-        const preco = result.data[0]!;
+        const preco = result.data[0];
         expect(preco).toHaveProperty('codigoProduto');
         expect(typeof preco.codigoProduto).toBe('number');
         expect(preco).toHaveProperty('unidade');
@@ -141,12 +141,12 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
 
   it('precos.porProduto()', async () => {
     const produtos = await sankhya.produtos.listar();
-    const code = produtos.data[0]!.codigoProduto;
+    const code = produtos.data[0]?.codigoProduto;
     try {
       const result = await sankhya.precos.porProduto(code);
       expect(result.data).toBeDefined();
       if (result.data.length > 0) {
-        const preco = result.data[0]!;
+        const preco = result.data[0];
         expect(preco).toHaveProperty('codigoProduto');
         expect(typeof preco.valor).toBe('number');
       }
@@ -163,7 +163,7 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
   it('estoque.listarLocais()', async () => {
     const result = await sankhya.estoque.listarLocais();
     expect(result.data.length).toBeGreaterThan(0);
-    const local = result.data[0]!;
+    const local = result.data[0];
     expect(local).toHaveProperty('codigoLocal');
     expect(typeof local.codigoLocal).toBe('number');
     expect(local).toHaveProperty('descricaoLocal');
@@ -175,12 +175,12 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
 
   it('estoque.porProduto()', async () => {
     const produtos = await sankhya.produtos.listar();
-    const code = produtos.data[0]!.codigoProduto;
+    const code = produtos.data[0]?.codigoProduto;
     const result = await sankhya.estoque.porProduto(code);
     // Empty array is valid (product may have zero stock)
     expect(Array.isArray(result)).toBe(true);
     if (result.length > 0) {
-      const item = result[0]!;
+      const item = result[0];
       expect(item).toHaveProperty('codigoProduto');
       expect(typeof item.codigoProduto).toBe('number');
       expect(item).toHaveProperty('codigoEmpresa');
@@ -212,7 +212,7 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
   it('cadastros.listarTiposOperacao()', async () => {
     const result = await sankhya.cadastros.listarTiposOperacao();
     expect(result.data.length).toBeGreaterThan(0);
-    const top = result.data[0]!;
+    const top = result.data[0];
     expect(top).toHaveProperty('codigoTipoOperacao');
     expect(typeof top.codigoTipoOperacao).toBe('number');
     expect(top).toHaveProperty('nome');
@@ -225,7 +225,7 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
   it('cadastros.listarNaturezas()', async () => {
     const result = await sankhya.cadastros.listarNaturezas();
     expect(result.data.length).toBeGreaterThan(0);
-    const nat = result.data[0]!;
+    const nat = result.data[0];
     expect(nat).toHaveProperty('codigoNatureza');
     expect(typeof nat.codigoNatureza).toBe('number');
     expect(nat).toHaveProperty('nome');
@@ -236,7 +236,7 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
   it('cadastros.listarEmpresas()', async () => {
     const result = await sankhya.cadastros.listarEmpresas();
     expect(result.data.length).toBeGreaterThan(0);
-    const emp = result.data[0]!;
+    const emp = result.data[0];
     expect(emp).toHaveProperty('codigoEmpresa');
     expect(typeof emp.codigoEmpresa).toBe('number');
     expect(emp).toHaveProperty('nomeFantasia');
@@ -248,7 +248,7 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
     const result = await sankhya.cadastros.listarUsuarios();
     expect(Array.isArray(result)).toBe(true);
     if (result.length > 0) {
-      const usr = result[0]!;
+      const usr = result[0];
       expect(usr).toHaveProperty('codigoUsuario');
       expect(typeof usr.codigoUsuario).toBe('number');
       expect(usr).toHaveProperty('nome');
@@ -260,7 +260,7 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
   it('cadastros.listarCentrosResultado()', async () => {
     const result = await sankhya.cadastros.listarCentrosResultado();
     expect(result.data.length).toBeGreaterThan(0);
-    const cr = result.data[0]!;
+    const cr = result.data[0];
     expect(cr).toHaveProperty('codigoCentroResultado');
     expect(typeof cr.codigoCentroResultado).toBe('number');
     expect(cr).toHaveProperty('nome');
@@ -286,7 +286,7 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
   it('cadastros.listarTiposNegociacao()', async () => {
     const result = await sankhya.cadastros.listarTiposNegociacao();
     expect(result.length).toBeGreaterThan(0);
-    const tipNeg = result[0]!;
+    const tipNeg = result[0];
     expect(tipNeg).toHaveProperty('codigoTipoNegociacao');
     expect(typeof tipNeg.codigoTipoNegociacao).toBe('number');
     expect(tipNeg).toHaveProperty('descricao');
@@ -303,7 +303,7 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
     try {
       const result = await sankhya.cadastros.listarModelosNota();
       expect(result.length).toBeGreaterThan(0);
-      const modelo = result[0]!;
+      const modelo = result[0];
       expect(modelo).toHaveProperty('numeroModelo');
       expect(typeof modelo.numeroModelo).toBe('number');
       expect(modelo).toHaveProperty('descricao');
@@ -313,7 +313,7 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
       // Sandbox pode retornar NPE interno para esta entity Gateway
       const err = e as { code?: string; message?: string };
       expect(err.code).toBe('GATEWAY_ERROR');
-      console.log(`modelos nota: Gateway NPE (sandbox limitation — OK)`);
+      console.log('modelos nota: Gateway NPE (sandbox limitation — OK)');
     }
   });
 

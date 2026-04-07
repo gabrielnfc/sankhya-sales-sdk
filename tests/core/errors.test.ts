@@ -5,10 +5,10 @@ import {
   GatewayError,
   SankhyaError,
   TimeoutError,
-  isSankhyaError,
-  isAuthError,
   isApiError,
+  isAuthError,
   isGatewayError,
+  isSankhyaError,
   isTimeoutError,
 } from '../../src/core/errors.js';
 import type { SankhyaErrorCode } from '../../src/core/errors.js';

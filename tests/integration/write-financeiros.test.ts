@@ -110,9 +110,7 @@ describe.skipIf(!has)('Financeiros Write — Sandbox Validation', { timeout: 60_
     } catch (e: unknown) {
       // Some fields may be immutable — document the error
       const err = e as { message?: string; statusCode?: number };
-      console.log(
-        `atualizarReceita rejected: status=${err.statusCode}, message=${err.message}`,
-      );
+      console.log(`atualizarReceita rejected: status=${err.statusCode}, message=${err.message}`);
     }
   });
 

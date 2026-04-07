@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import { SankhyaClient } from '../../src/client.js';
 import { AuthManager } from '../../src/core/auth.js';
 import { HttpClient } from '../../src/core/http.js';
-import { SankhyaClient } from '../../src/client.js';
-import { ClientesResource } from '../../src/resources/clientes.js';
-import { VendedoresResource } from '../../src/resources/vendedores.js';
-import { ProdutosResource } from '../../src/resources/produtos.js';
-import { PrecosResource } from '../../src/resources/precos.js';
-import { EstoqueResource } from '../../src/resources/estoque.js';
-import { PedidosResource } from '../../src/resources/pedidos.js';
-import { FinanceirosResource } from '../../src/resources/financeiros.js';
 import { CadastrosResource } from '../../src/resources/cadastros.js';
+import { ClientesResource } from '../../src/resources/clientes.js';
+import { EstoqueResource } from '../../src/resources/estoque.js';
+import { FinanceirosResource } from '../../src/resources/financeiros.js';
 import { FiscalResource } from '../../src/resources/fiscal.js';
 import { GatewayResource } from '../../src/resources/gateway.js';
+import { PedidosResource } from '../../src/resources/pedidos.js';
+import { PrecosResource } from '../../src/resources/precos.js';
+import { ProdutosResource } from '../../src/resources/produtos.js';
+import { VendedoresResource } from '../../src/resources/vendedores.js';
 import type { SankhyaConfig } from '../../src/types/config.js';
 
 const validConfig: SankhyaConfig = {
@@ -37,9 +37,7 @@ describe('SankhyaClient', () => {
     });
 
     it('throws on missing clientSecret', () => {
-      expect(() => new SankhyaClient({ ...validConfig, clientSecret: '' })).toThrow(
-        'clientSecret',
-      );
+      expect(() => new SankhyaClient({ ...validConfig, clientSecret: '' })).toThrow('clientSecret');
     });
 
     it('throws on missing xToken', () => {

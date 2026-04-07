@@ -218,15 +218,13 @@ describe('HttpClient', () => {
   describe('RequestOptions', () => {
     it('deve usar timeout customizado via options.timeout', async () => {
       let capturedSignal: AbortSignal | undefined;
-      globalThis.fetch = vi.fn().mockImplementation(
-        (_url: string, init?: RequestInit) => {
-          capturedSignal = init?.signal ?? undefined;
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ data: 'ok' }),
-          });
-        },
-      );
+      globalThis.fetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+        capturedSignal = init?.signal ?? undefined;
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ data: 'ok' }),
+        });
+      });
 
       const client = createHttpClient(undefined, 30000);
       await client.restGet('/test', undefined, { timeout: 5000 });
@@ -269,9 +267,7 @@ describe('HttpClient', () => {
       await client.restPost('/pedidos', { nome: 'Teste' }, { idempotencyKey: 'key-123' });
 
       const call = vi.mocked(globalThis.fetch).mock.calls[0];
-      expect(call[1]?.headers).toEqual(
-        expect.objectContaining({ 'X-Idempotency-Key': 'key-123' }),
-      );
+      expect(call[1]?.headers).toEqual(expect.objectContaining({ 'X-Idempotency-Key': 'key-123' }));
     });
 
     it('deve usar timeout padrão quando options não fornecido', async () => {
@@ -296,9 +292,7 @@ describe('HttpClient', () => {
       await client.restPut('/pedidos/1', { nome: 'Atualizado' }, { idempotencyKey: 'put-key' });
 
       const call = vi.mocked(globalThis.fetch).mock.calls[0];
-      expect(call[1]?.headers).toEqual(
-        expect.objectContaining({ 'X-Idempotency-Key': 'put-key' }),
-      );
+      expect(call[1]?.headers).toEqual(expect.objectContaining({ 'X-Idempotency-Key': 'put-key' }));
     });
 
     it('deve aceitar options em gatewayCall', async () => {

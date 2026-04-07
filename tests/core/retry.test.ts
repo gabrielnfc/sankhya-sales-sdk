@@ -99,7 +99,8 @@ describe('CORE-05: jitter no backoff', () => {
     });
 
     const error = new ApiError('server error', '/test', 'GET', 500);
-    const fn = vi.fn()
+    const fn = vi
+      .fn()
       .mockRejectedValueOnce(error)
       .mockRejectedValueOnce(error)
       .mockResolvedValue('ok');
@@ -122,9 +123,9 @@ describe('CORE-07: method-aware retry', () => {
     const error = new ApiError('rate limit', '/pedidos', 'POST', 429);
     const fn = vi.fn().mockRejectedValue(error);
 
-    await expect(
-      withRetry(fn, { maxRetries: 3, baseDelay: 1, method: 'POST' }),
-    ).rejects.toThrow(ApiError);
+    await expect(withRetry(fn, { maxRetries: 3, baseDelay: 1, method: 'POST' })).rejects.toThrow(
+      ApiError,
+    );
     expect(fn).toHaveBeenCalledOnce();
   });
 

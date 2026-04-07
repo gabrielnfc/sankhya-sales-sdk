@@ -1,10 +1,7 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
-import {
-  extractRestData,
-  normalizeRestPagination,
-} from '../../src/core/pagination.js';
 import { deserializeRows } from '../../src/core/gateway-serializer.js';
+import { extractRestData, normalizeRestPagination } from '../../src/core/pagination.js';
 
 const config = {
   baseUrl: process.env.SANKHYA_BASE_URL ?? '',

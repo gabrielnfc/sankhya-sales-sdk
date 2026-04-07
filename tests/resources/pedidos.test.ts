@@ -98,7 +98,14 @@ describe('PedidosResource', () => {
     it('calls restPost with /vendas/pedidos and input', async () => {
       const http = createMockHttp();
       const pedidos = new PedidosResource(http);
-      const input = { notaModelo: 1, data: '2024-01-01', hora: '10:00', valorTotal: 100, itens: [], financeiros: [] };
+      const input = {
+        notaModelo: 1,
+        data: '2024-01-01',
+        hora: '10:00',
+        valorTotal: 100,
+        itens: [],
+        financeiros: [],
+      };
       http.restPost.mockResolvedValue({ codigoPedido: 42 });
 
       const result = await pedidos.criar(input);
@@ -115,7 +122,14 @@ describe('PedidosResource', () => {
     it('calls restPut with /vendas/pedidos/{id} and input', async () => {
       const http = createMockHttp();
       const pedidos = new PedidosResource(http);
-      const input = { notaModelo: 1, data: '2024-01-01', hora: '10:00', valorTotal: 200, itens: [], financeiros: [] };
+      const input = {
+        notaModelo: 1,
+        data: '2024-01-01',
+        hora: '10:00',
+        valorTotal: 200,
+        itens: [],
+        financeiros: [],
+      };
       http.restPut.mockResolvedValue({ codigoPedido: 42 });
 
       const result = await pedidos.atualizar(42, input);
@@ -268,9 +282,7 @@ describe('PedidosResource', () => {
         codigoVendedor: 3,
         codigoEmpresa: 4,
         tipoMovimento: 'V',
-        itens: [
-          { codigoProduto: 100, quantidade: 5, valorUnitario: 10, unidade: 'UN' },
-        ],
+        itens: [{ codigoProduto: 100, quantidade: 5, valorUnitario: 10, unidade: 'UN' }],
       });
 
       expect(result).toEqual({ codigoPedido: 42 });
@@ -337,7 +349,13 @@ describe('PedidosResource', () => {
         codigoEmpresa: 4,
         tipoMovimento: 'V',
         itens: [
-          { codigoProduto: 1, quantidade: 1, valorUnitario: 1, unidade: 'UN', codigoLocalOrigem: 5 },
+          {
+            codigoProduto: 1,
+            quantidade: 1,
+            valorUnitario: 1,
+            unidade: 'UN',
+            codigoLocalOrigem: 5,
+          },
         ],
       });
 

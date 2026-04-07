@@ -1,11 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PedidosResource } from '../../src/resources/pedidos.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HttpClient } from '../../src/core/http.js';
+import { PedidosResource } from '../../src/resources/pedidos.js';
 import type { RequestOptions } from '../../src/types/config.js';
 
 function createMockHttp() {
   return {
-    restGet: vi.fn().mockResolvedValue({ data: [], pagination: { page: '0', total: '0', hasMore: 'false', offset: '0' } }),
+    restGet: vi.fn().mockResolvedValue({
+      data: [],
+      pagination: { page: '0', total: '0', hasMore: 'false', offset: '0' },
+    }),
     restPost: vi.fn().mockResolvedValue({ codigoPedido: 123 }),
     restPut: vi.fn().mockResolvedValue({ codigoPedido: 123 }),
     gatewayCall: vi.fn().mockResolvedValue({}),
@@ -79,11 +82,14 @@ describe('PedidosResource idempotency', () => {
   });
 
   it('faturar forwards RequestOptions to gatewayCall', async () => {
-    await pedidos.faturar({
-      codigoPedido: 42,
-      codigoTipoOperacao: 1,
-      dataFaturamento: '2026-01-01',
-    }, options);
+    await pedidos.faturar(
+      {
+        codigoPedido: 42,
+        codigoTipoOperacao: 1,
+        dataFaturamento: '2026-01-01',
+      },
+      options,
+    );
 
     expect((http as Record<string, ReturnType<typeof vi.fn>>).gatewayCall).toHaveBeenCalledWith(
       'mgecom',
@@ -94,16 +100,19 @@ describe('PedidosResource idempotency', () => {
   });
 
   it('incluirNotaGateway forwards RequestOptions to gatewayCall', async () => {
-    await pedidos.incluirNotaGateway({
-      codigoCliente: 1,
-      dataNegociacao: '2026-01-01',
-      codigoTipoOperacao: 1,
-      codigoTipoNegociacao: 1,
-      codigoVendedor: 1,
-      codigoEmpresa: 1,
-      tipoMovimento: 'V',
-      itens: [{ codigoProduto: 1, quantidade: 1, valorUnitario: 10, unidade: 'UN' }],
-    }, options);
+    await pedidos.incluirNotaGateway(
+      {
+        codigoCliente: 1,
+        dataNegociacao: '2026-01-01',
+        codigoTipoOperacao: 1,
+        codigoTipoNegociacao: 1,
+        codigoVendedor: 1,
+        codigoEmpresa: 1,
+        tipoMovimento: 'V',
+        itens: [{ codigoProduto: 1, quantidade: 1, valorUnitario: 10, unidade: 'UN' }],
+      },
+      options,
+    );
 
     expect((http as Record<string, ReturnType<typeof vi.fn>>).gatewayCall).toHaveBeenCalledWith(
       'mgecom',

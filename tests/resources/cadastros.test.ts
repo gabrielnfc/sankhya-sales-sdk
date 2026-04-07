@@ -327,7 +327,15 @@ describe('CadastrosResource', () => {
       const cad = new CadastrosResource(http);
       http.gatewayCall.mockResolvedValue(
         makeGatewayResponse(
-          ['CODMODELANOTA', 'DESCRICAO', 'CODTIPOPER', 'CODTIPVENDA', 'CODEMP', 'CODNAT', 'CODCENCUS'],
+          [
+            'CODMODELANOTA',
+            'DESCRICAO',
+            'CODTIPOPER',
+            'CODTIPVENDA',
+            'CODEMP',
+            'CODNAT',
+            'CODCENCUS',
+          ],
           [
             {
               f0: { $: '1' },
@@ -373,7 +381,15 @@ describe('CadastrosResource', () => {
       // When CODNAT and CODCENCUS have empty string values from deserializeRows
       http.gatewayCall.mockResolvedValue(
         makeGatewayResponse(
-          ['CODMODELANOTA', 'DESCRICAO', 'CODTIPOPER', 'CODTIPVENDA', 'CODEMP', 'CODNAT', 'CODCENCUS'],
+          [
+            'CODMODELANOTA',
+            'DESCRICAO',
+            'CODTIPOPER',
+            'CODTIPVENDA',
+            'CODEMP',
+            'CODNAT',
+            'CODCENCUS',
+          ],
           [
             {
               f0: { $: '1' },
@@ -399,7 +415,15 @@ describe('CadastrosResource', () => {
       const cad = new CadastrosResource(http);
       http.gatewayCall.mockResolvedValue(
         makeGatewayResponse(
-          ['CODMODELANOTA', 'DESCRICAO', 'CODTIPOPER', 'CODTIPVENDA', 'CODEMP', 'CODNAT', 'CODCENCUS'],
+          [
+            'CODMODELANOTA',
+            'DESCRICAO',
+            'CODTIPOPER',
+            'CODTIPVENDA',
+            'CODEMP',
+            'CODNAT',
+            'CODCENCUS',
+          ],
           [],
         ),
       );

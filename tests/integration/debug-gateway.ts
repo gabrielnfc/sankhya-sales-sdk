@@ -18,21 +18,21 @@ async function main() {
   const authUrl = `${process.env.SANKHYA_BASE_URL}/authenticate`;
   const authBody = new URLSearchParams({
     grant_type: 'client_credentials',
-    client_id: process.env.SANKHYA_CLIENT_ID!,
-    client_secret: process.env.SANKHYA_CLIENT_SECRET!,
+    client_id: process.env.SANKHYA_CLIENT_ID ?? '',
+    client_secret: process.env.SANKHYA_CLIENT_SECRET ?? '',
   });
 
   const authResp = await fetch(authUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      'X-Token': process.env.SANKHYA_X_TOKEN!,
+      'X-Token': process.env.SANKHYA_X_TOKEN ?? '',
     },
     body: authBody.toString(),
   });
   const authData = await authResp.json();
   const token = authData.access_token;
-  console.log('Token:', token.slice(0, 20) + '...');
+  console.log('Token:', `${token.slice(0, 20)}...`);
 
   // 2. Gateway call
   const gwUrl = `${process.env.SANKHYA_BASE_URL}/gateway/v1/mge/service.sbr`;
@@ -61,7 +61,7 @@ async function main() {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
-      'X-Token': process.env.SANKHYA_X_TOKEN!,
+      'X-Token': process.env.SANKHYA_X_TOKEN ?? '',
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },

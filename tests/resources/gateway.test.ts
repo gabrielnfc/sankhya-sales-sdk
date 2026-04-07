@@ -16,10 +16,7 @@ function createMockHttp() {
   };
 }
 
-function makeGatewayResponse(
-  fieldNames: string[],
-  entities: Array<Record<string, unknown>>,
-) {
+function makeGatewayResponse(fieldNames: string[], entities: Array<Record<string, unknown>>) {
   return {
     entities: {
       total: String(entities.length),
@@ -55,20 +52,16 @@ describe('GatewayResource', () => {
         fields: 'CODPROD,DESCRPROD',
       });
 
-      expect(http.gatewayCall).toHaveBeenCalledWith(
-        'mge',
-        'CRUDServiceProvider.loadRecords',
-        {
-          dataSet: {
-            rootEntity: 'Produto',
-            includePresentationFields: 'N',
-            offsetPage: '0',
-            entity: {
-              fieldset: { list: 'CODPROD,DESCRPROD' },
-            },
+      expect(http.gatewayCall).toHaveBeenCalledWith('mge', 'CRUDServiceProvider.loadRecords', {
+        dataSet: {
+          rootEntity: 'Produto',
+          includePresentationFields: 'N',
+          offsetPage: '0',
+          entity: {
+            fieldset: { list: 'CODPROD,DESCRPROD' },
           },
         },
-      );
+      });
 
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual({ CODPROD: '100', DESCRPROD: 'Produto A' });
@@ -199,21 +192,17 @@ describe('GatewayResource', () => {
         data: { CODPROD: '100', DESCRPROD: 'Novo Produto' },
       });
 
-      expect(http.gatewayCall).toHaveBeenCalledWith(
-        'mge',
-        'CRUDServiceProvider.saveRecord',
-        {
-          dataSet: {
-            rootEntity: 'Produto',
-            includePresentationFields: 'N',
-            entity: {
-              fieldset: { list: 'CODPROD,DESCRPROD' },
-              CODPROD: { $: '100' },
-              DESCRPROD: { $: 'Novo Produto' },
-            },
+      expect(http.gatewayCall).toHaveBeenCalledWith('mge', 'CRUDServiceProvider.saveRecord', {
+        dataSet: {
+          rootEntity: 'Produto',
+          includePresentationFields: 'N',
+          entity: {
+            fieldset: { list: 'CODPROD,DESCRPROD' },
+            CODPROD: { $: '100' },
+            DESCRPROD: { $: 'Novo Produto' },
           },
         },
-      );
+      });
 
       expect(result).toEqual({ CODPROD: '100', DESCRPROD: 'Novo Produto' });
     });
