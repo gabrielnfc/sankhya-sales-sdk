@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0-preview] - 2026-04-07
+
+### Planned
+- Package validation with publint and @arethetypeswrong/cli
+- CI/CD pipeline with GitHub Actions
+- npm publish with provenance attestation
+- GitHub Release with auto-generated notes
+
 ## [0.1.0] - 2026-04-07
 
 ### Added
@@ -25,5 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Idempotency key support for pedidos and financeiros mutations
 - Zero runtime dependencies (native fetch, Node 20+)
 
-[Unreleased]: https://github.com/gabrielnfc/sankhya-sales-sdk/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/gabrielnfc/sankhya-sales-sdk/compare/v1.0.0-preview...HEAD
+[1.0.0-preview]: https://github.com/gabrielnfc/sankhya-sales-sdk/compare/v0.1.0...v1.0.0-preview
 [0.1.0]: https://github.com/gabrielnfc/sankhya-sales-sdk/releases/tag/v0.1.0
