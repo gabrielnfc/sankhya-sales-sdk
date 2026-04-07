@@ -1,45 +1,64 @@
 import type { ModifiedSinceParams, PaginationParams } from './common.js';
 
+/** Tipo de vendedor no Sankhya ERP. */
 export enum TipoVendedor {
+  /** Comprador. */
   Comprador = 1,
+  /** Executante. */
   Executante = 2,
+  /** Gerente. */
   Gerente = 3,
+  /** Vendedor. */
   Vendedor = 4,
+  /** Supervisor. */
   Supervisor = 5,
+  /** Tecnico. */
   Tecnico = 6,
+  /** Representante. */
   Representante = 7,
 }
 
+/** Representa um vendedor no Sankhya ERP. */
 export interface Vendedor {
+  /** Codigo do vendedor. */
   codigoVendedor: number;
+  /** Nome do vendedor. */
   nome: string;
+  /** Indica se o vendedor esta ativo. */
   ativo: boolean;
-  /** Sandbox retorna string (ex: "" ou "4"), não enum numérico */
+  /** Tipo do vendedor. Sandbox pode retornar string. */
   tipo: TipoVendedor | number | string;
-  /** Sandbox pode retornar null quando não definido */
+  /** Percentual de comissao de gerencia. Sandbox pode retornar null. */
   comissaoGerencia: number | null;
-  /** Sandbox pode retornar null quando não definido */
+  /** Percentual de comissao de venda. Sandbox pode retornar null. */
   comissaoVenda: number | null;
+  /** Email do vendedor. */
   email: string;
-  /** Sandbox pode retornar null quando não definido */
+  /** Codigo da empresa. Sandbox pode retornar null. */
   codigoEmpresa: number | null;
+  /** Nome da empresa. */
   nomeEmpresa: string;
+  /** Codigo do parceiro vinculado. */
   codigoParceiro: number;
-  /** Sandbox retorna campo nomeParceiro junto com codigoParceiro */
+  /** Nome do parceiro vinculado. */
   nomeParceiro?: string;
+  /** Codigo do gerente. */
   codigoGerente?: number;
-  /** Sandbox retorna campo nomeGerente junto com codigoGerente */
+  /** Nome do gerente. */
   nomeGerente?: string;
+  /** Codigo da regiao de atuacao. */
   codigoRegiao?: number;
+  /** Nome da regiao. */
   nomeRegiao?: string;
-  /** Sandbox retorna codigoFuncionario (pode ser null) */
+  /** Codigo do funcionario vinculado. */
   codigoFuncionario?: number | null;
-  /** Sandbox retorna nomeFuncionario */
+  /** Nome do funcionario. */
   nomeFuncionario?: string;
-  /** Sandbox retorna codigoCentroResultado */
+  /** Codigo do centro de resultado. */
   codigoCentroResultado?: number;
-  /** Sandbox retorna nomeCentroResultado */
+  /** Nome do centro de resultado. */
   nomeCentroResultado?: string;
 }
 
+/** Filtros para listagem de vendedores. */
 export interface ListarVendedoresParams extends PaginationParams, ModifiedSinceParams {}

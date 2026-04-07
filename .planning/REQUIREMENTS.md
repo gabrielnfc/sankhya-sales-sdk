@@ -51,7 +51,7 @@
 ### Documentation
 
 - [ ] **DOCS-01**: README com quick-start (< 5 min para primeira chamada) incluindo auth, install, exemplo
-- [ ] **DOCS-02**: TSDoc em todos os métodos e tipos públicos
+- [x] **DOCS-02**: TSDoc em todos os métodos e tipos públicos
 - [x] **DOCS-03**: TypeDoc gerando API reference navegável
 - [ ] **DOCS-04**: Guia de error handling mostrando try/catch com cada classe de erro
 - [ ] **DOCS-05**: Exemplos de código funcionais (`examples/`) cobrindo cada resource principal
@@ -141,7 +141,7 @@
 | TEST-05 | Phase 5 | Complete |
 | TEST-06 | Phase 5 | Complete |
 | DOCS-01 | Phase 6 | Pending |
-| DOCS-02 | Phase 6 | Pending |
+| DOCS-02 | Phase 6 | Complete |
 | DOCS-03 | Phase 6 | Complete |
 | DOCS-04 | Phase 6 | Pending |
 | DOCS-05 | Phase 6 | Pending |

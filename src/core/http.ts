@@ -100,8 +100,7 @@ export class HttpClient {
 
     const signals: AbortSignal[] = [internalController.signal];
     if (options?.signal) signals.push(options.signal);
-    const combinedSignal =
-      signals.length === 1 ? signals[0] : AbortSignal.any(signals);
+    const combinedSignal = signals.length === 1 ? signals[0] : AbortSignal.any(signals);
 
     try {
       const headers: Record<string, string> = {
