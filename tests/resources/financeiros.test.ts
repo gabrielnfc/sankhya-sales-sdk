@@ -109,7 +109,16 @@ describe('FinanceirosResource', () => {
     it('calls restPost with /financeiros/receitas', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      const dados = { valor: 100 };
+      const dados = {
+        codigoEmpresa: 1,
+        codigoTipoOperacao: 1,
+        codigoNatureza: 1,
+        codigoParceiro: 10,
+        codigoTipoPagamento: 1,
+        dataNegociacao: '2024-01-01',
+        dataVencimento: '2024-02-01',
+        valorParcela: 100,
+      };
       http.restPost.mockResolvedValue({ id: 1 });
 
       const result = await fin.registrarReceita(dados);
@@ -175,7 +184,16 @@ describe('FinanceirosResource', () => {
     it('calls restPost with /financeiros/despesas', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      const dados = { valor: 50 };
+      const dados = {
+        codigoEmpresa: 1,
+        codigoTipoOperacao: 1,
+        codigoNatureza: 1,
+        codigoParceiro: 10,
+        codigoTipoPagamento: 1,
+        dataNegociacao: '2024-01-01',
+        dataVencimento: '2024-02-01',
+        valorParcela: 50,
+      };
       http.restPost.mockResolvedValue({ id: 2 });
 
       await fin.registrarDespesa(dados);

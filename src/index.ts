@@ -30,6 +30,20 @@ export {
 } from './core/errors.js';
 export type { SankhyaErrorCode } from './core/errors.js';
 
+// Validators
+export {
+  validatePedidoVendaInput,
+  validateCriarClienteInput,
+  validateRegistrarReceitaInput,
+  validateRegistrarDespesaInput,
+  validateLoadRecordsParams,
+  validateSaveRecordParams,
+  validateCalculoImpostoInput,
+  validateConfirmarPedidoInput,
+  validateFaturarPedidoInput,
+  validateCancelarPedidoInput,
+} from './core/validators.js';
+
 // Types
 export type {
   SankhyaConfig,

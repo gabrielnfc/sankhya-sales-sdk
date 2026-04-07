@@ -103,8 +103,10 @@ describe('PedidosResource', () => {
         data: '2024-01-01',
         hora: '10:00',
         valorTotal: 100,
-        itens: [],
-        financeiros: [],
+        itens: [{ codigoProduto: 1, quantidade: 1, valorUnitario: 100, unidade: 'UN' }],
+        financeiros: [
+          { codigoTipoPagamento: 1, valor: 100, dataVencimento: '2024-02-01', numeroParcela: 1 },
+        ],
       };
       http.restPost.mockResolvedValue({ codigoPedido: 42 });
 
@@ -127,8 +129,10 @@ describe('PedidosResource', () => {
         data: '2024-01-01',
         hora: '10:00',
         valorTotal: 200,
-        itens: [],
-        financeiros: [],
+        itens: [{ codigoProduto: 1, quantidade: 2, valorUnitario: 100, unidade: 'UN' }],
+        financeiros: [
+          { codigoTipoPagamento: 1, valor: 200, dataVencimento: '2024-02-01', numeroParcela: 1 },
+        ],
       };
       http.restPut.mockResolvedValue({ codigoPedido: 42 });
 

@@ -2,6 +2,12 @@ import { serialize } from '../core/gateway-serializer.js';
 import type { HttpClient } from '../core/http.js';
 import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
 import { safeParseNumber } from '../core/parse-utils.js';
+import {
+  validateCancelarPedidoInput,
+  validateConfirmarPedidoInput,
+  validateFaturarPedidoInput,
+  validatePedidoVendaInput,
+} from '../core/validators.js';
 import type { PaginatedResult } from '../types/common.js';
 import type { RequestOptions } from '../types/config.js';
 import type {
@@ -84,6 +90,7 @@ export class PedidosResource {
     pedido: PedidoVendaInput,
     options?: RequestOptions,
   ): Promise<{ codigoPedido: number }> {
+    validatePedidoVendaInput(pedido, 'PedidoVendaInput');
     return this.http.restPost('/vendas/pedidos', pedido, options);
   }
 
@@ -102,6 +109,7 @@ export class PedidosResource {
     pedido: PedidoVendaInput,
     options?: RequestOptions,
   ): Promise<{ codigoPedido: number }> {
+    validatePedidoVendaInput(pedido, 'PedidoVendaInput');
     return this.http.restPut(`/vendas/pedidos/${codigoPedido}`, pedido, options);
   }
 
@@ -118,6 +126,7 @@ export class PedidosResource {
     input: CancelarPedidoInput,
     options?: RequestOptions,
   ): Promise<{ codigoPedido: number }> {
+    validateCancelarPedidoInput(input, 'CancelarPedidoInput');
     return this.http.restPost(
       `/vendas/pedidos/${input.codigoPedido}/cancela`,
       {
@@ -136,6 +145,7 @@ export class PedidosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   async confirmar(input: ConfirmarPedidoInput, options?: RequestOptions): Promise<void> {
+    validateConfirmarPedidoInput(input, 'ConfirmarPedidoInput');
     await this.http.gatewayCall(
       'mgecom',
       'ServicosNfeSP.confirmarNota',
@@ -160,6 +170,7 @@ export class PedidosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   async faturar(input: FaturarPedidoInput, options?: RequestOptions): Promise<void> {
+    validateFaturarPedidoInput(input, 'FaturarPedidoInput');
     await this.http.gatewayCall(
       'mgecom',
       'SelecaoDocumentoSP.faturar',

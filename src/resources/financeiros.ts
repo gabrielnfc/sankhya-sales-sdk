@@ -1,5 +1,9 @@
 import type { HttpClient } from '../core/http.js';
 import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
+import {
+  validateRegistrarDespesaInput,
+  validateRegistrarReceitaInput,
+} from '../core/validators.js';
 import type { PaginatedResult } from '../types/common.js';
 import type { RequestOptions } from '../types/config.js';
 import type {
@@ -108,6 +112,7 @@ export class FinanceirosResource {
     dados: RegistrarReceitaInput,
     options?: RequestOptions,
   ): Promise<RegistrarFinanceiroResponse> {
+    validateRegistrarReceitaInput(dados, 'RegistrarReceitaInput');
     return this.http.restPost('/financeiros/receitas', dados, options);
   }
 
@@ -172,6 +177,7 @@ export class FinanceirosResource {
     dados: RegistrarDespesaInput,
     options?: RequestOptions,
   ): Promise<RegistrarFinanceiroResponse> {
+    validateRegistrarDespesaInput(dados, 'RegistrarDespesaInput');
     return this.http.restPost('/financeiros/despesas', dados, options);
   }
 
