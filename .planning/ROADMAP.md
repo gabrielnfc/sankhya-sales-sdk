@@ -149,6 +149,6 @@ Plans:
 | 3. Write-Path & E2E Validation | 0/3 | Planning complete | - |
 | 4. Public API Surface | 1/3 | In Progress | - |
 | 5. Test Coverage Hardening | 2/3 | In Progress|  |
-| 6. Documentation | 0/3 | Planning complete | - |
+| 6. Documentation | 1/3 | In Progress | - |
 | 7. Package Validation | 0/TBD | Not started | - |
 | 8. CI/CD & Release | 0/TBD | Not started | - |
