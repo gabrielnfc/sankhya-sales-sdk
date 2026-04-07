@@ -2,9 +2,31 @@ import { deserializeRows, serialize } from '../core/gateway-serializer.js';
 import type { HttpClient } from '../core/http.js';
 import type { LoadRecordParams, LoadRecordsParams, SaveRecordParams } from '../types/gateway.js';
 
+/**
+ * Acesso direto ao Gateway Sankhya para operacoes genericas (CRUD).
+ *
+ * Use este recurso para entidades que nao possuem resource dedicado.
+ * Acesse via `sankhya.gateway`.
+ */
 export class GatewayResource {
   constructor(private readonly http: HttpClient) {}
 
+  /**
+   * Carrega multiplos registros de uma entidade via Gateway.
+   *
+   * @param params - Entidade, campos, filtro e paginacao.
+   * @returns Array de registros como dicionarios chave-valor (string).
+   * @throws {GatewayError} Em erro de negocio Sankhya.
+   * @throws {AuthError} Se autenticacao falhar.
+   * @example
+   * ```ts
+   * const rows = await sankhya.gateway.loadRecords({
+   *   entity: 'Parceiro',
+   *   fields: 'CODPARC,NOMEPARC',
+   *   criteria: 'this.ATIVO = \'S\'',
+   * });
+   * ```
+   */
   async loadRecords(params: LoadRecordsParams): Promise<Record<string, string>[]> {
     const result = await this.http.gatewayCall<Record<string, unknown>>(
       'mge',
@@ -25,6 +47,22 @@ export class GatewayResource {
     return deserializeRows(result).rows;
   }
 
+  /**
+   * Carrega um unico registro pela chave primaria via Gateway.
+   *
+   * @param params - Entidade, campos e chave primaria.
+   * @returns Registro encontrado ou `null` se nao existir.
+   * @throws {GatewayError} Em erro de negocio Sankhya.
+   * @throws {AuthError} Se autenticacao falhar.
+   * @example
+   * ```ts
+   * const parceiro = await sankhya.gateway.loadRecord({
+   *   entity: 'Parceiro',
+   *   fields: 'CODPARC,NOMEPARC',
+   *   primaryKey: { CODPARC: '123' },
+   * });
+   * ```
+   */
   async loadRecord(params: LoadRecordParams): Promise<Record<string, string> | null> {
     const pkEntries = Object.entries(params.primaryKey);
     const expression = pkEntries.map(([key, val]) => `this.${key} = ${val}`).join(' AND ');
@@ -49,6 +87,22 @@ export class GatewayResource {
     return rows[0] ?? null;
   }
 
+  /**
+   * Salva (cria ou atualiza) um registro via Gateway.
+   *
+   * @param params - Entidade, campos e dados a salvar.
+   * @returns Registro salvo como dicionario chave-valor.
+   * @throws {GatewayError} Em erro de negocio Sankhya.
+   * @throws {AuthError} Se autenticacao falhar.
+   * @example
+   * ```ts
+   * const result = await sankhya.gateway.saveRecord({
+   *   entity: 'Parceiro',
+   *   fields: 'CODPARC,NOMEPARC,CGC_CPF',
+   *   data: { NOMEPARC: 'Teste', CGC_CPF: '12345678000199' },
+   * });
+   * ```
+   */
   async saveRecord(params: SaveRecordParams): Promise<Record<string, string>> {
     const serializedFields = serialize(params.data);
     const fieldsList = params.fields;
