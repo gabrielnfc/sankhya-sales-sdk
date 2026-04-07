@@ -68,9 +68,9 @@
 
 ### CI/CD & Release
 
-- [ ] **CICD-01**: GitHub Actions rodando lint, typecheck, test (unit), build em todo push/PR
-- [ ] **CICD-02**: GitHub Actions rodando testes de integração (com secrets) em push para main
-- [ ] **CICD-03**: Coverage report gerado e visível no CI
+- [x] **CICD-01**: GitHub Actions rodando lint, typecheck, test (unit), build em todo push/PR
+- [x] **CICD-02**: GitHub Actions rodando testes de integração (com secrets) em push para main
+- [x] **CICD-03**: Coverage report gerado e visível no CI
 - [ ] **CICD-04**: `npm publish --provenance` via GitHub Actions release workflow
 - [ ] **CICD-05**: GitHub Release v1.0.0 com release notes
 
@@ -152,9 +152,9 @@
 | PKGP-04 | Phase 7 | Pending |
 | PKGP-05 | Phase 7 | Pending |
 | PKGP-06 | Phase 7 | Pending |
-| CICD-01 | Phase 8 | Pending |
-| CICD-02 | Phase 8 | Pending |
-| CICD-03 | Phase 8 | Pending |
+| CICD-01 | Phase 8 | Complete |
+| CICD-02 | Phase 8 | Complete |
+| CICD-03 | Phase 8 | Complete |
 | CICD-04 | Phase 8 | Pending |
 | CICD-05 | Phase 8 | Pending |
 

@@ -149,4 +149,4 @@ Plans:
 | 5. Test Coverage Hardening | 2/3 | In Progress|  |
 | 6. Documentation | 0/TBD | Not started | - |
 | 7. Package Validation | 0/TBD | Not started | - |
-| 8. CI/CD & Release | 0/TBD | Not started | - |
+| 8. CI/CD & Release | 1/2 | In Progress | - |
