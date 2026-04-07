@@ -53,5 +53,9 @@
     "vendas"
   ],
   "author": "Gabriel Nascimento",
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gabrielnfc/sankhya-sales-sdk.git"
+  }
 }
