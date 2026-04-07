@@ -127,7 +127,9 @@ Plans:
   6. `tsc --noEmit` passes with `strict: true`, `noUncheckedIndexedAccess: true`, and all strict-family flags enabled
 **Plans**: 3 plans
 Plans:
-- [ ] TBD
+- [ ] 07-01-PLAN.md — Package config: sideEffects, files array, prepublishOnly, .npmignore, noFallthroughCasesInSwitch
+- [ ] 07-02-PLAN.md — TypeScript strict: exactOptionalPropertyTypes with code fixes
+- [ ] 07-03-PLAN.md — Final validation: publint, attw, any-audit, tarball, prepublishOnly
 
 ### Phase 8: CI/CD & Release
 **Goal**: Every push to main runs automated quality gates; v1.0.0 is published to npm with provenance attestation and a GitHub Release
