@@ -18,7 +18,7 @@ export class HttpClient {
     timeout: number,
     logger: Logger,
     auth: AuthManager,
-    retries: number = 3,
+    retries = 3,
   ) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.xToken = xToken;
@@ -45,6 +45,11 @@ export class HttpClient {
   async restPut<T>(path: string, body: unknown, options?: RequestOptions): Promise<T> {
     const url = this.buildUrl(`/v1${path}`);
     return this.requestWithRetry<T>(url, 'PUT', path, body, false, options);
+  }
+
+  async restDelete<T>(path: string, options?: RequestOptions): Promise<T> {
+    const url = this.buildUrl(`/v1${path}`);
+    return this.requestWithRetry<T>(url, 'DELETE', path, undefined, false, options);
   }
 
   async gatewayCall<T>(

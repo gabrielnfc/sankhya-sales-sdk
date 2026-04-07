@@ -10,7 +10,15 @@ function loadEnv() {
       if (!trimmed || trimmed.startsWith('#')) continue;
       const eqIndex = trimmed.indexOf('=');
       if (eqIndex === -1) continue;
-      env[trimmed.slice(0, eqIndex)] = trimmed.slice(eqIndex + 1);
+      let value = trimmed.slice(eqIndex + 1);
+      // Strip surrounding quotes (single or double)
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      env[trimmed.slice(0, eqIndex)] = value;
     }
     return env;
   } catch {
@@ -28,7 +36,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
-      exclude: ['src/types/**/*.ts', 'src/index.ts'],
+      exclude: ['src/types/**/*.ts', 'src/index.ts', 'src/resources/index.ts'],
       thresholds: {
         lines: 90,
         functions: 90,

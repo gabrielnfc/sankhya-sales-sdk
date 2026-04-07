@@ -8,6 +8,7 @@ jobs:
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    if: ${{ secrets.SANKHYA_BASE_URL != '' }}
     env:
       SANKHYA_BASE_URL: ${{ secrets.SANKHYA_BASE_URL }}
       SANKHYA_CLIENT_ID: ${{ secrets.SANKHYA_CLIENT_ID }}
