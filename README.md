@@ -7,6 +7,11 @@ SDK TypeScript para integração com as **APIs comerciais do Sankhya ERP**. Tipa
 
 > **[English version](./README.en.md)**
 
+## Pre-requisitos
+
+- Node.js >= 20
+- Credenciais OAuth 2.0 do Sankhya (Client ID, Client Secret, X-Token)
+
 ## Escopo
 
 Cobre operações comerciais do Sankhya Om (v4.34+): **vendas, clientes, produtos, preços, estoque, pedidos, financeiro e fiscal**. Total de 67 operações (55 REST v1 + 12 Gateway).
@@ -19,13 +24,22 @@ npm install sankhya-sales-sdk
 
 ## Quick Start
 
-### Configuração
+### Variaveis de ambiente
+
+```bash
+export SANKHYA_BASE_URL=https://api.sankhya.com.br
+export SANKHYA_CLIENT_ID=seu-client-id
+export SANKHYA_CLIENT_SECRET=seu-client-secret
+export SANKHYA_X_TOKEN=seu-x-token
+```
+
+### Configuracao
 
 ```typescript
 import { SankhyaClient } from 'sankhya-sales-sdk';
 
 const sankhya = new SankhyaClient({
-  baseUrl: 'https://api.sankhya.com.br',
+  baseUrl: process.env.SANKHYA_BASE_URL!,
   clientId: process.env.SANKHYA_CLIENT_ID!,
   clientSecret: process.env.SANKHYA_CLIENT_SECRET!,
   xToken: process.env.SANKHYA_X_TOKEN!,
@@ -102,13 +116,62 @@ await sankhya.pedidos.confirmar({ codigoPedido });
 - **Retry com backoff** — para erros transientes (429, 5xx)
 - **AsyncGenerator** — paginação automática com `for await...of`
 
+## Tratamento de Erros
+
+O SDK exporta type guards para identificar cada tipo de erro:
+
+```typescript
+import { isApiError, isGatewayError, isAuthError, isTimeoutError } from 'sankhya-sales-sdk';
+
+try {
+  await sankhya.pedidos.criar({ /* ... */ });
+} catch (error) {
+  if (isAuthError(error)) {
+    // Credenciais invalidas ou token expirado
+    console.error('Falha na autenticacao:', error.message);
+  } else if (isGatewayError(error)) {
+    // Erro de negocio Sankhya (HTTP 200, mas erro no body)
+    console.error(`Erro Sankhya [${error.tsErrorCode}]: ${error.message}`);
+  } else if (isApiError(error)) {
+    // Erro HTTP (4xx/5xx)
+    console.error(`HTTP ${error.statusCode} em ${error.method} ${error.endpoint}`);
+  } else if (isTimeoutError(error)) {
+    // Timeout na requisicao
+    console.error('Timeout:', error.message);
+  }
+}
+```
+
+Veja o [guia completo de tratamento de erros](./docs/guia/tratamento-erros.md).
+
+## Exemplos
+
+Exemplos completos e executaveis em [`examples/`](./examples/):
+
+| Exemplo | Descricao |
+|---------|-----------|
+| [01-quick-start.ts](./examples/01-quick-start.ts) | Configuracao e primeira chamada |
+| [02-listar-produtos.ts](./examples/02-listar-produtos.ts) | Paginacao com listarTodos |
+| [03-criar-pedido.ts](./examples/03-criar-pedido.ts) | Fluxo completo de pedido |
+| [04-error-handling.ts](./examples/04-error-handling.ts) | Tratamento de cada tipo de erro |
+| [05-gateway-generico.ts](./examples/05-gateway-generico.ts) | CRUD via Gateway generico |
+
+## Referencia da API
+
+Gere a documentacao completa localmente:
+
+```bash
+npm run docs
+open docs/api/index.html
+```
+
 ## Requisitos
 
 - **Node.js** >= 20.0.0
 - **TypeScript** >= 5.0 (recomendado)
 - **Sankhya Om** >= 4.34
 
-## Documentação
+## Documentacao
 
 | Tipo | Link |
 |------|------|
