@@ -74,6 +74,7 @@ export class SankhyaClient {
       config.timeout ?? 30_000,
       this.logger,
       this.auth,
+      config.retries ?? 3,
     );
   }
 

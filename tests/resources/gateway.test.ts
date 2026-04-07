@@ -138,7 +138,7 @@ describe('GatewayResource', () => {
 
       const body = http.gatewayCall.mock.calls[0][2] as Record<string, unknown>;
       const dataSet = body.dataSet as Record<string, unknown>;
-      expect(dataSet.criteria).toEqual({ expression: 'this.CODPROD = 100' });
+      expect(dataSet.criteria).toEqual({ expression: "this.CODPROD = '100'" });
       expect(dataSet.offsetPage).toBe('0');
     });
 
@@ -170,7 +170,7 @@ describe('GatewayResource', () => {
       const body = http.gatewayCall.mock.calls[0][2] as Record<string, unknown>;
       const dataSet = body.dataSet as Record<string, unknown>;
       expect(dataSet.criteria).toEqual({
-        expression: 'this.CODPROD = 1 AND this.CODEMP = 2',
+        expression: "this.CODPROD = '1' AND this.CODEMP = '2'",
       });
     });
   });

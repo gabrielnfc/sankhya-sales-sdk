@@ -2,6 +2,7 @@ import type { GatewayResponse } from '../types/common.js';
 import type { Logger, RequestOptions } from '../types/config.js';
 import type { AuthManager } from './auth.js';
 import { ApiError, GatewayError, TimeoutError } from './errors.js';
+import { withRetry } from './retry.js';
 
 export class HttpClient {
   private readonly baseUrl: string;
@@ -9,13 +10,22 @@ export class HttpClient {
   private readonly timeout: number;
   private readonly logger: Logger;
   private readonly auth: AuthManager;
+  private readonly retries: number;
 
-  constructor(baseUrl: string, xToken: string, timeout: number, logger: Logger, auth: AuthManager) {
+  constructor(
+    baseUrl: string,
+    xToken: string,
+    timeout: number,
+    logger: Logger,
+    auth: AuthManager,
+    retries: number = 3,
+  ) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.xToken = xToken;
     this.timeout = timeout;
     this.logger = logger;
     this.auth = auth;
+    this.retries = retries;
   }
 
   async restGet<T>(
@@ -119,12 +129,16 @@ export class HttpClient {
 
       this.logger.debug(`${method} ${url}`);
 
-      const response = await fetch(url, {
-        method,
-        headers,
-        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-        ...(combinedSignal ? { signal: combinedSignal } : {}),
-      });
+      const response = await withRetry(
+        () =>
+          fetch(url, {
+            method,
+            headers,
+            ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+            ...(combinedSignal ? { signal: combinedSignal } : {}),
+          }),
+        { maxRetries: this.retries, method },
+      );
 
       if (response.status === 401 && !isRetry) {
         this.logger.warn('Token expirado, renovando...');

@@ -65,7 +65,12 @@ export class GatewayResource {
    */
   async loadRecord(params: LoadRecordParams): Promise<Record<string, string> | null> {
     const pkEntries = Object.entries(params.primaryKey);
-    const expression = pkEntries.map(([key, val]) => `this.${key} = ${val}`).join(' AND ');
+    const expression = pkEntries
+      .map(([key, val]) => {
+        const escaped = String(val).replace(/'/g, "''");
+        return `this.${key} = '${escaped}'`;
+      })
+      .join(' AND ');
 
     const result = await this.http.gatewayCall<Record<string, unknown>>(
       'mge',
