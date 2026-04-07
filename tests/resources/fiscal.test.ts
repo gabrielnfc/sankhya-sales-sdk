@@ -16,9 +16,10 @@ describe('FiscalResource', () => {
     const http = createMockHttp();
     const resource = new FiscalResource(http);
     const input = {
+      notaModelo: 1,
+      codigoCliente: 100,
       codigoEmpresa: 1,
-      codigoParceiro: 100,
-      itens: [{ codigoProduto: 5, quantidade: 10, valorUnitario: 25.0 }],
+      produtos: [{ codigoProduto: 5, quantidade: 10, valorUnitario: 25.0 }],
     };
     const result = await resource.calcularImpostos(input);
 

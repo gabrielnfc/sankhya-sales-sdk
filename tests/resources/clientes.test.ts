@@ -40,7 +40,20 @@ describe('ClientesResource', () => {
   it('criar() calls restPost with /parceiros/clientes', async () => {
     const http = createMockHttp();
     const resource = new ClientesResource(http);
-    const input = { nomeCliente: 'Novo Cliente', tipoPessoa: 'J' as const };
+    const input = {
+      nome: 'Novo Cliente',
+      tipo: 'J' as const,
+      cnpjCpf: '12345678000199',
+      endereco: {
+        logradouro: 'Rua A',
+        numero: '100',
+        bairro: 'Centro',
+        cidade: 'Sao Paulo',
+        codigoIbge: '3550308',
+        uf: 'SP',
+        cep: '01000000',
+      },
+    };
     const result = await resource.criar(input);
 
     expect(http.restPost).toHaveBeenCalledWith('/parceiros/clientes', input);

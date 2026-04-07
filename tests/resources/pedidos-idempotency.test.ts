@@ -26,35 +26,44 @@ describe('PedidosResource idempotency', () => {
 
   const options: RequestOptions = { idempotencyKey: 'test-uuid-123' };
 
+  const validInput = {
+    notaModelo: 1,
+    data: '2024-01-01',
+    hora: '10:00',
+    valorTotal: 100,
+    codigoCliente: 1,
+    itens: [{ codigoProduto: 1, quantidade: 1, valorUnitario: 100, unidade: 'UN' }],
+    financeiros: [
+      { codigoTipoPagamento: 1, valor: 100, dataVencimento: '2024-02-01', numeroParcela: 1 },
+    ],
+  };
+
   it('criar forwards RequestOptions to restPost', async () => {
-    const input = { codigoCliente: 1, codigoEmpresa: 1, codigoTipoOperacao: 1, itens: [] };
-    await pedidos.criar(input, options);
+    await pedidos.criar(validInput, options);
 
     expect((http as Record<string, ReturnType<typeof vi.fn>>).restPost).toHaveBeenCalledWith(
       '/vendas/pedidos',
-      input,
+      validInput,
       options,
     );
   });
 
   it('criar works without options (backward compatible)', async () => {
-    const input = { codigoCliente: 1, codigoEmpresa: 1, codigoTipoOperacao: 1, itens: [] };
-    await pedidos.criar(input);
+    await pedidos.criar(validInput);
 
     expect((http as Record<string, ReturnType<typeof vi.fn>>).restPost).toHaveBeenCalledWith(
       '/vendas/pedidos',
-      input,
+      validInput,
       undefined,
     );
   });
 
   it('atualizar forwards RequestOptions to restPut', async () => {
-    const input = { codigoCliente: 1, codigoEmpresa: 1, codigoTipoOperacao: 1, itens: [] };
-    await pedidos.atualizar(42, input, options);
+    await pedidos.atualizar(42, validInput, options);
 
     expect((http as Record<string, ReturnType<typeof vi.fn>>).restPut).toHaveBeenCalledWith(
       '/vendas/pedidos/42',
-      input,
+      validInput,
       options,
     );
   });
