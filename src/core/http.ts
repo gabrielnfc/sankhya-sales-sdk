@@ -34,22 +34,22 @@ export class HttpClient {
     options?: RequestOptions,
   ): Promise<T> {
     const url = this.buildUrl(`/v1${path}`, params);
-    return this.requestWithRetry<T>(url, 'GET', path, undefined, false, options);
+    return this.requestWithRetry<T>(url, 'GET', path, undefined, 0, options);
   }
 
   async restPost<T>(path: string, body: unknown, options?: RequestOptions): Promise<T> {
     const url = this.buildUrl(`/v1${path}`);
-    return this.requestWithRetry<T>(url, 'POST', path, body, false, options);
+    return this.requestWithRetry<T>(url, 'POST', path, body, 0, options);
   }
 
   async restPut<T>(path: string, body: unknown, options?: RequestOptions): Promise<T> {
     const url = this.buildUrl(`/v1${path}`);
-    return this.requestWithRetry<T>(url, 'PUT', path, body, false, options);
+    return this.requestWithRetry<T>(url, 'PUT', path, body, 0, options);
   }
 
   async restDelete<T>(path: string, options?: RequestOptions): Promise<T> {
     const url = this.buildUrl(`/v1${path}`);
-    return this.requestWithRetry<T>(url, 'DELETE', path, undefined, false, options);
+    return this.requestWithRetry<T>(url, 'DELETE', path, undefined, 0, options);
   }
 
   async gatewayCall<T>(
@@ -71,7 +71,7 @@ export class HttpClient {
       'POST',
       path,
       { requestBody },
-      false,
+      0,
       options,
     );
 
@@ -105,7 +105,7 @@ export class HttpClient {
     method: string,
     path: string,
     body?: unknown,
-    isRetry = false,
+    authRetryDepth = 0,
     options?: RequestOptions,
   ): Promise<T> {
     const token = await this.auth.getToken();
@@ -115,7 +115,12 @@ export class HttpClient {
 
     const signals: AbortSignal[] = [internalController.signal];
     if (options?.signal) signals.push(options.signal);
-    const combinedSignal = signals.length === 1 ? signals[0] : AbortSignal.any(signals);
+    const combinedSignal =
+      signals.length === 1
+        ? signals[0]
+        : typeof AbortSignal.any === 'function'
+          ? AbortSignal.any(signals)
+          : internalController.signal;
 
     try {
       const headers: Record<string, string> = {
@@ -172,12 +177,11 @@ export class HttpClient {
         throw retryErr;
       }
 
-      if (response.status === 401 && !isRetry) {
+      if (response.status === 401 && authRetryDepth < 2) {
         this.logger.warn('Token expirado, renovando...');
-        const failedToken = token;
         await this.auth.invalidateToken();
         const newToken = await this.auth.getToken();
-        if (newToken === failedToken) {
+        if (newToken === token) {
           throw new ApiError(
             'API error: HTTP 401 — token refresh retornou o mesmo token',
             path,
@@ -186,11 +190,12 @@ export class HttpClient {
             '',
           );
         }
-        return this.requestWithRetry<T>(url, method, path, body, true, options);
+        return this.requestWithRetry<T>(url, method, path, body, authRetryDepth + 1, options);
       }
 
       if (!response.ok) {
-        const text = await response.text().catch(() => '');
+        let text = await response.text().catch(() => '');
+        text = sanitizeErrorBody(text);
         throw new ApiError(
           `API error: HTTP ${response.status} — ${text || response.statusText}`,
           path,
@@ -213,4 +218,19 @@ export class HttpClient {
       clearTimeout(timeoutId);
     }
   }
+}
+
+const MAX_ERROR_BODY_LENGTH = 500;
+
+function sanitizeErrorBody(body: string): string {
+  let sanitized = body.slice(0, MAX_ERROR_BODY_LENGTH);
+  // Strip potential stack trace lines
+  sanitized = sanitized
+    .replace(/^\s*at .+$/gm, '')
+    .replace(/\n{2,}/g, '\n')
+    .trim();
+  if (body.length > MAX_ERROR_BODY_LENGTH) {
+    sanitized += '... [truncated]';
+  }
+  return sanitized;
 }

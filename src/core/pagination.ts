@@ -74,10 +74,15 @@ export async function* createPaginator<T>(fetchFn: FetchPage<T>, startPage = 0):
 
   while (hasMore) {
     const result = await fetchFn(currentPage);
-    for (const item of result.data) {
+    const pageData = result.data;
+    const nextPage = result.page + 1;
+    const continueIterating = result.hasMore && result.data.length > 0;
+
+    for (const item of pageData) {
       yield item;
     }
-    hasMore = result.hasMore && result.data.length > 0;
-    currentPage = result.page + 1;
+
+    hasMore = continueIterating;
+    currentPage = nextPage;
   }
 }

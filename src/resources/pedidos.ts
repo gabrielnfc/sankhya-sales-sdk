@@ -1,6 +1,7 @@
 import { serialize } from '../core/gateway-serializer.js';
 import type { HttpClient } from '../core/http.js';
 import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
+import { safeParseNumber } from '../core/parse-utils.js';
 import type { PaginatedResult } from '../types/common.js';
 import type { RequestOptions } from '../types/config.js';
 import type {
@@ -222,7 +223,7 @@ export class PedidosResource {
     );
 
     const nunota = (result as Record<string, unknown>).NUNOTA;
-    return { codigoPedido: Number(nunota) || 0 };
+    return { codigoPedido: safeParseNumber(nunota, 'NUNOTA') };
   }
 
   /**

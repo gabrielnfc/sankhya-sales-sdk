@@ -34,22 +34,22 @@ export class AuthManager {
   }
 
   async getToken(): Promise<string> {
-    const cached = await this.getCachedToken();
-    if (cached) {
-      return cached;
-    }
-
     if (this.refreshPromise) {
       this.logger.debug('Aguardando refresh em andamento');
       return this.refreshPromise;
     }
-
-    this.refreshPromise = this.authenticate();
+    this.refreshPromise = this._doGetToken();
     try {
       return await this.refreshPromise;
     } finally {
       this.refreshPromise = null;
     }
+  }
+
+  private async _doGetToken(): Promise<string> {
+    const cached = await this.getCachedToken();
+    if (cached) return cached;
+    return this.authenticate();
   }
 
   async invalidateToken(): Promise<void> {
@@ -66,6 +66,11 @@ export class AuthManager {
       if (cached) {
         try {
           const data: TokenData = JSON.parse(cached);
+          if (typeof data.accessToken !== 'string' || typeof data.expiresAt !== 'number') {
+            this.logger.warn('Token em cache com formato invalido, ignorando');
+            await this.cacheProvider.del(TOKEN_CACHE_KEY);
+            return null;
+          }
           if (data.expiresAt > Date.now()) {
             return data.accessToken;
           }

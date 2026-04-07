@@ -1,6 +1,7 @@
 import { deserializeRows } from '../core/gateway-serializer.js';
 import type { HttpClient } from '../core/http.js';
 import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
+import { safeParseNumber } from '../core/parse-utils.js';
 import type {
   CentroResultado,
   Empresa,
@@ -286,9 +287,9 @@ export class CadastrosResource {
 
     const { rows } = deserializeRows(result);
     return rows.map((row) => ({
-      codigoTipoNegociacao: Number(row.CODTIPVENDA) || 0,
+      codigoTipoNegociacao: safeParseNumber(row.CODTIPVENDA, 'CODTIPVENDA'),
       descricao: row.DESCRTIPVENDA ?? '',
-      taxaJuro: row.TAXAJURO ? Number(row.TAXAJURO) || 0 : 0,
+      taxaJuro: row.TAXAJURO ? safeParseNumber(row.TAXAJURO, 'TAXAJURO') : 0,
       ativo: row.ATIVO === 'S',
     }));
   }
@@ -325,13 +326,13 @@ export class CadastrosResource {
 
     const { rows } = deserializeRows(result);
     return rows.map((row) => ({
-      numeroModelo: Number(row.CODMODELANOTA) || 0,
+      numeroModelo: safeParseNumber(row.CODMODELANOTA, 'CODMODELANOTA'),
       descricao: row.DESCRICAO ?? '',
-      codigoTipoOperacao: Number(row.CODTIPOPER) || 0,
-      codigoTipoNegociacao: Number(row.CODTIPVENDA) || 0,
-      codigoEmpresa: Number(row.CODEMP) || 0,
-      codigoNatureza: row.CODNAT ? Number(row.CODNAT) : undefined,
-      codigoCentroResultado: row.CODCENCUS ? Number(row.CODCENCUS) : undefined,
+      codigoTipoOperacao: safeParseNumber(row.CODTIPOPER, 'CODTIPOPER'),
+      codigoTipoNegociacao: safeParseNumber(row.CODTIPVENDA, 'CODTIPVENDA'),
+      codigoEmpresa: safeParseNumber(row.CODEMP, 'CODEMP'),
+      codigoNatureza: row.CODNAT ? safeParseNumber(row.CODNAT, 'CODNAT') : undefined,
+      codigoCentroResultado: row.CODCENCUS ? safeParseNumber(row.CODCENCUS, 'CODCENCUS') : undefined,
     }));
   }
 }
