@@ -35,6 +35,7 @@ export default defineConfig({
     env: loadEnv(),
     coverage: {
       provider: 'v8',
+      reporter: ['text', 'json-summary'],
       include: ['src/**/*.ts'],
       exclude: ['src/types/**/*.ts', 'src/index.ts', 'src/resources/index.ts'],
       thresholds: {
