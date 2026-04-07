@@ -12,7 +12,11 @@ export function safeParseNumber(value: unknown, fieldName: string): number {
     return 0;
   }
   // Gateway returns {} for empty numeric fields (e.g., TAXAJURO)
+  // After deserialization this may be an object {} or string "{}"
   if (typeof value === 'object') {
+    return 0;
+  }
+  if (typeof value === 'string' && (value.trim() === '{}' || value.trim() === '')) {
     return 0;
   }
   const n = Number(value);
