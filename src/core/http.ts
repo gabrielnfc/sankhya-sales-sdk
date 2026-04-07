@@ -137,7 +137,7 @@ export class HttpClient {
         headers['X-Idempotency-Key'] = options.idempotencyKey;
       }
 
-      this.logger.debug(`${method} ${url}`);
+      this.logger.debug(`${method} ${sanitizeUrl(url)}`);
 
       let response: Response;
       try {
@@ -217,6 +217,18 @@ export class HttpClient {
     } finally {
       clearTimeout(timeoutId);
     }
+  }
+}
+
+function sanitizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.search) {
+      return `${parsed.origin}${parsed.pathname}?[params redacted]`;
+    }
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return '[invalid url]';
   }
 }
 

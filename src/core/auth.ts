@@ -16,6 +16,8 @@ export class AuthManager {
 
   private memoryCache: TokenData | null = null;
   private refreshPromise: Promise<string> | null = null;
+  private consecutiveFailures = 0;
+  private circuitOpenUntil = 0;
 
   constructor(
     baseUrl: string,
@@ -47,9 +49,31 @@ export class AuthManager {
   }
 
   private async _doGetToken(): Promise<string> {
+    // Circuit breaker: fast-fail if auth is repeatedly failing
+    if (this.consecutiveFailures >= 3 && Date.now() < this.circuitOpenUntil) {
+      throw new AuthError(
+        `Circuit breaker aberto: ${this.consecutiveFailures} falhas consecutivas de autenticacao. Tentando novamente em ${Math.ceil((this.circuitOpenUntil - Date.now()) / 1000)}s`,
+      );
+    }
+
     const cached = await this.getCachedToken();
     if (cached) return cached;
-    return this.authenticate();
+
+    try {
+      const token = await this.authenticate();
+      this.consecutiveFailures = 0;
+      return token;
+    } catch (error) {
+      this.consecutiveFailures++;
+      // Open circuit for 30s after 3 consecutive failures
+      if (this.consecutiveFailures >= 3) {
+        this.circuitOpenUntil = Date.now() + 30_000;
+        this.logger.warn(
+          `Circuit breaker aberto apos ${this.consecutiveFailures} falhas. Proxima tentativa em 30s.`,
+        );
+      }
+      throw error;
+    }
   }
 
   async invalidateToken(): Promise<void> {

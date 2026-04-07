@@ -14,7 +14,7 @@ export class SankhyaError extends Error {
     this.name = 'SankhyaError';
     this.code = code;
     this.statusCode = statusCode;
-    this.details = details;
+    this.details = truncateDetails(details);
   }
 }
 
@@ -164,4 +164,24 @@ export function isGatewayError(err: unknown): err is GatewayError {
  */
 export function isTimeoutError(err: unknown): err is TimeoutError {
   return err instanceof TimeoutError;
+}
+
+const MAX_DETAILS_LENGTH = 1000;
+
+function truncateDetails(details: unknown): unknown {
+  if (details === undefined || details === null) return details;
+  if (typeof details === 'string') {
+    return details.length > MAX_DETAILS_LENGTH
+      ? `${details.slice(0, MAX_DETAILS_LENGTH)}... [truncated]`
+      : details;
+  }
+  try {
+    const serialized = JSON.stringify(details);
+    if (serialized.length > MAX_DETAILS_LENGTH) {
+      return `${serialized.slice(0, MAX_DETAILS_LENGTH)}... [truncated]`;
+    }
+    return details;
+  } catch {
+    return '[unserializable details]';
+  }
 }
