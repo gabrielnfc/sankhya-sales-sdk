@@ -128,7 +128,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [ ] 07-01-PLAN.md — Package config: sideEffects, files array, prepublishOnly, .npmignore, noFallthroughCasesInSwitch
-- [ ] 07-02-PLAN.md — TypeScript strict: exactOptionalPropertyTypes with code fixes
+- [x] 07-02-PLAN.md — TypeScript strict: exactOptionalPropertyTypes with code fixes
 - [ ] 07-03-PLAN.md — Final validation: publint, attw, any-audit, tarball, prepublishOnly
 
 ### Phase 8: CI/CD & Release
@@ -152,5 +152,5 @@ Plans:
 | 4. Public API Surface | 1/3 | In Progress | - |
 | 5. Test Coverage Hardening | 2/3 | In Progress|  |
 | 6. Documentation | 3/3 | Complete   | 2026-04-07 |
-| 7. Package Validation | 0/TBD | Not started | - |
+| 7. Package Validation | 1/3 | In Progress|  |
 | 8. CI/CD & Release | 0/TBD | Not started | - |
