@@ -1,0 +1,23 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SANKHYA_BASE_URL: ${{ secrets.SANKHYA_BASE_URL }}
+      SANKHYA_CLIENT_ID: ${{ secrets.SANKHYA_CLIENT_ID }}
+      SANKHYA_CLIENT_SECRET: ${{ secrets.SANKHYA_CLIENT_SECRET }}
+      SANKHYA_X_TOKEN: ${{ secrets.SANKHYA_X_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run test:integration
