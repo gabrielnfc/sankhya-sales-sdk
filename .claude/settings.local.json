@@ -21,7 +21,8 @@
       "Bash(npm pack:*)",
       "Skill(gsd:fast)",
       "Bash(npm audit:*)",
-      "Skill(gsd:quick)"
+      "Skill(gsd:quick)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

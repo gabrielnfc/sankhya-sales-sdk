@@ -1,5 +1,8 @@
 export function toSankhyaDate(input: Date | string): string {
   const date = typeof input === 'string' ? new Date(input) : input;
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Data invalida: "${String(input)}"`);
+  }
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const year = date.getFullYear();
@@ -8,6 +11,9 @@ export function toSankhyaDate(input: Date | string): string {
 
 export function toSankhyaDateTime(input: Date | string): string {
   const date = typeof input === 'string' ? new Date(input) : input;
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Data invalida: "${String(input)}"`);
+  }
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const year = date.getFullYear();

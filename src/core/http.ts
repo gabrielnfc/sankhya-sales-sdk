@@ -156,7 +156,7 @@ export class HttpClient {
             }
             return res;
           },
-          { maxRetries: this.retries, method },
+          { maxRetries: this.retries, method, signal: combinedSignal },
         );
       } catch (retryErr) {
         if (

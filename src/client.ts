@@ -159,9 +159,32 @@ export class SankhyaClient {
   }
 
   private validateConfig(config: SankhyaConfig): void {
-    if (!config.baseUrl) throw new Error('baseUrl é obrigatório');
-    if (!config.clientId) throw new Error('clientId é obrigatório');
-    if (!config.clientSecret) throw new Error('clientSecret é obrigatório');
-    if (!config.xToken) throw new Error('xToken é obrigatório');
+    if (!config || typeof config !== 'object') {
+      throw new Error('config deve ser um objeto');
+    }
+    if (typeof config.baseUrl !== 'string' || !config.baseUrl) {
+      throw new Error('baseUrl é obrigatório e deve ser uma string');
+    }
+    if (typeof config.clientId !== 'string' || !config.clientId) {
+      throw new Error('clientId é obrigatório e deve ser uma string');
+    }
+    if (typeof config.clientSecret !== 'string' || !config.clientSecret) {
+      throw new Error('clientSecret é obrigatório e deve ser uma string');
+    }
+    if (typeof config.xToken !== 'string' || !config.xToken) {
+      throw new Error('xToken é obrigatório e deve ser uma string');
+    }
+    if (
+      config.timeout !== undefined &&
+      (typeof config.timeout !== 'number' || config.timeout <= 0)
+    ) {
+      throw new Error('timeout deve ser um número positivo');
+    }
+    if (
+      config.retries !== undefined &&
+      (typeof config.retries !== 'number' || config.retries < 0)
+    ) {
+      throw new Error('retries deve ser um número >= 0');
+    }
   }
 }

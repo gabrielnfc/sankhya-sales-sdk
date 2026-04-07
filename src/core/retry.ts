@@ -42,7 +42,10 @@ function isRetryable(error: unknown): boolean {
   return false;
 }
 
-export async function withRetry<T>(fn: () => Promise<T>, options?: RetryOptions): Promise<T> {
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  options?: RetryOptions & { signal?: AbortSignal | undefined },
+): Promise<T> {
   const method = options?.method?.toUpperCase();
   const effectiveMaxRetries =
     method && !SAFE_METHODS.has(method) && !options?.forceRetry
@@ -62,6 +65,7 @@ export async function withRetry<T>(fn: () => Promise<T>, options?: RetryOptions)
         throw error;
       }
 
+      if (options?.signal?.aborted) throw lastError;
       const delay = Math.random() * baseDelay * 2 ** attempt;
       await sleep(delay);
     }
