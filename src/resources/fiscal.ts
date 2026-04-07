@@ -1,4 +1,5 @@
 import type { HttpClient } from '../core/http.js';
+import { validateCalculoImpostoInput } from '../core/validators.js';
 import type {
   CalculoImpostoInput,
   ImportNfseResult,
@@ -28,6 +29,7 @@ export class FiscalResource {
    * ```
    */
   async calcularImpostos(input: CalculoImpostoInput): Promise<ResultadoCalculoImposto[]> {
+    validateCalculoImpostoInput(input, 'CalculoImpostoInput');
     return this.http.restPost('/fiscal/impostos/calculo', input);
   }
 

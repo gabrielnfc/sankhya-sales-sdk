@@ -1,5 +1,6 @@
 import type { HttpClient } from '../core/http.js';
 import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
+import { validateCriarClienteInput } from '../core/validators.js';
 import type {
   AtualizarClienteInput,
   Cliente,
@@ -54,6 +55,7 @@ export class ClientesResource {
    * ```
    */
   async criar(dados: CriarClienteInput): Promise<{ codigoCliente: number }> {
+    validateCriarClienteInput(dados, 'CriarClienteInput');
     return this.http.restPost('/parceiros/clientes', dados);
   }
 

@@ -1,6 +1,7 @@
 import { SankhyaError } from '../core/errors.js';
 import { deserializeRows, serialize } from '../core/gateway-serializer.js';
 import type { HttpClient } from '../core/http.js';
+import { validateLoadRecordsParams, validateSaveRecordParams } from '../core/validators.js';
 import type { LoadRecordParams, LoadRecordsParams, SaveRecordParams } from '../types/gateway.js';
 
 const VALID_FIELD_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -32,6 +33,7 @@ export class GatewayResource {
    * ```
    */
   async loadRecords(params: LoadRecordsParams): Promise<Record<string, string>[]> {
+    validateLoadRecordsParams(params, 'LoadRecordsParams');
     const result = await this.http.gatewayCall<Record<string, unknown>>(
       'mge',
       'CRUDServiceProvider.loadRecords',
@@ -122,6 +124,7 @@ export class GatewayResource {
    * ```
    */
   async saveRecord(params: SaveRecordParams): Promise<Record<string, string>> {
+    validateSaveRecordParams(params, 'SaveRecordParams');
     const serializedFields = serialize(params.data);
     const fieldsList = params.fields;
 
