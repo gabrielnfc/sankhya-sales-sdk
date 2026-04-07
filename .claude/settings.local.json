@@ -17,7 +17,8 @@
       "Bash(npm install:*)",
       "Bash(mkdir:*)",
       "Bash(npm run:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(npm pack:*)"
     ]
   }
 }
