@@ -64,7 +64,7 @@
 - [x] **PKGP-03**: `prepublishOnly` script configurado como gate (lint + test + build + publint)
 - [x] **PKGP-04**: `npm pack` gera pacote limpo com apenas arquivos necessários
 - [ ] **PKGP-05**: Zero `any` no código fonte
-- [ ] **PKGP-06**: TypeScript strict mode compliance total
+- [x] **PKGP-06**: TypeScript strict mode compliance total
 
 ### CI/CD & Release
 
@@ -151,7 +151,7 @@
 | PKGP-03 | Phase 7 | Complete |
 | PKGP-04 | Phase 7 | Complete |
 | PKGP-05 | Phase 7 | Pending |
-| PKGP-06 | Phase 7 | Pending |
+| PKGP-06 | Phase 7 | Complete |
 | CICD-01 | Phase 8 | Pending |
 | CICD-02 | Phase 8 | Pending |
 | CICD-03 | Phase 8 | Pending |

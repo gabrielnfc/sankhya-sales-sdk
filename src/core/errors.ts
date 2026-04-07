@@ -6,7 +6,7 @@
  */
 export class SankhyaError extends Error {
   readonly code: string;
-  readonly statusCode?: number;
+  readonly statusCode: number | undefined;
   readonly details?: unknown;
 
   constructor(message: string, code: string, statusCode?: number, details?: unknown) {
@@ -74,8 +74,8 @@ export class ApiError extends SankhyaError {
 export class GatewayError extends SankhyaError {
   override readonly code = 'GATEWAY_ERROR' as const;
   readonly serviceName: string;
-  readonly tsErrorCode?: string;
-  readonly tsErrorLevel?: string;
+  readonly tsErrorCode: string | undefined;
+  readonly tsErrorLevel: string | undefined;
 
   constructor(
     message: string,

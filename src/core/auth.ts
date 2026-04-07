@@ -12,7 +12,7 @@ export class AuthManager {
   private readonly clientSecret: string;
   private readonly xToken: string;
   private readonly logger: Logger;
-  private readonly cacheProvider?: TokenCacheProvider;
+  private readonly cacheProvider: TokenCacheProvider | undefined;
 
   private memoryCache: TokenData | null = null;
   private refreshPromise: Promise<string> | null = null;
