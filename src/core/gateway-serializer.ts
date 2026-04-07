@@ -53,7 +53,7 @@ export function deserialize(data: Record<string, unknown>): Record<string, strin
 
 export interface DeserializedRows {
   rows: Record<string, string>[];
-  totalRecords?: number;
+  totalRecords?: number | undefined;
   hasMore: boolean;
   page: number;
 }

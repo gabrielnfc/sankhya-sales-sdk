@@ -122,8 +122,8 @@ export class HttpClient {
       const response = await fetch(url, {
         method,
         headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-        signal: combinedSignal,
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        ...(combinedSignal ? { signal: combinedSignal } : {}),
       });
 
       if (response.status === 401 && !isRetry) {

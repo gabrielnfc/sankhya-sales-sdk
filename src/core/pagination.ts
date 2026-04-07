@@ -50,7 +50,7 @@ export function normalizeGatewayPagination<T>(
  */
 export function extractRestData<T>(response: Record<string, unknown>): {
   data: T[];
-  pagination?: RestPagination;
+  pagination?: RestPagination | undefined;
 } {
   const pagination = response.pagination as RestPagination | undefined;
   let data: T[] = [];

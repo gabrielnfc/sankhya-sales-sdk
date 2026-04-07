@@ -17,7 +17,7 @@ export interface PaginatedResult<T> {
   /** Indica se existem mais paginas. */
   hasMore: boolean;
   /** Total de registros (quando disponivel na API). */
-  totalRecords?: number;
+  totalRecords?: number | undefined;
 }
 
 /**

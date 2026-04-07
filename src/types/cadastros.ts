@@ -121,7 +121,7 @@ export interface ModeloNota {
   /** Codigo da empresa. */
   codigoEmpresa: number;
   /** Codigo da natureza (opcional). */
-  codigoNatureza?: number;
+  codigoNatureza?: number | undefined;
   /** Codigo do centro de resultado (opcional). */
-  codigoCentroResultado?: number;
+  codigoCentroResultado?: number | undefined;
 }
