@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
+import { getHttpClient } from '../helpers/get-http.js';
 
 const config = {
   baseUrl: process.env.SANKHYA_BASE_URL ?? '',
@@ -59,7 +60,7 @@ describe.skipIf(!has)('Validação de TODOS os paths REST v1', () => {
 
   for (const { path, params, name } of paths) {
     it(`${name} → GET /v1${path}`, async () => {
-      const http = client.getHttpClient();
+      const http = getHttpClient(client);
       try {
         const result = await http.restGet<Record<string, unknown>>(path, params);
         const keys = Object.keys(result);

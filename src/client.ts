@@ -158,11 +158,6 @@ export class SankhyaClient {
     await this.auth.invalidateToken();
   }
 
-  /** @internal */
-  getHttpClient(): HttpClient {
-    return this.http;
-  }
-
   private validateConfig(config: SankhyaConfig): void {
     if (!config.baseUrl) throw new Error('baseUrl é obrigatório');
     if (!config.clientId) throw new Error('clientId é obrigatório');

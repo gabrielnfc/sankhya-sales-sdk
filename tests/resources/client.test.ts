@@ -103,13 +103,6 @@ describe('SankhyaClient', () => {
     });
   });
 
-  describe('internal getters', () => {
-    it('getHttpClient() returns HttpClient instance', () => {
-      const client = new SankhyaClient(validConfig);
-      expect(client.getHttpClient()).toBeInstanceOf(HttpClient);
-    });
-  });
-
   describe('public methods', () => {
     it('authenticate() is a callable async function', () => {
       const client = new SankhyaClient(validConfig);

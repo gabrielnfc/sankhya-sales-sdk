@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
 import { AuthError } from '../../src/core/errors.js';
+import { getHttpClient } from '../helpers/get-http.js';
 
 const config = {
   baseUrl: process.env.SANKHYA_BASE_URL ?? '',
@@ -31,7 +32,7 @@ describe.skipIf(!hasCredentials)('Sandbox Integration', () => {
   });
 
   it('deve fazer GET REST v1 — listar produtos', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     const result = await http.restGet<Record<string, unknown>>('/produtos', { page: '0' });
     console.log('Produtos response keys:', Object.keys(result));
     console.log('Produtos response:', JSON.stringify(result, null, 2).slice(0, 500));
@@ -39,7 +40,7 @@ describe.skipIf(!hasCredentials)('Sandbox Integration', () => {
   });
 
   it('deve fazer GET REST v1 — listar vendedores', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     const result = await http.restGet<Record<string, unknown>>('/vendedores', { page: '0' });
     console.log('Vendedores response keys:', Object.keys(result));
     console.log('Vendedores response:', JSON.stringify(result, null, 2).slice(0, 500));
@@ -47,7 +48,7 @@ describe.skipIf(!hasCredentials)('Sandbox Integration', () => {
   });
 
   it('deve fazer GET REST v1 — listar clientes (parceiros)', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     const result = await http.restGet<Record<string, unknown>>('/parceiros/clientes', {
       page: '1',
     });
@@ -57,7 +58,7 @@ describe.skipIf(!hasCredentials)('Sandbox Integration', () => {
   });
 
   it('deve fazer chamada Gateway — loadRecords Produto', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     const result = await http.gatewayCall<Record<string, unknown>>(
       'mge',
       'CRUDServiceProvider.loadRecords',
@@ -82,7 +83,7 @@ describe.skipIf(!hasCredentials)('Sandbox Integration', () => {
   it('deve invalidar token e re-autenticar automaticamente', async () => {
     await client.invalidateToken();
     // Próximo request deve re-autenticar
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     const result = await http.restGet<Record<string, unknown>>('/vendedores', { page: '0' });
     expect(result).toBeDefined();
   });

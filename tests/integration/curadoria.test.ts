@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
+import { getHttpClient } from '../helpers/get-http.js';
 
 const config = {
   baseUrl: process.env.SANKHYA_BASE_URL ?? '',
@@ -25,7 +26,7 @@ describe.skipIf(!hasCredentials)('Curadoria — Formatos de Resposta Reais', () 
   // =====================================================
 
   it('REST: estrutura da resposta de produtos', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     const result = await http.restGet<Record<string, unknown>>('/produtos', { page: '0' });
     console.log('\n=== PRODUTOS — KEYS ===');
     console.log('Top-level keys:', Object.keys(result));
@@ -38,7 +39,7 @@ describe.skipIf(!hasCredentials)('Curadoria — Formatos de Resposta Reais', () 
   });
 
   it('REST: estrutura da resposta de vendedores', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     const result = await http.restGet<Record<string, unknown>>('/vendedores', { page: '0' });
     console.log('\n=== VENDEDORES — KEYS ===');
     console.log('Top-level keys:', Object.keys(result));
@@ -51,7 +52,7 @@ describe.skipIf(!hasCredentials)('Curadoria — Formatos de Resposta Reais', () 
   });
 
   it('REST: estrutura da resposta de clientes', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     const result = await http.restGet<Record<string, unknown>>('/parceiros/clientes', {
       page: '1',
     });
@@ -66,7 +67,7 @@ describe.skipIf(!hasCredentials)('Curadoria — Formatos de Resposta Reais', () 
   });
 
   it('REST: estrutura da resposta de estoque', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     try {
       const result = await http.restGet<Record<string, unknown>>('/estoques', { page: '0' });
       console.log('\n=== ESTOQUE — KEYS ===');
@@ -79,7 +80,7 @@ describe.skipIf(!hasCredentials)('Curadoria — Formatos de Resposta Reais', () 
   });
 
   it('REST: estrutura da resposta de financeiros/receitas', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     try {
       const result = await http.restGet<Record<string, unknown>>('/financeiros/receitas', {
         page: '0',
@@ -94,7 +95,7 @@ describe.skipIf(!hasCredentials)('Curadoria — Formatos de Resposta Reais', () 
   });
 
   it('REST: estrutura da resposta de tipos de operação', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     try {
       const result = await http.restGet<Record<string, unknown>>('/cadastros/tiposDeOperacao', {
         page: '0',
@@ -109,7 +110,7 @@ describe.skipIf(!hasCredentials)('Curadoria — Formatos de Resposta Reais', () 
   });
 
   it('REST: estrutura da resposta de preços por tabela', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     try {
       const result = await http.restGet<Record<string, unknown>>('/precos/porTabela/1', {
         pagina: '1',
@@ -124,7 +125,7 @@ describe.skipIf(!hasCredentials)('Curadoria — Formatos de Resposta Reais', () 
   });
 
   it('REST: estrutura da resposta de tipos de pagamento', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     try {
       const result = await http.restGet<Record<string, unknown>>('/financeiros/tiposPagamento');
       console.log('\n=== TIPOS PAGAMENTO — KEYS ===');
@@ -137,7 +138,7 @@ describe.skipIf(!hasCredentials)('Curadoria — Formatos de Resposta Reais', () 
   });
 
   it('REST: estrutura da resposta de naturezas', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     try {
       const result = await http.restGet<Record<string, unknown>>('/cadastros/naturezas', {
         page: '0',
@@ -152,7 +153,7 @@ describe.skipIf(!hasCredentials)('Curadoria — Formatos de Resposta Reais', () 
   });
 
   it('REST: estrutura da resposta de empresas', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     try {
       const result = await http.restGet<Record<string, unknown>>('/cadastros/empresas');
       console.log('\n=== EMPRESAS — KEYS ===');
@@ -169,7 +170,7 @@ describe.skipIf(!hasCredentials)('Curadoria — Formatos de Resposta Reais', () 
   // =====================================================
 
   it('Gateway: estrutura COMPLETA do loadRecords', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     const result = await http.gatewayCall<Record<string, unknown>>(
       'mge',
       'CRUDServiceProvider.loadRecords',
@@ -212,7 +213,7 @@ describe.skipIf(!hasCredentials)('Curadoria — Formatos de Resposta Reais', () 
   });
 
   it('Gateway: loadRecords com TipoNegociacao (sem REST v1)', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     try {
       const result = await http.gatewayCall<Record<string, unknown>>(
         'mge',
@@ -240,7 +241,7 @@ describe.skipIf(!hasCredentials)('Curadoria — Formatos de Resposta Reais', () 
   });
 
   it('Gateway: loadRecord (registro único)', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     try {
       const result = await http.gatewayCall<Record<string, unknown>>(
         'mge',

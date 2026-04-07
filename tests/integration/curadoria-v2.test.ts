@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
 import { deserializeRows } from '../../src/core/gateway-serializer.js';
 import { extractRestData, normalizeRestPagination } from '../../src/core/pagination.js';
+import { getHttpClient } from '../helpers/get-http.js';
 
 const config = {
   baseUrl: process.env.SANKHYA_BASE_URL ?? '',
@@ -43,7 +44,7 @@ describe.skipIf(!has)('Curadoria v2 — Validação com novos formatos', () => {
 
   for (const { path, name, params } of restEndpoints) {
     it(`REST: extractRestData + normalizeRestPagination — ${name}`, async () => {
-      const http = client.getHttpClient();
+      const http = getHttpClient(client);
       const rawResponse = await http.restGet<Record<string, unknown>>(
         path,
         params ?? { page: '0' },
@@ -72,7 +73,7 @@ describe.skipIf(!has)('Curadoria v2 — Validação com novos formatos', () => {
   // =====================================================
 
   it('Gateway: deserializeRows com loadRecords Produto', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     const result = await http.gatewayCall<Record<string, unknown>>(
       'mge',
       'CRUDServiceProvider.loadRecords',
@@ -116,7 +117,7 @@ describe.skipIf(!has)('Curadoria v2 — Validação com novos formatos', () => {
   });
 
   it('Gateway: deserializeRows com TipoNegociacao', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
     const result = await http.gatewayCall<Record<string, unknown>>(
       'mge',
       'CRUDServiceProvider.loadRecords',
@@ -150,7 +151,7 @@ describe.skipIf(!has)('Curadoria v2 — Validação com novos formatos', () => {
   });
 
   it('Gateway: deserializeRows com paginação (offsetPage diferente)', async () => {
-    const http = client.getHttpClient();
+    const http = getHttpClient(client);
 
     // Buscar página 1 (segunda página) para validar paginação Gateway
     const result = await http.gatewayCall<Record<string, unknown>>(
