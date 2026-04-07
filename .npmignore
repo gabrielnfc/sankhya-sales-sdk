@@ -8,7 +8,6 @@ tsconfig.json
 tsup.config.ts
 vitest.config.ts
 coverage/
-README.en.md
 .planning/
 examples/
 typedoc.json

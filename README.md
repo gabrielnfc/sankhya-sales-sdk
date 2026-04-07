@@ -5,7 +5,7 @@
 
 SDK TypeScript para integração com as **APIs comerciais do Sankhya ERP**. Tipagem completa, zero dependencies, paginação normalizada e gerenciamento automático de autenticação.
 
-> **[English version](./README.en.md)**
+> **[English version](./docs/README-en.md)**
 
 ## Pre-requisitos
 
