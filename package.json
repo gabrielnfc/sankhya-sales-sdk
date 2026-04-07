@@ -1,6 +1,6 @@
 {
   "name": "sankhya-sales-sdk",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "SDK TypeScript para APIs comerciais do Sankhya ERP (vendas B2B)",
   "type": "module",
   "main": "./dist/index.cjs",
