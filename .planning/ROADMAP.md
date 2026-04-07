@@ -110,7 +110,9 @@ Plans:
   6. CHANGELOG.md exists with a v0.1.0 entry and a v1.0.0-preview entry following Keep a Changelog format
 **Plans**: 3 plans
 Plans:
-- [ ] TBD
+- [ ] 06-01-PLAN.md — TypeDoc setup and CHANGELOG.md
+- [ ] 06-02-PLAN.md — TSDoc annotations on all public exports
+- [ ] 06-03-PLAN.md — README polish, error guide update, examples directory
 
 ### Phase 7: Package Validation
 **Goal**: The npm package passes all automated package validators and is structurally correct for every TypeScript and Node.js consumer configuration
@@ -147,6 +149,6 @@ Plans:
 | 3. Write-Path & E2E Validation | 0/3 | Planning complete | - |
 | 4. Public API Surface | 1/3 | In Progress | - |
 | 5. Test Coverage Hardening | 2/3 | In Progress|  |
-| 6. Documentation | 0/TBD | Not started | - |
+| 6. Documentation | 0/3 | Planning complete | - |
 | 7. Package Validation | 0/TBD | Not started | - |
 | 8. CI/CD & Release | 0/TBD | Not started | - |

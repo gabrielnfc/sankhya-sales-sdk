@@ -34,13 +34,15 @@
     "test:integration": "vitest run tests/integration/",
     "test:smoke": "tsup && node tests/smoke/cjs.cjs && node tests/smoke/esm.mjs",
     "typecheck": "tsc --noEmit",
-    "dev": "tsup --watch"
+    "dev": "tsup --watch",
+    "docs": "typedoc"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
     "@types/node": "^20.17.0",
     "@vitest/coverage-v8": "^3.2.4",
     "tsup": "^8.3.0",
+    "typedoc": "^0.28.18",
     "typescript": "^5.8.0",
     "vitest": "^3.0.0"
   },
