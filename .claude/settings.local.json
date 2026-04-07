@@ -19,7 +19,9 @@
       "Bash(npm run:*)",
       "WebSearch",
       "Bash(npm pack:*)",
-      "Skill(gsd:fast)"
+      "Skill(gsd:fast)",
+      "Bash(npm audit:*)",
+      "Skill(gsd:quick)"
     ]
   }
 }
