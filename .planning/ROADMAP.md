@@ -141,6 +141,10 @@ Plans:
   3. Pushing to main triggers `integration.yml` — integration tests run against sandbox using GitHub Secrets and results are visible
   4. Creating a `v1.0.0` git tag triggers `release.yml` — npm publishes with `--provenance` and the package appears on npmjs.com with a provenance badge
   5. A GitHub Release `v1.0.0` exists with release notes summarizing the v1.0.0 changelog and a link to the published npm package
+**Plans**: 2 plans
+Plans:
+- [ ] 08-01-PLAN.md — CI quality gates (ci.yml + integration.yml) and package.json repository field
+- [ ] 08-02-PLAN.md — Release workflow (release.yml) and CHANGELOG v1.0.0 finalization
 
 ## Progress
 
@@ -153,4 +157,4 @@ Plans:
 | 5. Test Coverage Hardening | 2/3 | In Progress|  |
 | 6. Documentation | 3/3 | Complete   | 2026-04-07 |
 | 7. Package Validation | 2/3 | In Progress|  |
-| 8. CI/CD & Release | 0/TBD | Not started | - |
+| 8. CI/CD & Release | 0/2 | Planning complete | - |
