@@ -11,7 +11,7 @@ The SDK core is complete (OAuth 2.0, HTTP client, 10 resources, dual ESM/CJS bui
 - [ ] **Phase 3: Write-Path & E2E Validation** - Validate write operations for pedidos, financeiros, fiscal, gateway; run complete B2B order flow e2e
 - [ ] **Phase 4: Public API Surface** - Add type guards, SankhyaErrorCode union, listarTodos() on all resources, idempotency keys, per-call timeout, internal audit
 - [ ] **Phase 5: Test Coverage Hardening** - Enforce 90% unit coverage, add edge case tests, write integration test suite, CJS/ESM smoke tests
-- [ ] **Phase 6: Documentation** - Write README, TSDoc all public API, configure TypeDoc, add error-handling guide, examples, CHANGELOG
+- [x] **Phase 6: Documentation** - Write README, TSDoc all public API, configure TypeDoc, add error-handling guide, examples, CHANGELOG (completed 2026-04-07)
 - [ ] **Phase 7: Package Validation** - Run publint + attw, audit exports, enforce zero any, complete strict mode compliance, validate npm pack
 - [ ] **Phase 8: CI/CD & Release** - GitHub Actions for CI + integration + release; publish v1.0.0 with npm provenance; GitHub Release
 
@@ -111,8 +111,8 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 06-01-PLAN.md — TypeDoc setup and CHANGELOG.md
-- [ ] 06-02-PLAN.md — TSDoc annotations on all public exports
-- [ ] 06-03-PLAN.md — README polish, error guide update, examples directory
+- [x] 06-02-PLAN.md — TSDoc annotations on all public exports
+- [x] 06-03-PLAN.md — README polish, error guide update, examples directory
 
 ### Phase 7: Package Validation
 **Goal**: The npm package passes all automated package validators and is structurally correct for every TypeScript and Node.js consumer configuration
@@ -149,6 +149,6 @@ Plans:
 | 3. Write-Path & E2E Validation | 0/3 | Planning complete | - |
 | 4. Public API Surface | 1/3 | In Progress | - |
 | 5. Test Coverage Hardening | 2/3 | In Progress|  |
-| 6. Documentation | 1/3 | In Progress | - |
+| 6. Documentation | 3/3 | Complete   | 2026-04-07 |
 | 7. Package Validation | 0/TBD | Not started | - |
 | 8. CI/CD & Release | 0/TBD | Not started | - |
