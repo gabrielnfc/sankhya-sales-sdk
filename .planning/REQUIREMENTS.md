@@ -52,10 +52,10 @@
 
 - [ ] **DOCS-01**: README com quick-start (< 5 min para primeira chamada) incluindo auth, install, exemplo
 - [ ] **DOCS-02**: TSDoc em todos os métodos e tipos públicos
-- [ ] **DOCS-03**: TypeDoc gerando API reference navegável
+- [x] **DOCS-03**: TypeDoc gerando API reference navegável
 - [ ] **DOCS-04**: Guia de error handling mostrando try/catch com cada classe de erro
 - [ ] **DOCS-05**: Exemplos de código funcionais (`examples/`) cobrindo cada resource principal
-- [ ] **DOCS-06**: CHANGELOG.md com formato Keep a Changelog
+- [x] **DOCS-06**: CHANGELOG.md com formato Keep a Changelog
 
 ### Package & Publishing
 
@@ -142,10 +142,10 @@
 | TEST-06 | Phase 5 | Complete |
 | DOCS-01 | Phase 6 | Pending |
 | DOCS-02 | Phase 6 | Pending |
-| DOCS-03 | Phase 6 | Pending |
+| DOCS-03 | Phase 6 | Complete |
 | DOCS-04 | Phase 6 | Pending |
 | DOCS-05 | Phase 6 | Pending |
-| DOCS-06 | Phase 6 | Pending |
+| DOCS-06 | Phase 6 | Complete |
 | PKGP-01 | Phase 7 | Pending |
 | PKGP-02 | Phase 7 | Pending |
 | PKGP-03 | Phase 7 | Pending |
