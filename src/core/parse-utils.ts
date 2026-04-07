@@ -11,6 +11,10 @@ export function safeParseNumber(value: unknown, fieldName: string): number {
   if (value === null || value === undefined || value === '') {
     return 0;
   }
+  // Gateway returns {} for empty numeric fields (e.g., TAXAJURO)
+  if (typeof value === 'object') {
+    return 0;
+  }
   const n = Number(value);
   if (!Number.isFinite(n)) {
     throw new SankhyaError(
