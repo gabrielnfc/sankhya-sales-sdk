@@ -1,11 +1,14 @@
 import { SankhyaError } from '../core/errors.js';
-import { deserializeRows, serialize } from '../core/gateway-serializer.js';
+import { type DeserializedRows, deserializeRows, serialize } from '../core/gateway-serializer.js';
 import type { HttpClient } from '../core/http.js';
 import { validateLoadRecordsParams, validateSaveRecordParams } from '../core/validators.js';
 import type { LoadRecordParams, LoadRecordsParams, SaveRecordParams } from '../types/gateway.js';
 
 const VALID_FIELD_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const BLOCKED_FIELD_NAMES = new Set(['__proto__', 'constructor', 'prototype']);
+
+/** Tamanho de pagina default do Gateway Sankhya quando nenhum filtro e aplicado. */
+const SANKHYA_DEFAULT_PAGE_SIZE = 50;
 
 /**
  * Acesso direto ao Gateway Sankhya para operacoes genericas (CRUD).
@@ -50,7 +53,9 @@ export class GatewayResource {
       },
     );
 
-    return deserializeRows(result).rows;
+    const deserialized = deserializeRows(result);
+    if (params.criteria) this.warnIfFilterPossiblyIgnored(deserialized);
+    return deserialized.rows;
   }
 
   /**
@@ -103,8 +108,26 @@ export class GatewayResource {
       },
     );
 
-    const { rows } = deserializeRows(result);
-    return rows[0] ?? null;
+    const deserialized = deserializeRows(result);
+    this.warnIfFilterPossiblyIgnored(deserialized);
+    return deserialized.rows[0] ?? null;
+  }
+
+  /**
+   * Defesa em profundidade contra o Bug #1 (criteria ignorada silenciosamente
+   * pelo servidor): se enviamos um filtro mas a resposta veio com a primeira
+   * pagina default cheia (total=50, hasMoreResult=true), o filtro provavelmente
+   * nao foi aplicado. Emite warn para flagrar regressao em vez de devolver
+   * linhas erradas em silencio.
+   */
+  private warnIfFilterPossiblyIgnored(meta: DeserializedRows): void {
+    if (meta.hasMore && meta.page === 0 && meta.totalRecords === SANKHYA_DEFAULT_PAGE_SIZE) {
+      this.http
+        .getLogger()
+        .warn(
+          `gateway: filtro (criteria) enviado mas a resposta retornou a pagina default cheia (total=${SANKHYA_DEFAULT_PAGE_SIZE}, hasMoreResult=true). O filtro pode nao ter sido aplicado pelo servidor.`,
+        );
+    }
   }
 
   /**

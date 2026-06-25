@@ -1,6 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HttpClient } from '../../src/core/http.js';
 import { GatewayResource } from '../../src/resources/gateway.js';
+
+const mockLogger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 
 function createMockHttp() {
   return {
@@ -8,11 +10,13 @@ function createMockHttp() {
     restPost: vi.fn(),
     restPut: vi.fn(),
     gatewayCall: vi.fn(),
+    getLogger: vi.fn(() => mockLogger),
   } as unknown as HttpClient & {
     restGet: ReturnType<typeof vi.fn>;
     restPost: ReturnType<typeof vi.fn>;
     restPut: ReturnType<typeof vi.fn>;
     gatewayCall: ReturnType<typeof vi.fn>;
+    getLogger: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -33,6 +37,10 @@ function makeGatewayResponse(fieldNames: string[], entities: Array<Record<string
 }
 
 describe('GatewayResource', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe('loadRecords()', () => {
     it('calls gatewayCall with correct structure and returns deserialized rows', async () => {
       const http = createMockHttp();
@@ -241,6 +249,62 @@ describe('GatewayResource', () => {
       });
 
       expect(result).toEqual({});
+    });
+  });
+
+  // Bug #3: defense-in-depth canary for a silently-ignored criteria filter.
+  describe('filter-ignored warning', () => {
+    function makeFullDefaultPage() {
+      return {
+        entities: {
+          total: '50',
+          hasMoreResult: 'true',
+          offsetPage: '0',
+          metadata: { fields: { field: [{ name: 'NUNOTA' }] } },
+          entity: Array.from({ length: 50 }, (_, i) => ({ f0: { $: String(i) } })),
+        },
+      };
+    }
+
+    it('warns when a criteria filter returns the full default page (Bug #1 symptom)', async () => {
+      const http = createMockHttp();
+      const gw = new GatewayResource(http);
+      http.gatewayCall.mockResolvedValue(makeFullDefaultPage());
+
+      await gw.loadRecords({
+        entity: 'CabecalhoNota',
+        fields: 'NUNOTA',
+        criteria: 'this.NUNOTA = 1378934',
+      });
+
+      expect(mockLogger.warn).toHaveBeenCalledTimes(1);
+      expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('filtro'));
+    });
+
+    it('does NOT warn when no criteria was sent', async () => {
+      const http = createMockHttp();
+      const gw = new GatewayResource(http);
+      http.gatewayCall.mockResolvedValue(makeFullDefaultPage());
+
+      await gw.loadRecords({ entity: 'CabecalhoNota', fields: 'NUNOTA' });
+
+      expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+
+    it('does NOT warn when the filtered result is smaller than the default page', async () => {
+      const http = createMockHttp();
+      const gw = new GatewayResource(http);
+      http.gatewayCall.mockResolvedValue(
+        makeGatewayResponse(['NUNOTA'], [{ f0: { $: '1378934' } }]),
+      );
+
+      await gw.loadRecords({
+        entity: 'CabecalhoNota',
+        fields: 'NUNOTA',
+        criteria: 'this.NUNOTA = 1378934',
+      });
+
+      expect(mockLogger.warn).not.toHaveBeenCalled();
     });
   });
 });

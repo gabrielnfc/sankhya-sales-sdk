@@ -28,6 +28,11 @@ export class HttpClient {
     this.retries = retries;
   }
 
+  /** Logger configurado, exposto para os resources emitirem diagnosticos. @internal */
+  getLogger(): Logger {
+    return this.logger;
+  }
+
   async restGet<T>(
     path: string,
     params?: Record<string, string>,
