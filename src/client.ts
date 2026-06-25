@@ -8,6 +8,7 @@ import {
   FinanceirosResource,
   FiscalResource,
   GatewayResource,
+  MetadataResource,
   PedidosResource,
   PrecosResource,
   ProdutosResource,
@@ -48,6 +49,7 @@ export class SankhyaClient {
   private _cadastros?: CadastrosResource;
   private _fiscal?: FiscalResource;
   private _gateway?: GatewayResource;
+  private _metadata?: MetadataResource;
 
   /**
    * Cria uma instancia do SDK Sankhya.
@@ -134,6 +136,12 @@ export class SankhyaClient {
   get gateway(): GatewayResource {
     this._gateway ??= new GatewayResource(this.http);
     return this._gateway;
+  }
+
+  /** Descoberta de metadata de entidades (colunas reais, incluindo campos `AD_*`). */
+  get metadata(): MetadataResource {
+    this._metadata ??= new MetadataResource(this.http);
+    return this._metadata;
   }
 
   /**

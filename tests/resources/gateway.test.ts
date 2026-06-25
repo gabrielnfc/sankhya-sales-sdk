@@ -1,6 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HttpClient } from '../../src/core/http.js';
 import { GatewayResource } from '../../src/resources/gateway.js';
+
+const mockLogger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 
 function createMockHttp() {
   return {
@@ -8,11 +10,13 @@ function createMockHttp() {
     restPost: vi.fn(),
     restPut: vi.fn(),
     gatewayCall: vi.fn(),
+    getLogger: vi.fn(() => mockLogger),
   } as unknown as HttpClient & {
     restGet: ReturnType<typeof vi.fn>;
     restPost: ReturnType<typeof vi.fn>;
     restPut: ReturnType<typeof vi.fn>;
     gatewayCall: ReturnType<typeof vi.fn>;
+    getLogger: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -33,6 +37,10 @@ function makeGatewayResponse(fieldNames: string[], entities: Array<Record<string
 }
 
 describe('GatewayResource', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe('loadRecords()', () => {
     it('calls gatewayCall with correct structure and returns deserialized rows', async () => {
       const http = createMockHttp();
@@ -81,7 +89,29 @@ describe('GatewayResource', () => {
 
       const body = http.gatewayCall.mock.calls[0][2] as Record<string, unknown>;
       const dataSet = body.dataSet as Record<string, unknown>;
-      expect(dataSet.criteria).toEqual({ expression: "this.ATIVO = 'S'" });
+      expect(dataSet.criteria).toEqual({ expression: { $: "this.ATIVO = 'S'" } });
+    });
+
+    // Regression guard for Bug #1: criteria.expression MUST be wrapped in { $: ... }.
+    // Sent as a raw string, the Sankhya server silently ignores the filter (HTTP 200,
+    // status "1") and returns the first page of unfiltered rows.
+    it('wraps criteria.expression in the Gateway { $: ... } envelope', async () => {
+      const http = createMockHttp();
+      const gw = new GatewayResource(http);
+      http.gatewayCall.mockResolvedValue(makeGatewayResponse(['NUNOTA'], []));
+
+      await gw.loadRecords({
+        entity: 'CabecalhoNota',
+        fields: 'NUNOTA',
+        criteria: 'this.NUNOTA = 1378934',
+      });
+
+      const body = http.gatewayCall.mock.calls[0][2] as Record<string, unknown>;
+      const dataSet = body.dataSet as Record<string, unknown>;
+      const criteria = dataSet.criteria as { expression: unknown };
+      expect(criteria.expression).toEqual({ $: 'this.NUNOTA = 1378934' });
+      // Never a raw string — that is the exact shape of the bug.
+      expect(typeof criteria.expression).toBe('object');
     });
 
     it('sets includePresentationFields to S when true', async () => {
@@ -138,7 +168,7 @@ describe('GatewayResource', () => {
 
       const body = http.gatewayCall.mock.calls[0][2] as Record<string, unknown>;
       const dataSet = body.dataSet as Record<string, unknown>;
-      expect(dataSet.criteria).toEqual({ expression: "this.CODPROD = '100'" });
+      expect(dataSet.criteria).toEqual({ expression: { $: "this.CODPROD = '100'" } });
       expect(dataSet.offsetPage).toBe('0');
     });
 
@@ -170,7 +200,7 @@ describe('GatewayResource', () => {
       const body = http.gatewayCall.mock.calls[0][2] as Record<string, unknown>;
       const dataSet = body.dataSet as Record<string, unknown>;
       expect(dataSet.criteria).toEqual({
-        expression: "this.CODPROD = '1' AND this.CODEMP = '2'",
+        expression: { $: "this.CODPROD = '1' AND this.CODEMP = '2'" },
       });
     });
   });
@@ -219,6 +249,62 @@ describe('GatewayResource', () => {
       });
 
       expect(result).toEqual({});
+    });
+  });
+
+  // Bug #3: defense-in-depth canary for a silently-ignored criteria filter.
+  describe('filter-ignored warning', () => {
+    function makeFullDefaultPage() {
+      return {
+        entities: {
+          total: '50',
+          hasMoreResult: 'true',
+          offsetPage: '0',
+          metadata: { fields: { field: [{ name: 'NUNOTA' }] } },
+          entity: Array.from({ length: 50 }, (_, i) => ({ f0: { $: String(i) } })),
+        },
+      };
+    }
+
+    it('warns when a criteria filter returns the full default page (Bug #1 symptom)', async () => {
+      const http = createMockHttp();
+      const gw = new GatewayResource(http);
+      http.gatewayCall.mockResolvedValue(makeFullDefaultPage());
+
+      await gw.loadRecords({
+        entity: 'CabecalhoNota',
+        fields: 'NUNOTA',
+        criteria: 'this.NUNOTA = 1378934',
+      });
+
+      expect(mockLogger.warn).toHaveBeenCalledTimes(1);
+      expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('filtro'));
+    });
+
+    it('does NOT warn when no criteria was sent', async () => {
+      const http = createMockHttp();
+      const gw = new GatewayResource(http);
+      http.gatewayCall.mockResolvedValue(makeFullDefaultPage());
+
+      await gw.loadRecords({ entity: 'CabecalhoNota', fields: 'NUNOTA' });
+
+      expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+
+    it('does NOT warn when the filtered result is smaller than the default page', async () => {
+      const http = createMockHttp();
+      const gw = new GatewayResource(http);
+      http.gatewayCall.mockResolvedValue(
+        makeGatewayResponse(['NUNOTA'], [{ f0: { $: '1378934' } }]),
+      );
+
+      await gw.loadRecords({
+        entity: 'CabecalhoNota',
+        fields: 'NUNOTA',
+        criteria: 'this.NUNOTA = 1378934',
+      });
+
+      expect(mockLogger.warn).not.toHaveBeenCalled();
     });
   });
 });

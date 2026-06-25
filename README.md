@@ -184,6 +184,39 @@ open docs/api/index.html
 | **Arquitetura** | [docs/projeto/arquitetura.md](./docs/projeto/arquitetura.md) |
 | **Tipos** | [docs/api-reference/tipos.md](./docs/api-reference/tipos.md) |
 
+## Suporte via MCP (documentação Sankhya)
+
+A Sankhya disponibiliza um servidor **MCP** oficial com a documentação da API. Se você
+desenvolve com um assistente de IA (Claude Code, Cursor, Windsurf, etc.), pode conectá-lo
+para consultar a doc da API direto no seu fluxo enquanto usa este SDK — tirar dúvidas de
+entidades, campos e serviços sem sair do editor.
+
+> Não faz parte do runtime do SDK e não é instalado pelo `npm install` — é uma ferramenta
+> de apoio ao **desenvolvimento**, opt-in, registrada no seu editor.
+
+**Endpoint:** `https://developer.sankhya.com.br/mcp` (HTTP, remoto, hospedado pela Sankhya)
+
+**Claude Code:**
+
+```bash
+claude mcp add --transport http sankhya-docs https://developer.sankhya.com.br/mcp
+```
+
+**Cursor / Windsurf / VS Code** (adicione ao `mcp.json` do editor):
+
+```json
+{
+  "mcpServers": {
+    "sankhya-docs": {
+      "url": "https://developer.sankhya.com.br/mcp"
+    }
+  }
+}
+```
+
+Contribuidores deste repositório já têm o servidor pré-configurado via [`.mcp.json`](./.mcp.json)
+na raiz (o Claude Code detecta automaticamente).
+
 ## Contribuindo
 
 Veja [CONTRIBUTING.md](./CONTRIBUTING.md) para instruções de setup, convenções e processo de PR.

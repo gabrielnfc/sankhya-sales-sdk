@@ -7,3 +7,6 @@ coverage/
 docs/api/
 .claude/
 CLAUDE.md
+
+# Internal bug-tracking docs (not shipped, not public)
+docs/bugs/
