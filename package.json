@@ -20,7 +20,12 @@
   },
   "files": [
     "dist",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "examples",
+    "docs/api-reference",
+    "docs/guia",
+    "docs/projeto",
+    "docs/README-en.md"
   ],
   "engines": {
     "node": ">=20.0.0"
