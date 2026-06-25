@@ -277,7 +277,7 @@ export class CadastrosResource {
           rootEntity: 'TipoNegociacao',
           includePresentationFields: 'N',
           offsetPage: String(params?.page ?? 0),
-          criteria: { expression: criteria },
+          criteria: { expression: { $: criteria } },
           entity: {
             fieldset: { list: 'CODTIPVENDA,DESCRTIPVENDA,ATIVO,TAXAJURO' },
           },

@@ -230,7 +230,7 @@ describe('CadastrosResource', () => {
         expect.objectContaining({
           dataSet: expect.objectContaining({
             rootEntity: 'TipoNegociacao',
-            criteria: { expression: "this.ATIVO = 'S'" },
+            criteria: { expression: { $: "this.ATIVO = 'S'" } },
           }),
         }),
       );
@@ -259,8 +259,8 @@ describe('CadastrosResource', () => {
 
       const body = http.gatewayCall.mock.calls[0][2] as Record<string, unknown>;
       const dataSet = body.dataSet as Record<string, unknown>;
-      const criteria = dataSet.criteria as { expression: string };
-      expect(criteria.expression).toBe('1 = 1');
+      const criteria = dataSet.criteria as { expression: { $: string } };
+      expect(criteria.expression).toEqual({ $: '1 = 1' });
       expect(result[0].ativo).toBe(false);
     });
 

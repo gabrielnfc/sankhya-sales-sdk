@@ -81,7 +81,29 @@ describe('GatewayResource', () => {
 
       const body = http.gatewayCall.mock.calls[0][2] as Record<string, unknown>;
       const dataSet = body.dataSet as Record<string, unknown>;
-      expect(dataSet.criteria).toEqual({ expression: "this.ATIVO = 'S'" });
+      expect(dataSet.criteria).toEqual({ expression: { $: "this.ATIVO = 'S'" } });
+    });
+
+    // Regression guard for Bug #1: criteria.expression MUST be wrapped in { $: ... }.
+    // Sent as a raw string, the Sankhya server silently ignores the filter (HTTP 200,
+    // status "1") and returns the first page of unfiltered rows.
+    it('wraps criteria.expression in the Gateway { $: ... } envelope', async () => {
+      const http = createMockHttp();
+      const gw = new GatewayResource(http);
+      http.gatewayCall.mockResolvedValue(makeGatewayResponse(['NUNOTA'], []));
+
+      await gw.loadRecords({
+        entity: 'CabecalhoNota',
+        fields: 'NUNOTA',
+        criteria: 'this.NUNOTA = 1378934',
+      });
+
+      const body = http.gatewayCall.mock.calls[0][2] as Record<string, unknown>;
+      const dataSet = body.dataSet as Record<string, unknown>;
+      const criteria = dataSet.criteria as { expression: unknown };
+      expect(criteria.expression).toEqual({ $: 'this.NUNOTA = 1378934' });
+      // Never a raw string — that is the exact shape of the bug.
+      expect(typeof criteria.expression).toBe('object');
     });
 
     it('sets includePresentationFields to S when true', async () => {
@@ -138,7 +160,7 @@ describe('GatewayResource', () => {
 
       const body = http.gatewayCall.mock.calls[0][2] as Record<string, unknown>;
       const dataSet = body.dataSet as Record<string, unknown>;
-      expect(dataSet.criteria).toEqual({ expression: "this.CODPROD = '100'" });
+      expect(dataSet.criteria).toEqual({ expression: { $: "this.CODPROD = '100'" } });
       expect(dataSet.offsetPage).toBe('0');
     });
 
@@ -170,7 +192,7 @@ describe('GatewayResource', () => {
       const body = http.gatewayCall.mock.calls[0][2] as Record<string, unknown>;
       const dataSet = body.dataSet as Record<string, unknown>;
       expect(dataSet.criteria).toEqual({
-        expression: "this.CODPROD = '1' AND this.CODEMP = '2'",
+        expression: { $: "this.CODPROD = '1' AND this.CODEMP = '2'" },
       });
     });
   });

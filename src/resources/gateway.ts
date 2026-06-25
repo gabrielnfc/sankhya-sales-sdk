@@ -42,7 +42,7 @@ export class GatewayResource {
           rootEntity: params.entity,
           includePresentationFields: params.includePresentationFields ? 'S' : 'N',
           offsetPage: String(params.page ?? 0),
-          ...(params.criteria ? { criteria: { expression: params.criteria } } : {}),
+          ...(params.criteria ? { criteria: { expression: { $: params.criteria } } } : {}),
           entity: {
             fieldset: { list: params.fields },
           },
@@ -95,7 +95,7 @@ export class GatewayResource {
           rootEntity: params.entity,
           includePresentationFields: 'N',
           offsetPage: '0',
-          criteria: { expression },
+          criteria: { expression: { $: expression } },
           entity: {
             fieldset: { list: params.fields },
           },
