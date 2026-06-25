@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "sankhya-docs": {
+      "type": "http",
+      "url": "https://developer.sankhya.com.br/mcp"
+    }
+  }
+}
