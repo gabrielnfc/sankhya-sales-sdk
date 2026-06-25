@@ -13,6 +13,7 @@ export {
   CadastrosResource,
   FiscalResource,
   GatewayResource,
+  MetadataResource,
 } from './resources/index.js';
 
 // Errors
@@ -126,6 +127,8 @@ export type {
   LoadRecordParams,
   SaveRecordParams,
   GatewayDataRow,
+  EntityField,
+  ListFieldsOptions,
 } from './types/index.js';
 
 // Enums (re-exported as values)

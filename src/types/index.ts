@@ -119,3 +119,5 @@ export type {
   SaveRecordParams,
   GatewayDataRow,
 } from './gateway.js';
+
+export type { EntityField, ListFieldsOptions } from './metadata.js';
