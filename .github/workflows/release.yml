@@ -23,10 +23,15 @@ jobs:
       - name: Quality checks and build
         run: npm run prepublishOnly
 
-      - name: Publish to npm with provenance
+      # OIDC Trusted Publishing requires npm >= 11.5.1; setup-node ships npm 10.x.
+      - name: Update npm for OIDC trusted publishing
+        run: npm install -g npm@latest
+
+      # No NODE_AUTH_TOKEN: auth comes from the GitHub OIDC id-token (id-token: write
+      # above) against the Trusted Publisher configured on npmjs.com. Provenance is
+      # attached automatically. Exempt from the account's 2FA-for-writes policy.
+      - name: Publish to npm with provenance (OIDC trusted publishing)
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Extract changelog for release
         id: changelog
