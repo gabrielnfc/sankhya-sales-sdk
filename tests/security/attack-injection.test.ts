@@ -8,6 +8,7 @@ function createMockHttp(): HttpClient {
     restPost: vi.fn(),
     restPut: vi.fn(),
     restDelete: vi.fn(),
+    getLogger: vi.fn(() => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })),
     gatewayCall: vi.fn().mockResolvedValue({
       entities: {
         total: '0',

@@ -170,14 +170,43 @@ describe('MetadataResource', () => {
       expect(mockLogger.warn).not.toHaveBeenCalled();
     });
 
-    it('coerces non-numeric length/precision to 0', async () => {
+    it('treats empty-string numeric values as 0 (via safeParseNumber)', async () => {
       const http = createMockHttp();
       const meta = new MetadataResource(http);
-      http.gatewayCall.mockResolvedValue(dbResponse([['COL', 'CLOB', 'n/a', 'Y', null, null]]));
+      http.gatewayCall.mockResolvedValue(dbResponse([['COL', 'CLOB', '', 'Y', null, null]]));
 
       const [field] = await meta.listFields('TGFCAB');
 
       expect(field.length).toBe(0);
+    });
+
+    it('throws PARSE_ERROR on a genuinely non-numeric length (shared safeParseNumber)', async () => {
+      const http = createMockHttp();
+      const meta = new MetadataResource(http);
+      http.gatewayCall.mockResolvedValue(dbResponse([['COL', 'CLOB', 'n/a', 'Y', null, null]]));
+
+      await expect(meta.listFields('TGFCAB')).rejects.toMatchObject({ code: 'PARSE_ERROR' });
+    });
+
+    it('falls back to ALL_TAB_COLUMNS when USER_TAB_COLUMNS is empty (multi-schema)', async () => {
+      const http = createMockHttp();
+      const meta = new MetadataResource(http);
+      http.gatewayCall
+        .mockResolvedValueOnce(dbResponse([])) // USER_TAB_COLUMNS: not the owner
+        .mockResolvedValueOnce(dbResponse([['CODPARC', 'NUMBER', 22, 'N', 10, 0]])); // ALL_TAB_COLUMNS
+
+      const fields = await meta.listFields('Parceiro');
+
+      expect(fields).toHaveLength(1);
+      expect(fields[0]?.name).toBe('CODPARC');
+      expect(http.gatewayCall).toHaveBeenCalledTimes(2);
+      const firstSql = (http.gatewayCall.mock.calls[0][2] as { sql: string }).sql;
+      const secondSql = (http.gatewayCall.mock.calls[1][2] as { sql: string }).sql;
+      expect(firstSql).toContain('USER_TAB_COLUMNS');
+      expect(secondSql).toContain('ALL_TAB_COLUMNS');
+      // ALL_TAB_COLUMNS spans schemas — must pin to a single OWNER to avoid
+      // duplicated/interleaved columns when a table exists under 2+ owners.
+      expect(secondSql).toContain('OWNER = (SELECT MIN(OWNER)');
     });
   });
 });

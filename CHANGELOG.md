@@ -14,7 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   uma entidade Sankhya (incluindo campos personalizados `AD_*`) sem precisar saber a
   tabela fisica Oracle nem montar SQL contra `USER_TAB_COLUMNS`. Aceita nome logico da
   entidade (mapa curado: `CabecalhoNota` → `TGFCAB`, etc.) ou tabela fisica via passthrough.
-  Suporta `{ customOnly: true }` para listar apenas campos `AD_*`. Resolve o Bug #5. (`MetadataResource`)
+  Suporta `{ customOnly: true }` para listar apenas campos `AD_*`. Consulta `USER_TAB_COLUMNS`
+  com fallback para `ALL_TAB_COLUMNS` (cobre instalacoes multi-schema onde a tabela e
+  alcancada via synonym/grant). Resolve o Bug #5. (`MetadataResource`)
 
 ### Fixed
 - Gateway `loadRecords`/`loadRecord`: `criteria.expression` agora vai no envelope

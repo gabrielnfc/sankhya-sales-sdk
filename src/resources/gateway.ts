@@ -50,7 +50,7 @@ export class GatewayResource {
       },
     );
 
-    return deserializeRows(result).rows;
+    return deserializeRows(result, this.http.getLogger()).rows;
   }
 
   /**
@@ -103,7 +103,7 @@ export class GatewayResource {
       },
     );
 
-    return deserializeRows(result).rows[0] ?? null;
+    return deserializeRows(result, this.http.getLogger()).rows[0] ?? null;
   }
 
   /**
@@ -142,7 +142,7 @@ export class GatewayResource {
       },
     );
 
-    const { rows } = deserializeRows(result);
+    const { rows } = deserializeRows(result, this.http.getLogger());
     return rows[0] ?? {};
   }
 }
