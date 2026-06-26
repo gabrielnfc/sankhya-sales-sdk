@@ -150,10 +150,29 @@ describe('MetadataResource', () => {
         const meta = new MetadataResource(http);
         http.gatewayCall.mockResolvedValue(dbResponse([]));
 
-        // Must surface a SankhyaError (never a raw TypeError from .toUpperCase()).
-        await expect(meta.listFields(input)).rejects.toBeInstanceOf(SankhyaError);
+        // Sanitized to a harmless table name and queried via the normal path —
+        // must yield METADATA_EMPTY, never a raw TypeError from .toUpperCase().
+        await expect(meta.listFields(input)).rejects.toMatchObject({ code: 'METADATA_EMPTY' });
       },
     );
+
+    it('classifies AD_ custom fields case-insensitively and respects the underscore boundary', async () => {
+      const http = createMockHttp();
+      const meta = new MetadataResource(http);
+      http.gatewayCall.mockResolvedValue(
+        dbResponse([
+          ['ad_foo', 'VARCHAR2', 10, 'Y', null, null], // lowercase custom → custom (toUpperCase)
+          ['ADITIVO', 'VARCHAR2', 10, 'Y', null, null], // starts 'AD' but not 'AD_' → NOT custom
+          ['AD_BAR', 'DATE', 7, 'Y', null, null],
+        ]),
+      );
+
+      const fields = await meta.listFields('CabecalhoNota');
+
+      expect(fields.find((f) => f.name === 'ad_foo')?.custom).toBe(true);
+      expect(fields.find((f) => f.name === 'ADITIVO')?.custom).toBe(false);
+      expect(fields.find((f) => f.name === 'AD_BAR')?.custom).toBe(true);
+    });
 
     it('queries only USER_TAB_COLUMNS once when it already returns rows (no fallback)', async () => {
       const http = createMockHttp();

@@ -111,6 +111,23 @@ describe('Security: Injection and Prototype Pollution', () => {
     ).rejects.toThrow(/invalido/);
   });
 
+  it('escapes single quotes in PK values (injection via the value, not the name)', async () => {
+    const http = createMockHttp();
+    const gw = new GatewayResource(http);
+
+    await gw.loadRecord({
+      entity: 'Parceiro',
+      fields: 'CODPARC',
+      primaryKey: { NOMEPARC: "O'Brien' OR '1'='1" },
+    });
+
+    const body = vi.mocked(http.gatewayCall).mock.calls[0][2] as {
+      dataSet: { criteria: { expression: { $: string } } };
+    };
+    // Single quotes doubled → the value stays a single SQL string literal.
+    expect(body.dataSet.criteria.expression.$).toBe("this.NOMEPARC = 'O''Brien'' OR ''1''=''1'");
+  });
+
   it('accepts valid Sankhya field names', async () => {
     const gw = new GatewayResource(createMockHttp());
 
