@@ -285,7 +285,7 @@ export class CadastrosResource {
       },
     );
 
-    const { rows } = deserializeRows(result);
+    const { rows } = deserializeRows(result, this.http.getLogger());
     return rows.map((row) => ({
       codigoTipoNegociacao: safeParseNumber(row.CODTIPVENDA, 'CODTIPVENDA'),
       descricao: row.DESCRTIPVENDA ?? '',
@@ -324,7 +324,7 @@ export class CadastrosResource {
       },
     );
 
-    const { rows } = deserializeRows(result);
+    const { rows } = deserializeRows(result, this.http.getLogger());
     return rows.map((row) => ({
       numeroModelo: safeParseNumber(row.CODMODELANOTA, 'CODMODELANOTA'),
       descricao: row.DESCRICAO ?? '',

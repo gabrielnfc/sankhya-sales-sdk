@@ -8,6 +8,7 @@ function createMockHttp(): HttpClient {
     restPost: vi.fn(),
     restPut: vi.fn(),
     restDelete: vi.fn(),
+    getLogger: vi.fn(() => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })),
     gatewayCall: vi.fn().mockResolvedValue({
       entities: {
         total: '0',
@@ -108,6 +109,23 @@ describe('Security: Injection and Prototype Pollution', () => {
         primaryKey: { '0FIELD': '1' },
       }),
     ).rejects.toThrow(/invalido/);
+  });
+
+  it('escapes single quotes in PK values (injection via the value, not the name)', async () => {
+    const http = createMockHttp();
+    const gw = new GatewayResource(http);
+
+    await gw.loadRecord({
+      entity: 'Parceiro',
+      fields: 'CODPARC',
+      primaryKey: { NOMEPARC: "O'Brien' OR '1'='1" },
+    });
+
+    const body = vi.mocked(http.gatewayCall).mock.calls[0][2] as {
+      dataSet: { criteria: { expression: { $: string } } };
+    };
+    // Single quotes doubled → the value stays a single SQL string literal.
+    expect(body.dataSet.criteria.expression.$).toBe("this.NOMEPARC = 'O''Brien'' OR ''1''=''1'");
   });
 
   it('accepts valid Sankhya field names', async () => {

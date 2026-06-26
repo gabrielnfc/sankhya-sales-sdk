@@ -25,7 +25,9 @@
     "docs/api-reference",
     "docs/guia",
     "docs/projeto",
-    "docs/README-en.md"
+    "docs/en",
+    "docs/README-en.md",
+    "CONTRIBUTING.md"
   ],
   "engines": {
     "node": ">=20.0.0"

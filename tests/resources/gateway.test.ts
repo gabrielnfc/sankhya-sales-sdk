@@ -252,8 +252,12 @@ describe('GatewayResource', () => {
     });
   });
 
-  // Bug #3: defense-in-depth canary for a silently-ignored criteria filter.
-  describe('filter-ignored warning', () => {
+  // Regression: the old Bug #3 "filter-ignored" canary was a false-positive
+  // generator. A correctly-applied filter matching more than one page returns
+  // total=50 + hasMoreResult=true — IDENTICAL to an ignored filter (verified
+  // live: `total` is the per-page row count, not the grand total). So a full
+  // default page with criteria must NOT emit any warning.
+  describe('no spurious filter-ignored warning', () => {
     function makeFullDefaultPage() {
       return {
         entities: {
@@ -266,44 +270,21 @@ describe('GatewayResource', () => {
       };
     }
 
-    it('warns when a criteria filter returns the full default page (Bug #1 symptom)', async () => {
+    it('returns the full page and does NOT warn when a criteria filter fills it', async () => {
       const http = createMockHttp();
       const gw = new GatewayResource(http);
       http.gatewayCall.mockResolvedValue(makeFullDefaultPage());
 
-      await gw.loadRecords({
+      const rows = await gw.loadRecords({
         entity: 'CabecalhoNota',
         fields: 'NUNOTA',
-        criteria: 'this.NUNOTA = 1378934',
+        criteria: 'this.CODTIPOPER > 0',
       });
 
-      expect(mockLogger.warn).toHaveBeenCalledTimes(1);
-      expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('filtro'));
-    });
-
-    it('does NOT warn when no criteria was sent', async () => {
-      const http = createMockHttp();
-      const gw = new GatewayResource(http);
-      http.gatewayCall.mockResolvedValue(makeFullDefaultPage());
-
-      await gw.loadRecords({ entity: 'CabecalhoNota', fields: 'NUNOTA' });
-
-      expect(mockLogger.warn).not.toHaveBeenCalled();
-    });
-
-    it('does NOT warn when the filtered result is smaller than the default page', async () => {
-      const http = createMockHttp();
-      const gw = new GatewayResource(http);
-      http.gatewayCall.mockResolvedValue(
-        makeGatewayResponse(['NUNOTA'], [{ f0: { $: '1378934' } }]),
-      );
-
-      await gw.loadRecords({
-        entity: 'CabecalhoNota',
-        fields: 'NUNOTA',
-        criteria: 'this.NUNOTA = 1378934',
-      });
-
+      // A correctly-applied broad filter returns its rows...
+      expect(rows).toHaveLength(50);
+      expect(rows[0]).toEqual({ NUNOTA: '0' });
+      // ...with zero spurious "filter may have been ignored" noise.
       expect(mockLogger.warn).not.toHaveBeenCalled();
     });
   });

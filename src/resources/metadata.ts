@@ -1,5 +1,6 @@
 import { SankhyaError } from '../core/errors.js';
 import type { HttpClient } from '../core/http.js';
+import { safeParseNumber } from '../core/parse-utils.js';
 import type { EntityField, ListFieldsOptions } from '../types/metadata.js';
 
 /**
@@ -32,6 +33,11 @@ interface DbExplorerResponse {
   rows?: unknown[][];
   /** `true` quando o DbExplorer truncou o resultado por limite de linhas. */
   burstLimit?: boolean;
+}
+
+/** Extrai linhas de forma defensiva — tolera `rows` ausente ou nao-array. */
+function rowsOf(result: DbExplorerResponse): unknown[][] {
+  return Array.isArray(result.rows) ? result.rows : [];
 }
 
 /**
@@ -75,15 +81,16 @@ export class MetadataResource {
   async listFields(entityOrTable: string, options?: ListFieldsOptions): Promise<EntityField[]> {
     const table = this.resolveTable(entityOrTable);
 
-    const sql = `SELECT COLUMN_NAME, DATA_TYPE, DATA_LENGTH, NULLABLE, DATA_PRECISION, DATA_SCALE FROM USER_TAB_COLUMNS WHERE TABLE_NAME = '${table}' ORDER BY COLUMN_ID`;
+    // USER_TAB_COLUMNS so lista tabelas do schema conectado. Em instalacoes
+    // multi-schema a tabela e alcancada via synonym/grant de outro schema, e a
+    // primeira consulta vem vazia — cai no fallback ALL_TAB_COLUMNS (tabelas
+    // acessiveis ao usuario, possivelmente de outros schemas).
+    let result = await this.queryColumns('USER_TAB_COLUMNS', table);
+    if (rowsOf(result).length === 0) {
+      result = await this.queryColumns('ALL_TAB_COLUMNS', table);
+    }
 
-    const result = await this.http.gatewayCall<DbExplorerResponse>(
-      'mge',
-      'DbExplorerSP.executeQuery',
-      { sql },
-    );
-
-    const rows = result.rows ?? [];
+    const rows = rowsOf(result);
     if (rows.length === 0) {
       throw new SankhyaError(
         `Entidade ou tabela '${entityOrTable}' (resolvida para '${table}') nao retornou colunas. Verifique o nome ou passe a tabela fisica Oracle diretamente.`,
@@ -103,6 +110,30 @@ export class MetadataResource {
     return options?.customOnly ? fields.filter((f) => f.custom) : fields;
   }
 
+  /**
+   * Consulta as colunas de `table` numa view de dicionario Oracle. `view` e um
+   * literal interno (nao entrada do usuario); `table` ja passou pelo guard
+   * anti-injection em resolveTable.
+   *
+   * `ALL_TAB_COLUMNS` cruza schemas: se a mesma `TABLE_NAME` existir em mais de
+   * um OWNER acessivel, sem filtro as colunas viriam duplicadas e intercaladas.
+   * Por isso fixamos um unico OWNER deterministico (`MIN(OWNER)`). Ressalva: se
+   * dois schemas tiverem tabelas DIFERENTES com o mesmo nome, retorna a do owner
+   * alfabeticamente menor — improvavel dado o naming global unico do Sankhya.
+   */
+  private queryColumns(
+    view: 'USER_TAB_COLUMNS' | 'ALL_TAB_COLUMNS',
+    table: string,
+  ): Promise<DbExplorerResponse> {
+    const select = `SELECT COLUMN_NAME, DATA_TYPE, DATA_LENGTH, NULLABLE, DATA_PRECISION, DATA_SCALE FROM ${view} WHERE TABLE_NAME = '${table}'`;
+    const ownerClause =
+      view === 'ALL_TAB_COLUMNS'
+        ? ` AND OWNER = (SELECT MIN(OWNER) FROM ALL_TAB_COLUMNS WHERE TABLE_NAME = '${table}')`
+        : '';
+    const sql = `${select}${ownerClause} ORDER BY COLUMN_ID`;
+    return this.http.gatewayCall<DbExplorerResponse>('mge', 'DbExplorerSP.executeQuery', { sql });
+  }
+
   /** Resolve entidade logica -> tabela fisica, com passthrough e validacao. */
   private resolveTable(entityOrTable: string): string {
     if (typeof entityOrTable !== 'string' || entityOrTable.trim() === '') {
@@ -112,7 +143,10 @@ export class MetadataResource {
       );
     }
     const trimmed = entityOrTable.trim();
-    const mapped = ENTITY_TABLE_MAP[trimmed.toLowerCase()];
+    // Object.hasOwn evita resolver chaves herdadas do prototype
+    // (`__proto__`, `constructor`, `toString`) para membros do Object.prototype.
+    const key = trimmed.toLowerCase();
+    const mapped = Object.hasOwn(ENTITY_TABLE_MAP, key) ? ENTITY_TABLE_MAP[key] : undefined;
     const table = (mapped ?? trimmed).toUpperCase();
 
     if (!VALID_TABLE_NAME.test(table)) {
@@ -130,17 +164,12 @@ export class MetadataResource {
     const field: EntityField = {
       name,
       type: String(row[1] ?? ''),
-      length: this.toNumber(row[2]),
+      length: safeParseNumber(row[2], 'DATA_LENGTH'),
       nullable: String(row[3] ?? '').toUpperCase() === 'Y',
       custom: name.toUpperCase().startsWith('AD_'),
     };
-    if (row[4] != null) field.precision = this.toNumber(row[4]);
-    if (row[5] != null) field.scale = this.toNumber(row[5]);
+    if (row[4] != null) field.precision = safeParseNumber(row[4], 'DATA_PRECISION');
+    if (row[5] != null) field.scale = safeParseNumber(row[5], 'DATA_SCALE');
     return field;
-  }
-
-  private toNumber(value: unknown): number {
-    const n = typeof value === 'number' ? value : Number(value);
-    return Number.isFinite(n) ? n : 0;
   }
 }

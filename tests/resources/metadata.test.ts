@@ -143,6 +143,50 @@ describe('MetadataResource', () => {
       expect(http.gatewayCall).not.toHaveBeenCalled();
     });
 
+    it.each(['__proto__', 'constructor', 'toString'])(
+      'does not resolve prototype-chain key %p to an inherited member',
+      async (input) => {
+        const http = createMockHttp();
+        const meta = new MetadataResource(http);
+        http.gatewayCall.mockResolvedValue(dbResponse([]));
+
+        // Sanitized to a harmless table name and queried via the normal path —
+        // must yield METADATA_EMPTY, never a raw TypeError from .toUpperCase().
+        await expect(meta.listFields(input)).rejects.toMatchObject({ code: 'METADATA_EMPTY' });
+      },
+    );
+
+    it('classifies AD_ custom fields case-insensitively and respects the underscore boundary', async () => {
+      const http = createMockHttp();
+      const meta = new MetadataResource(http);
+      http.gatewayCall.mockResolvedValue(
+        dbResponse([
+          ['ad_foo', 'VARCHAR2', 10, 'Y', null, null], // lowercase custom → custom (toUpperCase)
+          ['ADITIVO', 'VARCHAR2', 10, 'Y', null, null], // starts 'AD' but not 'AD_' → NOT custom
+          ['AD_BAR', 'DATE', 7, 'Y', null, null],
+        ]),
+      );
+
+      const fields = await meta.listFields('CabecalhoNota');
+
+      expect(fields.find((f) => f.name === 'ad_foo')?.custom).toBe(true);
+      expect(fields.find((f) => f.name === 'ADITIVO')?.custom).toBe(false);
+      expect(fields.find((f) => f.name === 'AD_BAR')?.custom).toBe(true);
+    });
+
+    it('queries only USER_TAB_COLUMNS once when it already returns rows (no fallback)', async () => {
+      const http = createMockHttp();
+      const meta = new MetadataResource(http);
+      http.gatewayCall.mockResolvedValue(dbResponse([['NUNOTA', 'NUMBER', 22, 'N', 10, 0]]));
+
+      await meta.listFields('CabecalhoNota');
+
+      expect(http.gatewayCall).toHaveBeenCalledTimes(1);
+      expect((http.gatewayCall.mock.calls[0][2] as { sql: string }).sql).toContain(
+        'USER_TAB_COLUMNS',
+      );
+    });
+
     it('warns when DbExplorer truncates the result (burstLimit)', async () => {
       const http = createMockHttp();
       const meta = new MetadataResource(http);
@@ -170,14 +214,43 @@ describe('MetadataResource', () => {
       expect(mockLogger.warn).not.toHaveBeenCalled();
     });
 
-    it('coerces non-numeric length/precision to 0', async () => {
+    it('treats empty-string numeric values as 0 (via safeParseNumber)', async () => {
       const http = createMockHttp();
       const meta = new MetadataResource(http);
-      http.gatewayCall.mockResolvedValue(dbResponse([['COL', 'CLOB', 'n/a', 'Y', null, null]]));
+      http.gatewayCall.mockResolvedValue(dbResponse([['COL', 'CLOB', '', 'Y', null, null]]));
 
       const [field] = await meta.listFields('TGFCAB');
 
       expect(field.length).toBe(0);
+    });
+
+    it('throws PARSE_ERROR on a genuinely non-numeric length (shared safeParseNumber)', async () => {
+      const http = createMockHttp();
+      const meta = new MetadataResource(http);
+      http.gatewayCall.mockResolvedValue(dbResponse([['COL', 'CLOB', 'n/a', 'Y', null, null]]));
+
+      await expect(meta.listFields('TGFCAB')).rejects.toMatchObject({ code: 'PARSE_ERROR' });
+    });
+
+    it('falls back to ALL_TAB_COLUMNS when USER_TAB_COLUMNS is empty (multi-schema)', async () => {
+      const http = createMockHttp();
+      const meta = new MetadataResource(http);
+      http.gatewayCall
+        .mockResolvedValueOnce(dbResponse([])) // USER_TAB_COLUMNS: not the owner
+        .mockResolvedValueOnce(dbResponse([['CODPARC', 'NUMBER', 22, 'N', 10, 0]])); // ALL_TAB_COLUMNS
+
+      const fields = await meta.listFields('Parceiro');
+
+      expect(fields).toHaveLength(1);
+      expect(fields[0]?.name).toBe('CODPARC');
+      expect(http.gatewayCall).toHaveBeenCalledTimes(2);
+      const firstSql = (http.gatewayCall.mock.calls[0][2] as { sql: string }).sql;
+      const secondSql = (http.gatewayCall.mock.calls[1][2] as { sql: string }).sql;
+      expect(firstSql).toContain('USER_TAB_COLUMNS');
+      expect(secondSql).toContain('ALL_TAB_COLUMNS');
+      // ALL_TAB_COLUMNS spans schemas — must pin to a single OWNER to avoid
+      // duplicated/interleaved columns when a table exists under 2+ owners.
+      expect(secondSql).toContain('OWNER = (SELECT MIN(OWNER)');
     });
   });
 });
