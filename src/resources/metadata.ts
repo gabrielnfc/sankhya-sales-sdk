@@ -35,6 +35,11 @@ interface DbExplorerResponse {
   burstLimit?: boolean;
 }
 
+/** Extrai linhas de forma defensiva — tolera `rows` ausente ou nao-array. */
+function rowsOf(result: DbExplorerResponse): unknown[][] {
+  return Array.isArray(result.rows) ? result.rows : [];
+}
+
 /**
  * Descoberta de metadata de entidades Sankhya.
  *
@@ -81,11 +86,11 @@ export class MetadataResource {
     // primeira consulta vem vazia — cai no fallback ALL_TAB_COLUMNS (tabelas
     // acessiveis ao usuario, possivelmente de outros schemas).
     let result = await this.queryColumns('USER_TAB_COLUMNS', table);
-    if ((result.rows ?? []).length === 0) {
+    if (rowsOf(result).length === 0) {
       result = await this.queryColumns('ALL_TAB_COLUMNS', table);
     }
 
-    const rows = result.rows ?? [];
+    const rows = rowsOf(result);
     if (rows.length === 0) {
       throw new SankhyaError(
         `Entidade ou tabela '${entityOrTable}' (resolvida para '${table}') nao retornou colunas. Verifique o nome ou passe a tabela fisica Oracle diretamente.`,
@@ -138,7 +143,10 @@ export class MetadataResource {
       );
     }
     const trimmed = entityOrTable.trim();
-    const mapped = ENTITY_TABLE_MAP[trimmed.toLowerCase()];
+    // Object.hasOwn evita resolver chaves herdadas do prototype
+    // (`__proto__`, `constructor`, `toString`) para membros do Object.prototype.
+    const key = trimmed.toLowerCase();
+    const mapped = Object.hasOwn(ENTITY_TABLE_MAP, key) ? ENTITY_TABLE_MAP[key] : undefined;
     const table = (mapped ?? trimmed).toUpperCase();
 
     if (!VALID_TABLE_NAME.test(table)) {

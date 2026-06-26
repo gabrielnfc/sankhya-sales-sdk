@@ -24,8 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   e retornava as 50 primeiras linhas (Bug #1/#2).
 
 ### Packaging
-- `examples/` e `docs/` referenciados no README agora sao publicados no pacote npm,
-  incluindo `docs/en/` (alvo de links em `docs/README-en.md`) (Bug #4).
+- Arquivos referenciados no README agora sao publicados no pacote npm: `examples/`,
+  `docs/` (incluindo `docs/en/`, alvo de links em `docs/README-en.md`) e
+  `CONTRIBUTING.md` — eliminando links quebrados no pacote instalado (Bug #4).
 
 ## [1.0.0] - 2026-04-07
 

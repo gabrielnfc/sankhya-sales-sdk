@@ -143,6 +143,31 @@ describe('MetadataResource', () => {
       expect(http.gatewayCall).not.toHaveBeenCalled();
     });
 
+    it.each(['__proto__', 'constructor', 'toString'])(
+      'does not resolve prototype-chain key %p to an inherited member',
+      async (input) => {
+        const http = createMockHttp();
+        const meta = new MetadataResource(http);
+        http.gatewayCall.mockResolvedValue(dbResponse([]));
+
+        // Must surface a SankhyaError (never a raw TypeError from .toUpperCase()).
+        await expect(meta.listFields(input)).rejects.toBeInstanceOf(SankhyaError);
+      },
+    );
+
+    it('queries only USER_TAB_COLUMNS once when it already returns rows (no fallback)', async () => {
+      const http = createMockHttp();
+      const meta = new MetadataResource(http);
+      http.gatewayCall.mockResolvedValue(dbResponse([['NUNOTA', 'NUMBER', 22, 'N', 10, 0]]));
+
+      await meta.listFields('CabecalhoNota');
+
+      expect(http.gatewayCall).toHaveBeenCalledTimes(1);
+      expect((http.gatewayCall.mock.calls[0][2] as { sql: string }).sql).toContain(
+        'USER_TAB_COLUMNS',
+      );
+    });
+
     it('warns when DbExplorer truncates the result (burstLimit)', async () => {
       const http = createMockHttp();
       const meta = new MetadataResource(http);
