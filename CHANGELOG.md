@@ -20,11 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Gateway `loadRecords`/`loadRecord`: `criteria.expression` agora vai no envelope
   `{ $: ... }` exigido pelo servidor — antes o filtro era ignorado silenciosamente
   e retornava as 50 primeiras linhas (Bug #1/#2).
-- Aviso (`warn`) quando uma `criteria` e enviada mas a resposta volta com a pagina
-  default cheia (`total=50, hasMoreResult=true`), sintoma de filtro nao aplicado (Bug #3).
 
 ### Packaging
-- `examples/` e `docs/` referenciados no README agora sao publicados no pacote npm (Bug #4).
+- `examples/` e `docs/` referenciados no README agora sao publicados no pacote npm,
+  incluindo `docs/en/` (alvo de links em `docs/README-en.md`) (Bug #4).
 
 ## [1.0.0] - 2026-04-07
 

@@ -25,6 +25,7 @@
     "docs/api-reference",
     "docs/guia",
     "docs/projeto",
+    "docs/en",
     "docs/README-en.md"
   ],
   "engines": {
