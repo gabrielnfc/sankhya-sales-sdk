@@ -106,7 +106,7 @@ describe('FinanceirosResource', () => {
   });
 
   describe('registrarReceita()', () => {
-    it('calls restPost with /financeiros/receitas', async () => {
+    it('converts ISO dates to dd/MM/yyyy and unwraps codigoFinanceiro', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
       const dados = {
@@ -119,24 +119,69 @@ describe('FinanceirosResource', () => {
         dataVencimento: '2024-02-01',
         valorParcela: 100,
       };
-      http.restPost.mockResolvedValue({ id: 1 });
+      http.restPost.mockResolvedValue({ retorno: { codigoFinanceiro: '777' } });
 
       const result = await fin.registrarReceita(dados);
 
       expect(http.restPost).toHaveBeenCalledTimes(1);
       const [path, body] = http.restPost.mock.calls[0];
       expect(path).toBe('/financeiros/receitas');
-      expect(body).toEqual(dados);
-      expect(result).toEqual({ id: 1 });
+      expect(body).toEqual({
+        ...dados,
+        dataNegociacao: '01/01/2024',
+        dataVencimento: '01/02/2024',
+      });
+      expect(result).toEqual({ codigoFinanceiro: 777 });
+    });
+
+    it('ignores envelope.codigo (status) and throws when retorno has no codigoFinanceiro', async () => {
+      const http = createMockHttp();
+      const fin = new FinanceirosResource(http);
+      const dados = {
+        codigoEmpresa: 1,
+        codigoTipoOperacao: 1,
+        codigoNatureza: 1,
+        codigoParceiro: 10,
+        codigoTipoPagamento: 1,
+        dataNegociacao: '2024-01-01',
+        dataVencimento: '2024-02-01',
+        valorParcela: 100,
+      };
+      // codigo=200 e status do envelope, NAO o NUFIN -> deve lancar
+      http.restPost.mockResolvedValue({ codigo: 200, tipo: 'OK', mensagem: 'ok', retorno: {} });
+
+      await expect(fin.registrarReceita(dados)).rejects.toThrow('sem codigoFinanceiro');
+    });
+
+    it('merges camposExtras (AD_) into the payload', async () => {
+      const http = createMockHttp();
+      const fin = new FinanceirosResource(http);
+      http.restPost.mockResolvedValue({ retorno: { codigoFinanceiro: 1 } });
+
+      await fin.registrarReceita({
+        codigoEmpresa: 1,
+        codigoTipoOperacao: 1,
+        codigoNatureza: 1,
+        codigoParceiro: 10,
+        codigoTipoPagamento: 1,
+        dataNegociacao: '2024-01-01',
+        dataVencimento: '2024-02-01',
+        valorParcela: 100,
+        camposExtras: { AD_CODRECEITA: 'X' },
+      });
+
+      const body = http.restPost.mock.calls[0][1] as Record<string, unknown>;
+      expect(body.AD_CODRECEITA).toBe('X');
+      expect(body.camposExtras).toBeUndefined();
     });
   });
 
   describe('atualizarReceita()', () => {
-    it('calls restPut with /financeiros/receitas/{id}', async () => {
+    it('calls restPut with /financeiros/receitas/{id} and unwraps response', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      const dados = { valor: 200 };
-      http.restPut.mockResolvedValue({ id: 5 });
+      const dados = { valorParcela: 200 };
+      http.restPut.mockResolvedValue({ retorno: { codigoFinanceiro: 5 } });
 
       const result = await fin.atualizarReceita(5, dados);
 
@@ -144,24 +189,39 @@ describe('FinanceirosResource', () => {
       const [path, body] = http.restPut.mock.calls[0];
       expect(path).toBe('/financeiros/receitas/5');
       expect(body).toEqual(dados);
-      expect(result).toEqual({ id: 5 });
+      expect(result).toEqual({ codigoFinanceiro: 5 });
     });
   });
 
   describe('baixarReceita()', () => {
-    it('calls restPost with /financeiros/receitas/baixa', async () => {
+    it('puts codigoFinanceiro in path, converts dataBaixa, unwraps response', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      const dados = { codigoFinanceiro: 1 };
-      http.restPost.mockResolvedValue({ ok: true });
+      http.restPost.mockResolvedValue({ retorno: { codigoFinanceiro: 1 } });
 
-      const result = await fin.baixarReceita(dados);
+      const result = await fin.baixarReceita({
+        codigoFinanceiro: 1,
+        dataBaixa: '2024-03-15',
+        valorBaixa: 100,
+        codigoContaBancaria: 42,
+      });
 
       expect(http.restPost).toHaveBeenCalledTimes(1);
       const [path, body] = http.restPost.mock.calls[0];
-      expect(path).toBe('/financeiros/receitas/baixa');
-      expect(body).toEqual(dados);
-      expect(result).toEqual({ ok: true });
+      expect(path).toBe('/financeiros/receitas/1/baixa');
+      expect(body).toEqual({ dataBaixa: '15/03/2024', valorBaixa: 100, codigoContaBancaria: 42 });
+      expect(body).not.toHaveProperty('codigoFinanceiro');
+      expect(result).toEqual({ codigoFinanceiro: 1 });
+    });
+
+    it('throws when dataBaixa is missing', async () => {
+      const http = createMockHttp();
+      const fin = new FinanceirosResource(http);
+      await expect(
+        fin.baixarReceita({ codigoFinanceiro: 1 } as unknown as Parameters<
+          typeof fin.baixarReceita
+        >[0]),
+      ).rejects.toThrow('dataBaixa');
     });
   });
 
@@ -194,44 +254,51 @@ describe('FinanceirosResource', () => {
         dataVencimento: '2024-02-01',
         valorParcela: 50,
       };
-      http.restPost.mockResolvedValue({ id: 2 });
+      http.restPost.mockResolvedValue({ retorno: { codigoFinanceiro: 2 } });
 
-      await fin.registrarDespesa(dados);
+      const result = await fin.registrarDespesa(dados);
 
       expect(http.restPost).toHaveBeenCalledTimes(1);
       const [path, body] = http.restPost.mock.calls[0];
       expect(path).toBe('/financeiros/despesas');
-      expect(body).toEqual(dados);
+      expect(body).toEqual({
+        ...dados,
+        dataNegociacao: '01/01/2024',
+        dataVencimento: '01/02/2024',
+      });
+      expect(result).toEqual({ codigoFinanceiro: 2 });
     });
   });
 
   describe('atualizarDespesa()', () => {
-    it('calls restPut with /financeiros/despesas/{id}', async () => {
+    it('calls restPut with /financeiros/despesas/{id} and unwraps response', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restPut.mockResolvedValue({});
+      http.restPut.mockResolvedValue({ retorno: { codigoFinanceiro: 7 } });
 
-      await fin.atualizarDespesa(7, { valor: 75 });
+      const result = await fin.atualizarDespesa(7, { valorParcela: 75 });
 
       expect(http.restPut).toHaveBeenCalledTimes(1);
       const [path, body] = http.restPut.mock.calls[0];
       expect(path).toBe('/financeiros/despesas/7');
-      expect(body).toEqual({ valor: 75 });
+      expect(body).toEqual({ valorParcela: 75 });
+      expect(result).toEqual({ codigoFinanceiro: 7 });
     });
   });
 
   describe('baixarDespesa()', () => {
-    it('calls restPost with /financeiros/despesas/baixa', async () => {
+    it('puts codigoFinanceiro in path and unwraps response', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restPost.mockResolvedValue({});
+      http.restPost.mockResolvedValue({ retorno: { codigoFinanceiro: 3 } });
 
-      await fin.baixarDespesa({ codigoFinanceiro: 3 });
+      const result = await fin.baixarDespesa({ codigoFinanceiro: 3, dataBaixa: '2024-03-15' });
 
       expect(http.restPost).toHaveBeenCalledTimes(1);
       const [path, body] = http.restPost.mock.calls[0];
-      expect(path).toBe('/financeiros/despesas/baixa');
-      expect(body).toEqual({ codigoFinanceiro: 3 });
+      expect(path).toBe('/financeiros/despesas/3/baixa');
+      expect(body).toEqual({ dataBaixa: '15/03/2024' });
+      expect(result).toEqual({ codigoFinanceiro: 3 });
     });
   });
 

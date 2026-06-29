@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-06-29
+
+Fechamento dos gaps de cobertura de vendas levantados na auditoria doc-oficial ×
+SDK × testes (clientes, financeiros, catalogo). Contratos verificados na doc
+OpenAPI **e** ao vivo no sandbox.
+
+### Fixed
+- **Baixa de financeiro (`baixarReceita`/`baixarDespesa`) usava URL e corpo errados.**
+  O contrato oficial e `POST /financeiros/{receitas|despesas}/{codigoFinanceiro}/baixa`
+  (id no **path**); o SDK enviava `codigoFinanceiro` no corpo num path sem id. Agora o
+  id vai na URL e o corpo segue o contrato (`dataBaixa` + `valorJuro`/`valorMulta`/
+  `valorDesconto`/`codigoContaBancaria`/`codigoTipoOperacao`/`observacao`). O retorno
+  e desempacotado para `{ codigoFinanceiro }` (antes `{ sucesso }`, que nunca existiu).
+- **Datas de financeiro eram enviadas em ISO e rejeitadas pelo servidor.**
+  `registrar*`/`atualizar*`/`baixar*` convertem `dataNegociacao`/`dataVencimento`/
+  `dataBaixa` para `dd/MM/yyyy` (formato exigido pelo Om — verificado ao vivo; a doc
+  documenta ISO incorretamente).
+- **`registrarReceita`/`registrarDespesa` nao expunham campos do contrato oficial.**
+  Adicionados como opcionais: `codigoBanco`, `codigoContaBancaria`, `codigoCentroResultado`,
+  `numeroNota`, `codigoProjeto`, `codigoMoeda`, `cheque`, `cartao`, `boleto`, `rateios`.
+  O retorno passou a ser desempacotado (`retorno.codigoFinanceiro`).
+- **`clientes.criar` so funcionava com `tipo` errado.** A API REST exige `'PF'`/`'PJ'`
+  (enviar `'F'`/`'J'` resultava em `TIPPESSOA` nulo — verificado ao vivo). `tipo` agora
+  aceita `'PF'`/`'PJ'` canonico e mapeia `'F'`/`'J'` legado. Alem disso `codigoCliente`
+  (string na resposta) e coagido para `number` conforme o tipo prometia.
+- **Volumes de produto usavam path inexistente.** `produtos.listarVolumes`/`buscarVolume`
+  apontavam para `/produtos/volumes`; o path oficial e `/volumes-produtos`.
+
+### Added
+- **Campos personalizados `AD_*` em clientes e financeiros.** `CriarClienteInput`/
+  `AtualizarClienteInput` ganharam `camposAdicionais` (objeto aninhado do contrato);
+  `registrar*`/`atualizar*` de financeiro ganharam `camposExtras` (merge no payload).
+  Fecha a paridade com `pedidos` (Issue #4 backlog de campos `AD_*`).
+- Tipos novos: `TipoPessoaInput`, `ChequeFinanceiroInput`, `CartaoFinanceiroInput`,
+  `BoletoFinanceiroInput`, `RateioFinanceiroInput`; validadores
+  `validateBaixarFinanceiroInput`, `validateAtualizarClienteInput`, `validateContatoInput`.
+- Validacao adicionada a `clientes.atualizar` e aos metodos de contato.
+
+### Changed
+- `BaixaResult` agora e `{ codigoFinanceiro: number }` (antes `{ sucesso: boolean }`,
+  que nunca refletia a resposta real). `valorBaixa` passou a ser opcional na baixa.
+- `tipo` de cliente: canonico `'PF'`/`'PJ'`; `'F'`/`'J'` aceitos como aliases legados.
+
+### Tests
+- Novo `tests/integration/v123-coverage.test.ts`: valida ao vivo `listarVolumes`
+  (path oficial), `registrarReceita`, o round-trip de campo `AD_*` no pedido
+  (`camposExtras` → readback) e a coercao de `codigoCliente`. Baixa, cancelamento e
+  `cliente.atualizar` ficam best-effort (dependem de config do tenant — conta
+  bancaria, `EXCLUIRPEDCONF`, cadastro de bairro).
+
 ## [1.2.2] - 2026-06-29
 
 ### Fixed

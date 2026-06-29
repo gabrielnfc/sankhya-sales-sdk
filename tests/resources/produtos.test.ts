@@ -86,7 +86,7 @@ describe('ProdutosResource', () => {
     expect(result).toHaveLength(1);
   });
 
-  it('listarVolumes() calls restGet with /produtos/volumes', async () => {
+  it('listarVolumes() calls restGet with /volumes-produtos', async () => {
     const http = createMockHttp({
       restGet: vi.fn().mockResolvedValue({
         volumes: [{ codigoVolume: 'UN' }],
@@ -96,18 +96,18 @@ describe('ProdutosResource', () => {
     const resource = new ProdutosResource(http);
     const result = await resource.listarVolumes();
 
-    expect(http.restGet).toHaveBeenCalledWith('/produtos/volumes', { page: '0' });
+    expect(http.restGet).toHaveBeenCalledWith('/volumes-produtos', { page: '0' });
     expect(result.data).toHaveLength(1);
   });
 
-  it('buscarVolume() calls restGet with /produtos/volumes/{id}', async () => {
+  it('buscarVolume() calls restGet with /volumes-produtos/{id}', async () => {
     const http = createMockHttp({
       restGet: vi.fn().mockResolvedValue({ volumes: { codigoVolume: 'CX', descricao: 'Caixa' } }),
     });
     const resource = new ProdutosResource(http);
     const result = await resource.buscarVolume('CX');
 
-    expect(http.restGet).toHaveBeenCalledWith('/produtos/volumes/CX');
+    expect(http.restGet).toHaveBeenCalledWith('/volumes-produtos/CX');
     expect(result.codigoVolume).toBe('CX');
   });
 

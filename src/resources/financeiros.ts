@@ -1,3 +1,5 @@
+import { toSankhyaDateMaybe } from '../core/date.js';
+import { SankhyaError } from '../core/errors.js';
 import type { HttpClient } from '../core/http.js';
 import {
   createPaginator,
@@ -5,7 +7,9 @@ import {
   extractRestRecordOrThrow,
   normalizeRestPagination,
 } from '../core/pagination.js';
+import { safeParseNumber } from '../core/parse-utils.js';
 import {
+  validateBaixarFinanceiroInput,
   validateRegistrarDespesaInput,
   validateRegistrarReceitaInput,
 } from '../core/validators.js';
@@ -34,6 +38,46 @@ import type {
  */
 export class FinanceirosResource {
   constructor(private readonly http: HttpClient) {}
+
+  /**
+   * Monta o payload de um movimento financeiro: converte os campos de data
+   * informados (ISO -> `dd/MM/yyyy`) e mescla `camposExtras` no objeto.
+   *
+   * @internal
+   */
+  private buildFinanceiroPayload(
+    dados: Record<string, unknown>,
+    dateFields: string[],
+  ): Record<string, unknown> {
+    const { camposExtras, ...rest } = dados;
+    const out: Record<string, unknown> = { ...rest };
+    for (const field of dateFields) {
+      if (typeof out[field] === 'string') out[field] = toSankhyaDateMaybe(out[field] as string);
+    }
+    if (camposExtras) Object.assign(out, camposExtras as Record<string, unknown>);
+    return out;
+  }
+
+  /**
+   * Desempacota o codigo do financeiro do envelope REST
+   * (`{ codigo, tipo, mensagem, retorno: { codigoFinanceiro } }`). Lanca quando
+   * ausente, em vez de fabricar um `0` silencioso.
+   *
+   * @internal
+   */
+  private extractCodigoFinanceiro(raw: unknown): number {
+    const envelope = (raw ?? {}) as Record<string, unknown>;
+    const retorno = (envelope.retorno ?? {}) as Record<string, unknown>;
+    // Nao usar `envelope.codigo`: e o status code do envelope, nao o NUFIN.
+    const value = retorno.codigoFinanceiro ?? envelope.codigoFinanceiro;
+    if (value === undefined || value === null) {
+      throw new SankhyaError(
+        'Resposta financeira sem codigoFinanceiro (envelope inesperado da API)',
+        'API_ERROR',
+      );
+    }
+    return safeParseNumber(value, 'codigoFinanceiro');
+  }
 
   // --- Tipos de Pagamento ---
 
@@ -124,7 +168,16 @@ export class FinanceirosResource {
     options?: RequestOptions,
   ): Promise<RegistrarFinanceiroResponse> {
     validateRegistrarReceitaInput(dados, 'RegistrarReceitaInput');
-    return this.http.restPost('/financeiros/receitas', dados, options);
+    const payload = this.buildFinanceiroPayload(dados as unknown as Record<string, unknown>, [
+      'dataNegociacao',
+      'dataVencimento',
+    ]);
+    const raw = await this.http.restPost<Record<string, unknown>>(
+      '/financeiros/receitas',
+      payload,
+      options,
+    );
+    return { codigoFinanceiro: this.extractCodigoFinanceiro(raw) };
   }
 
   /**
@@ -142,20 +195,40 @@ export class FinanceirosResource {
     dados: AtualizarReceitaInput,
     options?: RequestOptions,
   ): Promise<RegistrarFinanceiroResponse> {
-    return this.http.restPut(`/financeiros/receitas/${codigoFinanceiro}`, dados, options);
+    const payload = this.buildFinanceiroPayload(dados as unknown as Record<string, unknown>, [
+      'dataNegociacao',
+      'dataVencimento',
+    ]);
+    const raw = await this.http.restPut<Record<string, unknown>>(
+      `/financeiros/receitas/${codigoFinanceiro}`,
+      payload,
+      options,
+    );
+    return { codigoFinanceiro: this.extractCodigoFinanceiro(raw) };
   }
 
   /**
-   * Registra a baixa (pagamento) de uma receita.
+   * Realiza a baixa (liquidacao) de uma receita.
    *
-   * @param dados - Dados da baixa.
+   * `codigoFinanceiro` vai na URL; o restante no corpo. `dataBaixa` (ISO ou
+   * `dd/MM/yyyy`) e convertida para `dd/MM/yyyy`.
+   *
+   * @param dados - Dados da baixa (inclui o `codigoFinanceiro` a baixar).
    * @param options - Opcoes de requisicao.
-   * @returns Resposta da API.
-   * @throws {ApiError} Em erro HTTP.
+   * @returns Codigo do financeiro baixado.
+   * @throws {ApiError} Em erro HTTP (ex.: conta obrigatoria, data ausente).
    * @throws {AuthError} Se autenticacao falhar.
    */
   async baixarReceita(dados: BaixarReceitaInput, options?: RequestOptions): Promise<BaixaResult> {
-    return this.http.restPost('/financeiros/receitas/baixa', dados, options);
+    validateBaixarFinanceiroInput(dados, 'BaixarReceitaInput');
+    const { codigoFinanceiro, ...corpo } = dados;
+    const body = this.buildFinanceiroPayload(corpo, ['dataBaixa']);
+    const raw = await this.http.restPost<Record<string, unknown>>(
+      `/financeiros/receitas/${codigoFinanceiro}/baixa`,
+      body,
+      options,
+    );
+    return { codigoFinanceiro: this.extractCodigoFinanceiro(raw) };
   }
 
   // --- Despesas ---
@@ -189,7 +262,16 @@ export class FinanceirosResource {
     options?: RequestOptions,
   ): Promise<RegistrarFinanceiroResponse> {
     validateRegistrarDespesaInput(dados, 'RegistrarDespesaInput');
-    return this.http.restPost('/financeiros/despesas', dados, options);
+    const payload = this.buildFinanceiroPayload(dados as unknown as Record<string, unknown>, [
+      'dataNegociacao',
+      'dataVencimento',
+    ]);
+    const raw = await this.http.restPost<Record<string, unknown>>(
+      '/financeiros/despesas',
+      payload,
+      options,
+    );
+    return { codigoFinanceiro: this.extractCodigoFinanceiro(raw) };
   }
 
   /**
@@ -207,20 +289,40 @@ export class FinanceirosResource {
     dados: AtualizarDespesaInput,
     options?: RequestOptions,
   ): Promise<RegistrarFinanceiroResponse> {
-    return this.http.restPut(`/financeiros/despesas/${codigoFinanceiro}`, dados, options);
+    const payload = this.buildFinanceiroPayload(dados as unknown as Record<string, unknown>, [
+      'dataNegociacao',
+      'dataVencimento',
+    ]);
+    const raw = await this.http.restPut<Record<string, unknown>>(
+      `/financeiros/despesas/${codigoFinanceiro}`,
+      payload,
+      options,
+    );
+    return { codigoFinanceiro: this.extractCodigoFinanceiro(raw) };
   }
 
   /**
-   * Registra a baixa (pagamento) de uma despesa.
+   * Realiza a baixa (liquidacao) de uma despesa.
    *
-   * @param dados - Dados da baixa.
+   * `codigoFinanceiro` vai na URL; o restante no corpo. `dataBaixa` (ISO ou
+   * `dd/MM/yyyy`) e convertida para `dd/MM/yyyy`.
+   *
+   * @param dados - Dados da baixa (inclui o `codigoFinanceiro` a baixar).
    * @param options - Opcoes de requisicao.
-   * @returns Resposta da API.
-   * @throws {ApiError} Em erro HTTP.
+   * @returns Codigo do financeiro baixado.
+   * @throws {ApiError} Em erro HTTP (ex.: conta obrigatoria, data ausente).
    * @throws {AuthError} Se autenticacao falhar.
    */
   async baixarDespesa(dados: BaixarDespesaInput, options?: RequestOptions): Promise<BaixaResult> {
-    return this.http.restPost('/financeiros/despesas/baixa', dados, options);
+    validateBaixarFinanceiroInput(dados, 'BaixarDespesaInput');
+    const { codigoFinanceiro, ...corpo } = dados;
+    const body = this.buildFinanceiroPayload(corpo, ['dataBaixa']);
+    const raw = await this.http.restPost<Record<string, unknown>>(
+      `/financeiros/despesas/${codigoFinanceiro}/baixa`,
+      body,
+      options,
+    );
+    return { codigoFinanceiro: this.extractCodigoFinanceiro(raw) };
   }
 
   // --- Moedas ---
