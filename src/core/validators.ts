@@ -50,6 +50,16 @@ function requireArray(o: Record<string, unknown>, field: string, name: string): 
   }
 }
 
+/** Valida que ao menos um dos campos informados e um numero finito. */
+function requireOneOfNumber(o: Record<string, unknown>, fields: string[], name: string): void {
+  const ok = fields.some((f) => typeof o[f] === 'number' && Number.isFinite(o[f] as number));
+  if (!ok) {
+    const [first, ...aliases] = fields;
+    const hint = aliases.length ? ` (ou ${aliases.join('/')})` : '';
+    throw new SankhyaError(`${name}.${first}${hint} deve ser um numero finito`, 'VALIDATION_ERROR');
+  }
+}
+
 /**
  * Valida dados de entrada para criacao/atualizacao de pedido de venda.
  *
@@ -80,7 +90,10 @@ export function validatePedidoVendaInput(input: unknown, name: string): void {
     requireNumber(item, 'codigoProduto', `${name}.itens[${i}]`);
     requireNumber(item, 'quantidade', `${name}.itens[${i}]`);
     requireNumber(item, 'valorUnitario', `${name}.itens[${i}]`);
-    requireString(item, 'unidade', `${name}.itens[${i}]`);
+    optionalString(item, 'unidade', `${name}.itens[${i}]`);
+    optionalString(item, 'controle', `${name}.itens[${i}]`);
+    optionalNumber(item, 'codigoLocalEstoque', `${name}.itens[${i}]`);
+    optionalNumber(item, 'sequencia', `${name}.itens[${i}]`);
     optionalNumber(item, 'percentualDesconto', `${name}.itens[${i}]`);
     optionalNumber(item, 'valorDesconto', `${name}.itens[${i}]`);
   }
@@ -88,10 +101,12 @@ export function validatePedidoVendaInput(input: unknown, name: string): void {
   const financeiros = o.financeiros as unknown[];
   for (let i = 0; i < financeiros.length; i++) {
     const fin = assertObject(financeiros[i], `${name}.financeiros[${i}]`);
-    requireNumber(fin, 'codigoTipoPagamento', `${name}.financeiros[${i}]`);
-    requireNumber(fin, 'valor', `${name}.financeiros[${i}]`);
+    // Nomes canonicos com fallback para os aliases depreciados.
+    requireOneOfNumber(fin, ['tipoPagamento', 'codigoTipoPagamento'], `${name}.financeiros[${i}]`);
+    requireOneOfNumber(fin, ['valorParcela', 'valor'], `${name}.financeiros[${i}]`);
     requireString(fin, 'dataVencimento', `${name}.financeiros[${i}]`);
-    requireNumber(fin, 'numeroParcela', `${name}.financeiros[${i}]`);
+    optionalNumber(fin, 'sequencia', `${name}.financeiros[${i}]`);
+    optionalNumber(fin, 'numeroParcela', `${name}.financeiros[${i}]`);
   }
 }
 

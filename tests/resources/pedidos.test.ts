@@ -95,7 +95,7 @@ describe('PedidosResource', () => {
   });
 
   describe('criar()', () => {
-    it('calls restPost with /vendas/pedidos and input', async () => {
+    it('builds the REST payload: canonical financeiro names, sequencia, controle default, br dates', async () => {
       const http = createMockHttp();
       const pedidos = new PedidosResource(http);
       const input = {
@@ -104,9 +104,7 @@ describe('PedidosResource', () => {
         hora: '10:00',
         valorTotal: 100,
         itens: [{ codigoProduto: 1, quantidade: 1, valorUnitario: 100, unidade: 'UN' }],
-        financeiros: [
-          { codigoTipoPagamento: 1, valor: 100, dataVencimento: '2024-02-01', numeroParcela: 1 },
-        ],
+        financeiros: [{ tipoPagamento: 1, valorParcela: 100, dataVencimento: '2024-02-01' }],
       };
       http.restPost.mockResolvedValue({ codigoPedido: 42 });
 
@@ -115,13 +113,246 @@ describe('PedidosResource', () => {
       expect(http.restPost).toHaveBeenCalledTimes(1);
       const [path, body] = http.restPost.mock.calls[0];
       expect(path).toBe('/vendas/pedidos');
-      expect(body).toEqual(input);
+      expect(body).toEqual({
+        notaModelo: 1,
+        data: '01/01/2024',
+        hora: '10:00',
+        valorTotal: 100,
+        itens: [
+          {
+            codigoProduto: 1,
+            quantidade: 1,
+            valorUnitario: 100,
+            unidade: 'UN',
+            sequencia: 1,
+            controle: ' ',
+          },
+        ],
+        financeiros: [
+          { tipoPagamento: 1, valorParcela: 100, dataVencimento: '01/02/2024', sequencia: 1 },
+        ],
+      });
       expect(result.codigoPedido).toBe(42);
+    });
+
+    it('maps deprecated financeiro aliases (codigoTipoPagamento/valor/numeroParcela)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.restPost.mockResolvedValue({ codigoPedido: 1 });
+
+      await pedidos.criar({
+        notaModelo: 1,
+        data: '2024-01-01',
+        hora: '10:00',
+        valorTotal: 100,
+        itens: [{ codigoProduto: 1, quantidade: 1, valorUnitario: 100 }],
+        financeiros: [
+          { codigoTipoPagamento: 7, valor: 100, dataVencimento: '2024-02-01', numeroParcela: 3 },
+        ],
+      });
+
+      const body = http.restPost.mock.calls[0][1] as Record<string, unknown>;
+      const fin = (body.financeiros as Record<string, unknown>[])[0];
+      expect(fin).toEqual({
+        tipoPagamento: 7,
+        valorParcela: 100,
+        dataVencimento: '01/02/2024',
+        sequencia: 3,
+      });
+    });
+
+    it('auto-numbers sequencia across multiple itens and financeiros', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.restPost.mockResolvedValue({ codigoPedido: 1 });
+
+      await pedidos.criar({
+        notaModelo: 1,
+        data: '2024-01-01',
+        hora: '10:00',
+        valorTotal: 30,
+        itens: [
+          { codigoProduto: 1, quantidade: 1, valorUnitario: 10 },
+          { codigoProduto: 2, quantidade: 1, valorUnitario: 20 },
+        ],
+        financeiros: [
+          { tipoPagamento: 1, valorParcela: 15, dataVencimento: '2024-02-01' },
+          { tipoPagamento: 1, valorParcela: 15, dataVencimento: '2024-03-01' },
+        ],
+      });
+
+      const body = http.restPost.mock.calls[0][1] as Record<string, unknown>;
+      const itens = body.itens as Record<string, unknown>[];
+      const fins = body.financeiros as Record<string, unknown>[];
+      expect(itens.map((i) => i.sequencia)).toEqual([1, 2]);
+      expect(fins.map((f) => f.sequencia)).toEqual([1, 2]);
+    });
+
+    it('respects explicit sequencia and controle when provided', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.restPost.mockResolvedValue({ codigoPedido: 1 });
+
+      await pedidos.criar({
+        notaModelo: 1,
+        data: '2024-01-01',
+        hora: '10:00',
+        valorTotal: 10,
+        itens: [
+          {
+            codigoProduto: 1,
+            quantidade: 1,
+            valorUnitario: 10,
+            sequencia: 5,
+            controle: 'AZUL',
+            codigoLocalEstoque: 30102,
+          },
+        ],
+        financeiros: [{ tipoPagamento: 1, valorParcela: 10, dataVencimento: '2024-02-01' }],
+      });
+
+      const item = (http.restPost.mock.calls[0][1] as Record<string, unknown>).itens as Record<
+        string,
+        unknown
+      >[];
+      expect(item[0]).toMatchObject({ sequencia: 5, controle: 'AZUL', codigoLocalEstoque: 30102 });
+    });
+
+    it('merges camposExtras at cabecalho, item, and financeiro levels', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.restPost.mockResolvedValue({ codigoPedido: 1 });
+
+      await pedidos.criar({
+        notaModelo: 12,
+        data: '2024-01-01',
+        hora: '10:00',
+        valorTotal: 10,
+        camposExtras: { CODTIPOPER: 1000, CODEMP: 1, AD_CAMPO: 'x' },
+        itens: [
+          {
+            codigoProduto: 1,
+            quantidade: 1,
+            valorUnitario: 10,
+            camposExtras: { AD_ITEM: 'y' },
+          },
+        ],
+        financeiros: [
+          {
+            tipoPagamento: 1,
+            valorParcela: 10,
+            dataVencimento: '2024-02-01',
+            camposExtras: { AD_FIN: 'z' },
+          },
+        ],
+      });
+
+      const body = http.restPost.mock.calls[0][1] as Record<string, unknown>;
+      expect(body).toMatchObject({ CODTIPOPER: 1000, CODEMP: 1, AD_CAMPO: 'x' });
+      expect((body.itens as Record<string, unknown>[])[0]).toMatchObject({ AD_ITEM: 'y' });
+      expect((body.financeiros as Record<string, unknown>[])[0]).toMatchObject({ AD_FIN: 'z' });
+    });
+
+    it('unwraps codigoPedido from the real REST envelope (retorno.codigoPedido string)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.restPost.mockResolvedValue({
+        codigo: '1541414',
+        tipo: 'Pedido',
+        mensagem: 'Pedido Incluido/Atualizado com sucesso.',
+        retorno: { codigoPedido: '1541414' },
+      });
+
+      const result = await pedidos.criar({
+        notaModelo: 1,
+        data: '2024-01-01',
+        hora: '10:00',
+        valorTotal: 10,
+        itens: [{ codigoProduto: 1, quantidade: 1, valorUnitario: 10 }],
+        financeiros: [{ tipoPagamento: 1, valorParcela: 10, dataVencimento: '2024-02-01' }],
+      });
+
+      expect(result).toEqual({ codigoPedido: 1541414 });
+    });
+
+    it('throws when the success envelope has no codigoPedido (no silent 0)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.restPost.mockResolvedValue({ tipo: 'Pedido', mensagem: 'ok', retorno: {} });
+
+      await expect(
+        pedidos.criar({
+          notaModelo: 1,
+          data: '2024-01-01',
+          hora: '10:00',
+          valorTotal: 10,
+          itens: [{ codigoProduto: 1, quantidade: 1, valorUnitario: 10 }],
+          financeiros: [{ tipoPagamento: 1, valorParcela: 10, dataVencimento: '2024-02-01' }],
+        }),
+      ).rejects.toThrow('sem codigoPedido');
+    });
+
+    it('emits impostos on item and cheque/cartao/idTransacao on financeiro', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.restPost.mockResolvedValue({ retorno: { codigoPedido: '7' } });
+
+      await pedidos.criar({
+        notaModelo: 1,
+        data: '2024-01-01',
+        hora: '10:00',
+        valorTotal: 10,
+        itens: [
+          {
+            codigoProduto: 1,
+            quantidade: 1,
+            valorUnitario: 10,
+            impostos: [{ tipo: 'ibs', aliquota: 26.5, valorImposto: 2.65 }],
+          },
+        ],
+        financeiros: [
+          {
+            tipoPagamento: 2,
+            valorParcela: 10,
+            dataVencimento: '2024-02-01',
+            cheque: { banco: '341', numero: '1880' },
+            cartao: { bandeira: '02', autorizacao: '4581596' },
+            idTransacao: 'pix-abc',
+          },
+        ],
+      });
+
+      const body = http.restPost.mock.calls[0][1] as Record<string, unknown>;
+      const item = (body.itens as Record<string, unknown>[])[0];
+      const fin = (body.financeiros as Record<string, unknown>[])[0];
+      expect(item.impostos).toEqual([{ tipo: 'ibs', aliquota: 26.5, valorImposto: 2.65 }]);
+      expect(fin.cheque).toEqual({ banco: '341', numero: '1880' });
+      expect(fin.cartao).toEqual({ bandeira: '02', autorizacao: '4581596' });
+      expect(fin.idTransacao).toBe('pix-abc');
+    });
+
+    it('passes dd/MM/yyyy dates through unchanged', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.restPost.mockResolvedValue({ codigoPedido: 1 });
+
+      await pedidos.criar({
+        notaModelo: 1,
+        data: '15/03/2024',
+        hora: '10:00',
+        valorTotal: 10,
+        itens: [{ codigoProduto: 1, quantidade: 1, valorUnitario: 10 }],
+        financeiros: [{ tipoPagamento: 1, valorParcela: 10, dataVencimento: '20/04/2024' }],
+      });
+
+      const body = http.restPost.mock.calls[0][1] as Record<string, unknown>;
+      expect(body.data).toBe('15/03/2024');
+      expect((body.financeiros as Record<string, unknown>[])[0].dataVencimento).toBe('20/04/2024');
     });
   });
 
   describe('atualizar()', () => {
-    it('calls restPut with /vendas/pedidos/{id} and input', async () => {
+    it('calls restPut with /vendas/pedidos/{id} and built payload', async () => {
       const http = createMockHttp();
       const pedidos = new PedidosResource(http);
       const input = {
@@ -130,9 +361,7 @@ describe('PedidosResource', () => {
         hora: '10:00',
         valorTotal: 200,
         itens: [{ codigoProduto: 1, quantidade: 2, valorUnitario: 100, unidade: 'UN' }],
-        financeiros: [
-          { codigoTipoPagamento: 1, valor: 200, dataVencimento: '2024-02-01', numeroParcela: 1 },
-        ],
+        financeiros: [{ tipoPagamento: 1, valorParcela: 200, dataVencimento: '2024-02-01' }],
       };
       http.restPut.mockResolvedValue({ codigoPedido: 42 });
 
@@ -141,7 +370,25 @@ describe('PedidosResource', () => {
       expect(http.restPut).toHaveBeenCalledTimes(1);
       const [path, body] = http.restPut.mock.calls[0];
       expect(path).toBe('/vendas/pedidos/42');
-      expect(body).toEqual(input);
+      expect(body).toEqual({
+        notaModelo: 1,
+        data: '01/01/2024',
+        hora: '10:00',
+        valorTotal: 200,
+        itens: [
+          {
+            codigoProduto: 1,
+            quantidade: 2,
+            valorUnitario: 100,
+            unidade: 'UN',
+            sequencia: 1,
+            controle: ' ',
+          },
+        ],
+        financeiros: [
+          { tipoPagamento: 1, valorParcela: 200, dataVencimento: '01/02/2024', sequencia: 1 },
+        ],
+      });
       expect(result.codigoPedido).toBe(42);
     });
   });
@@ -175,7 +422,7 @@ describe('PedidosResource', () => {
       expect(http.gatewayCall).toHaveBeenCalledTimes(1);
       const [modulo, service, requestBody] = http.gatewayCall.mock.calls[0];
       expect(modulo).toBe('mgecom');
-      expect(service).toBe('ServicosNfeSP.confirmarNota');
+      expect(service).toBe('CACSP.confirmarNota');
       expect(requestBody).toEqual({ nota: { NUNOTA: { $: '123' } } });
     });
 
