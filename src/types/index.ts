@@ -25,6 +25,7 @@ export type {
 export type {
   Cliente,
   TipoPessoa,
+  TipoPessoaInput,
   Endereco,
   Contato,
   CriarClienteInput,
@@ -93,6 +94,10 @@ export type {
   AtualizarDespesaInput,
   BaixarDespesaInput,
   RegistrarFinanceiroResponse,
+  ChequeFinanceiroInput,
+  CartaoFinanceiroInput,
+  BoletoFinanceiroInput,
+  RateioFinanceiroInput,
 } from './financeiros.js';
 
 export { TipoMovimento } from './cadastros.js';

@@ -115,7 +115,7 @@ export class ProdutosResource {
    */
   async listarVolumes(params?: { page?: number }): Promise<PaginatedResult<Volume>> {
     const query: Record<string, string> = { page: String(params?.page ?? 0) };
-    const raw = await this.http.restGet<Record<string, unknown>>('/produtos/volumes', query);
+    const raw = await this.http.restGet<Record<string, unknown>>('/volumes-produtos', query);
     const { data, pagination } = extractRestData<Volume>(raw);
     return normalizeRestPagination(data, pagination);
   }
@@ -130,7 +130,7 @@ export class ProdutosResource {
    */
   async buscarVolume(codigoVolume: string): Promise<Volume> {
     const raw = await this.http.restGet<Record<string, unknown>>(
-      `/produtos/volumes/${codigoVolume}`,
+      `/volumes-produtos/${codigoVolume}`,
     );
     return extractRestRecordOrThrow<Volume>(raw, `Volume ${codigoVolume} nao encontrado`);
   }

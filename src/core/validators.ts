@@ -115,18 +115,20 @@ export function validatePedidoVendaInput(input: unknown, name: string): void {
  *
  * Campos obrigatorios: tipo, cnpjCpf, nome, endereco (com sub-campos).
  */
-export function validateCriarClienteInput(input: unknown, name: string): void {
-  const o = assertObject(input, name);
-  requireString(o, 'nome', name);
-  requireString(o, 'cnpjCpf', name);
+const TIPOS_PESSOA = new Set(['PF', 'PJ', 'F', 'J']);
 
-  if (o.tipo !== 'F' && o.tipo !== 'J') {
+/** Valida o campo `tipo` de pessoa (aceita PF/PJ canonico e F/J legado). */
+function requireTipoPessoa(o: Record<string, unknown>, name: string): void {
+  if (typeof o.tipo !== 'string' || !TIPOS_PESSOA.has(o.tipo)) {
     throw new SankhyaError(
-      `${name}.tipo deve ser 'F' (Fisica) ou 'J' (Juridica)`,
+      `${name}.tipo deve ser 'PF'/'PJ' (ou 'F'/'J' legado)`,
       'VALIDATION_ERROR',
     );
   }
+}
 
+/** Valida os campos obrigatorios de um endereco de cliente. */
+function validateEnderecoCliente(o: Record<string, unknown>, name: string): void {
   const endereco = assertObject(o.endereco, `${name}.endereco`);
   requireString(endereco, 'logradouro', `${name}.endereco`);
   requireString(endereco, 'numero', `${name}.endereco`);
@@ -136,11 +138,42 @@ export function validateCriarClienteInput(input: unknown, name: string): void {
   requireString(endereco, 'uf', `${name}.endereco`);
   requireString(endereco, 'cep', `${name}.endereco`);
   optionalString(endereco, 'complemento', `${name}.endereco`);
+}
+
+export function validateCriarClienteInput(input: unknown, name: string): void {
+  const o = assertObject(input, name);
+  requireString(o, 'nome', name);
+  requireString(o, 'cnpjCpf', name);
+  requireTipoPessoa(o, name);
+  validateEnderecoCliente(o, name);
 
   optionalString(o, 'email', name);
   optionalString(o, 'telefoneDdd', name);
   optionalString(o, 'telefoneNumero', name);
   optionalNumber(o, 'codigoVendedor', name);
+}
+
+/**
+ * Valida dados de atualizacao parcial de cliente: valida apenas o que estiver
+ * presente (tipo, se enviado; endereco completo, se enviado).
+ */
+export function validateAtualizarClienteInput(input: unknown, name: string): void {
+  const o = assertObject(input, name);
+  if (o.tipo !== undefined) requireTipoPessoa(o, name);
+  if (o.endereco !== undefined) validateEnderecoCliente(o, name);
+  optionalString(o, 'nome', name);
+  optionalString(o, 'cnpjCpf', name);
+  optionalString(o, 'email', name);
+  optionalNumber(o, 'codigoVendedor', name);
+}
+
+/** Valida dados de um contato de cliente. Campo obrigatorio: nome. */
+export function validateContatoInput(input: unknown, name: string): void {
+  const o = assertObject(input, name);
+  requireString(o, 'nome', name);
+  optionalString(o, 'email', name);
+  optionalString(o, 'telefoneDdd', name);
+  optionalString(o, 'telefoneNumero', name);
 }
 
 /**
@@ -181,6 +214,24 @@ export function validateRegistrarReceitaInput(input: unknown, name: string): voi
 export function validateRegistrarDespesaInput(input: unknown, name: string): void {
   const o = assertObject(input, name);
   validateFinanceiroBase(o, name);
+}
+
+/**
+ * Valida dados de entrada para baixa (liquidacao) de titulo financeiro.
+ *
+ * Campos obrigatorios: codigoFinanceiro, dataBaixa.
+ */
+export function validateBaixarFinanceiroInput(input: unknown, name: string): void {
+  const o = assertObject(input, name);
+  requireNumber(o, 'codigoFinanceiro', name);
+  requireString(o, 'dataBaixa', name);
+  optionalNumber(o, 'valorBaixa', name);
+  optionalNumber(o, 'codigoContaBancaria', name);
+  optionalNumber(o, 'codigoTipoOperacao', name);
+  optionalNumber(o, 'valorJuro', name);
+  optionalNumber(o, 'valorMulta', name);
+  optionalNumber(o, 'valorDesconto', name);
+  optionalString(o, 'observacao', name);
 }
 
 /**

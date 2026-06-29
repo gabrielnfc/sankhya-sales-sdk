@@ -1,6 +1,12 @@
+import { SankhyaError } from '../core/errors.js';
 import type { HttpClient } from '../core/http.js';
 import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
-import { validateCriarClienteInput } from '../core/validators.js';
+import { safeParseNumber } from '../core/parse-utils.js';
+import {
+  validateAtualizarClienteInput,
+  validateContatoInput,
+  validateCriarClienteInput,
+} from '../core/validators.js';
 import type {
   AtualizarClienteInput,
   Cliente,
@@ -10,9 +16,44 @@ import type {
 } from '../types/clientes.js';
 import type { PaginatedResult } from '../types/common.js';
 
+/** Mapeia `tipo` legado (`F`/`J`) para o canonico da API REST (`PF`/`PJ`). */
+function normalizeTipoPessoa(tipo: string | undefined): string | undefined {
+  if (tipo === 'F') return 'PF';
+  if (tipo === 'J') return 'PJ';
+  return tipo;
+}
+
 /** Operacoes de clientes (parceiros) no Sankhya ERP. Acesse via `sankhya.clientes`. */
 export class ClientesResource {
   constructor(private readonly http: HttpClient) {}
+
+  /**
+   * Normaliza o payload de cliente: mapeia `tipo` legado (`F`/`J`) para
+   * `PF`/`PJ` exigido pela API REST.
+   *
+   * @internal
+   */
+  private buildClientePayload<T extends { tipo?: string }>(dados: T): T {
+    if (dados.tipo === undefined) return dados;
+    return { ...dados, tipo: normalizeTipoPessoa(dados.tipo) };
+  }
+
+  /**
+   * Desempacota e coage `codigoCliente` da resposta REST. A API responde
+   * `{ codigoCliente: "290013", mensagem }` (id string); coage para numero.
+   *
+   * @internal
+   */
+  private extractCodigoCliente(raw: unknown): number {
+    const envelope = (raw ?? {}) as Record<string, unknown>;
+    if (envelope.codigoCliente === undefined || envelope.codigoCliente === null) {
+      throw new SankhyaError(
+        'Resposta de cliente sem codigoCliente (envelope inesperado da API)',
+        'API_ERROR',
+      );
+    }
+    return safeParseNumber(envelope.codigoCliente, 'codigoCliente');
+  }
 
   /**
    * Lista clientes paginados.
@@ -56,7 +97,11 @@ export class ClientesResource {
    */
   async criar(dados: CriarClienteInput): Promise<{ codigoCliente: number }> {
     validateCriarClienteInput(dados, 'CriarClienteInput');
-    return this.http.restPost('/parceiros/clientes', dados);
+    const raw = await this.http.restPost<Record<string, unknown>>(
+      '/parceiros/clientes',
+      this.buildClientePayload(dados),
+    );
+    return { codigoCliente: this.extractCodigoCliente(raw) };
   }
 
   /**
@@ -72,7 +117,17 @@ export class ClientesResource {
     codigoCliente: number,
     dados: AtualizarClienteInput,
   ): Promise<{ codigoCliente: number }> {
-    return this.http.restPut(`/parceiros/clientes/${codigoCliente}`, dados);
+    validateAtualizarClienteInput(dados, 'AtualizarClienteInput');
+    const raw = await this.http.restPut<Record<string, unknown>>(
+      `/parceiros/clientes/${codigoCliente}`,
+      this.buildClientePayload(dados),
+    );
+    // A resposta pode omitir codigoCliente em update; cai no proprio id da URL.
+    const envelope = (raw ?? {}) as Record<string, unknown>;
+    return {
+      codigoCliente:
+        envelope.codigoCliente !== undefined ? this.extractCodigoCliente(raw) : codigoCliente,
+    };
   }
 
   /**
@@ -88,6 +143,7 @@ export class ClientesResource {
     codigoCliente: number,
     contato: Contato,
   ): Promise<{ codigoContato: number; codigoCliente: number }> {
+    validateContatoInput(contato, 'Contato');
     return this.http.restPost(`/parceiros/clientes/${codigoCliente}/contatos`, contato);
   }
 

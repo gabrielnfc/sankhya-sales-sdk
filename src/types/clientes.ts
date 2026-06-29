@@ -1,11 +1,20 @@
 import type { PaginationParams } from './common.js';
 
 /**
- * Tipo de pessoa no Sankhya.
+ * Tipo de pessoa no Sankhya (modelo de leitura).
  *
- * A API retorna `'F'` (Fisica) ou `'J'` (Juridica).
+ * A API REST retorna `'F'` (Fisica) ou `'J'` (Juridica) na consulta.
  */
 export type TipoPessoa = 'F' | 'J';
+
+/**
+ * Tipo de pessoa aceito na criacao/atualizacao de cliente.
+ *
+ * O contrato REST oficial exige `'PF'`/`'PJ'` (verificado ao vivo: enviar
+ * `'F'`/`'J'` resulta em `TIPPESSOA` nulo). Os valores `'F'`/`'J'` continuam
+ * aceitos como aliases e sao mapeados para `'PF'`/`'PJ'` pelo SDK.
+ */
+export type TipoPessoaInput = 'PF' | 'PJ' | 'F' | 'J';
 
 /** Endereco de um parceiro/cliente. */
 export interface Endereco {
@@ -97,11 +106,29 @@ export interface Cliente {
   dataAlteracao?: string;
 }
 
-/** Dados para criacao de um novo cliente. */
-export type CriarClienteInput = Omit<Cliente, 'codigoCliente' | 'dataAlteracao'>;
+/**
+ * Dados para criacao de um novo cliente.
+ *
+ * `tipo` aceita `'PF'`/`'PJ'` (canonico) ou `'F'`/`'J'` (legado, mapeado).
+ * `camposAdicionais` carrega campos personalizados `AD_*` no objeto exigido
+ * pelo contrato oficial (`{ camposAdicionais: { AD_*: ... } }`).
+ */
+export type CriarClienteInput = Omit<Cliente, 'codigoCliente' | 'dataAlteracao' | 'tipo'> & {
+  /** Tipo de pessoa: `'PF'`/`'PJ'` (ou `'F'`/`'J'` legado). */
+  tipo: TipoPessoaInput;
+  /** Campos personalizados `AD_*` (objeto `camposAdicionais` do contrato). */
+  camposAdicionais?: Record<string, unknown>;
+};
 
 /** Dados para atualizacao parcial de um cliente. */
-export type AtualizarClienteInput = Partial<Omit<Cliente, 'codigoCliente' | 'dataAlteracao'>>;
+export type AtualizarClienteInput = Partial<
+  Omit<Cliente, 'codigoCliente' | 'dataAlteracao' | 'tipo'>
+> & {
+  /** Tipo de pessoa: `'PF'`/`'PJ'` (ou `'F'`/`'J'` legado). */
+  tipo?: TipoPessoaInput;
+  /** Campos personalizados `AD_*` (objeto `camposAdicionais` do contrato). */
+  camposAdicionais?: Record<string, unknown>;
+};
 
 /** Filtros para listagem de clientes. */
 export interface ListarClientesParams extends PaginationParams {

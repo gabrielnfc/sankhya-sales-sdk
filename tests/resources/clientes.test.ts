@@ -56,8 +56,58 @@ describe('ClientesResource', () => {
     };
     const result = await resource.criar(input);
 
-    expect(http.restPost).toHaveBeenCalledWith('/parceiros/clientes', input);
+    // tipo legado 'J' e mapeado para 'PJ' (canonico exigido pela API REST)
+    expect(http.restPost).toHaveBeenCalledWith('/parceiros/clientes', { ...input, tipo: 'PJ' });
     expect(result).toEqual({ codigoCliente: 99 });
+  });
+
+  it('criar() preserves canonical PF/PJ and camposAdicionais', async () => {
+    const http = createMockHttp();
+    const resource = new ClientesResource(http);
+    await resource.criar({
+      nome: 'PF Cliente',
+      tipo: 'PF',
+      cnpjCpf: '11144477735',
+      endereco: {
+        logradouro: 'Av B',
+        numero: '1',
+        bairro: 'Centro',
+        cidade: 'SP',
+        codigoIbge: '3550308',
+        uf: 'SP',
+        cep: '01000000',
+      },
+      camposAdicionais: { AD_IDEXTERNO: 'EXT-1' },
+    });
+    const body = http.restPost.mock.calls[0][1] as Record<string, unknown>;
+    expect(body.tipo).toBe('PF');
+    expect(body.camposAdicionais).toEqual({ AD_IDEXTERNO: 'EXT-1' });
+  });
+
+  it('criar() coerces string codigoCliente and throws when absent', async () => {
+    const http = createMockHttp();
+    const resource = new ClientesResource(http);
+    const base = {
+      nome: 'X',
+      tipo: 'PF' as const,
+      cnpjCpf: '11144477735',
+      endereco: {
+        logradouro: 'A',
+        numero: '1',
+        bairro: 'B',
+        cidade: 'C',
+        codigoIbge: '3550308',
+        uf: 'SP',
+        cep: '01000000',
+      },
+    };
+
+    http.restPost.mockResolvedValueOnce({ codigoCliente: '290013', mensagem: 'ok' });
+    const ok = await resource.criar(base);
+    expect(ok).toEqual({ codigoCliente: 290013 });
+
+    http.restPost.mockResolvedValueOnce({ mensagem: 'ok' });
+    await expect(resource.criar(base)).rejects.toThrow('sem codigoCliente');
   });
 
   it('atualizar() calls restPut with /parceiros/clientes/{id}', async () => {
@@ -73,7 +123,7 @@ describe('ClientesResource', () => {
   it('incluirContato() calls restPost with correct path', async () => {
     const http = createMockHttp();
     const resource = new ClientesResource(http);
-    const contato = { nomeContato: 'Joao', telefone: '11999' };
+    const contato = { nome: 'Joao', telefoneDdd: '11', telefoneNumero: '999999999' };
     await resource.incluirContato(10, contato);
 
     expect(http.restPost).toHaveBeenCalledWith('/parceiros/clientes/10/contatos', contato);
