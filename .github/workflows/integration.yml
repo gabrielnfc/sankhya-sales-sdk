@@ -3,6 +3,10 @@ name: Integration Tests
 on:
   push:
     branches: [main]
+  schedule:
+    # Nightly contract check against the Sankhya sandbox — 05:37 UTC (~02:37 BRT).
+    - cron: '37 5 * * *'
+  workflow_dispatch:
 
 jobs:
   integration:
@@ -22,7 +26,10 @@ jobs:
       - run: npm ci
       - name: Run integration tests
         if: ${{ env.SANKHYA_BASE_URL != '' }}
-        continue-on-error: true
+        # Push to main stays informational (sandbox flakiness must not block).
+        # Scheduled / manual runs fail hard so a real regression is visible (and
+        # GitHub emails the owner on a failed scheduled run).
+        continue-on-error: ${{ github.event_name == 'push' }}
         id: integration
         run: npm run test:integration
       - name: Report results
