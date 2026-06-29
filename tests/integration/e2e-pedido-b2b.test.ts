@@ -129,8 +129,13 @@ describe.skipIf(!has)(
     });
 
     it('cria pedido de venda', async () => {
-      if (!codigoCliente || !codigoProduto) {
-        console.warn('E2E Step 4: Skipped - cliente ou produto nao encontrado');
+      // Sankhya REST devolve IDs string-tipados; coage e exige numero finito.
+      // Se o sandbox nao entregou cliente/produto utilizavel, e limitacao de
+      // dado (skip), nao regressao do SDK.
+      const cliente = Number(codigoCliente);
+      const produto = Number(codigoProduto);
+      if (!Number.isFinite(cliente) || !Number.isFinite(produto)) {
+        console.warn('E2E Step 4: Skipped - sandbox sem cliente/produto utilizavel');
         return;
       }
 
@@ -147,11 +152,11 @@ describe.skipIf(!has)(
         notaModelo,
         data: todayStr,
         hora: horaStr,
-        codigoCliente,
+        codigoCliente: cliente,
         valorTotal,
         itens: [
           {
-            codigoProduto,
+            codigoProduto: produto,
             quantidade: 1,
             valorUnitario,
             unidade,
