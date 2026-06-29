@@ -19,28 +19,32 @@ async function main() {
   if (!produto) throw new Error('Nenhum produto encontrado');
   console.log(`Produto: ${produto.nome} (${produto.codigoProduto})`);
 
-  // 2. Criar pedido via REST
+  // 2. Criar pedido via REST (datas aceitas em ISO; convertidas internamente)
+  const hoje = new Date().toISOString().slice(0, 10); // yyyy-MM-dd
   const { codigoPedido } = await sankhya.pedidos.criar({
     notaModelo: 1,
-    data: new Date().toLocaleDateString('pt-BR'),
+    data: hoje,
     hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
     codigoCliente: 1, // Ajuste para um cliente valido
     codigoVendedor: 1, // Ajuste para um vendedor valido
     valorTotal: 100.0,
+    // camposExtras: { AD_NUMPEDIDO: 'ECOM-123' }, // campos personalizados AD_ (opcional)
     itens: [
       {
         codigoProduto: produto.codigoProduto,
         quantidade: 1,
         valorUnitario: 100.0,
-        unidade: 'UN',
+        // codigoLocalEstoque: 101, // necessario quando ha controle de estoque por local
+        // `controle` opcional (SDK envia ' ' quando omitido); `sequencia` auto-preenchida
       },
     ],
     financeiros: [
+      // nomes canonicos tipoPagamento/valorParcela (codigoTipoPagamento/valor/numeroParcela
+      // seguem aceitos como aliases legados)
       {
-        codigoTipoPagamento: 1,
-        valor: 100.0,
-        dataVencimento: '01/05/2026',
-        numeroParcela: 1,
+        tipoPagamento: 1,
+        valorParcela: 100.0,
+        dataVencimento: hoje,
       },
     ],
   });
