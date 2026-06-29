@@ -56,7 +56,7 @@ describe('FinanceirosResource', () => {
     it('calls restGet with id in path', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restGet.mockResolvedValue({ id: 10 });
+      http.restGet.mockResolvedValue({ tiposPagamento: { id: 10 } });
 
       const result = await fin.buscarTipoPagamento(10);
 
@@ -254,7 +254,7 @@ describe('FinanceirosResource', () => {
     it('calls restGet with id in path', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restGet.mockResolvedValue({ id: 3 });
+      http.restGet.mockResolvedValue({ moedas: { id: 3 } });
 
       const result = await fin.buscarMoeda(3);
 
@@ -283,7 +283,7 @@ describe('FinanceirosResource', () => {
     it('calls restGet with id in path', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restGet.mockResolvedValue({ id: 5 });
+      http.restGet.mockResolvedValue({ contasBancaria: { id: 5 } });
 
       const result = await fin.buscarContaBancaria(5);
 

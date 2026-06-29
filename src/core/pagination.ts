@@ -1,4 +1,5 @@
 import type { GatewayEntities, PaginatedResult, RestPagination } from '../types/common.js';
+import { SankhyaError } from './errors.js';
 
 /**
  * Normaliza resposta REST v1 para PaginatedResult.
@@ -64,6 +65,44 @@ export function extractRestData<T>(response: Record<string, unknown>): {
   }
 
   return { data, pagination };
+}
+
+/**
+ * Desempacota o registro unico de uma resposta REST de GET-por-id, no formato
+ * `{ "<recurso>": { ...campos } }` (ex.: `{ "grupos": { codigoGrupoProduto, ... } }`).
+ *
+ * Retorna o primeiro valor objeto sob uma chave que nao seja metadado. Se `key`
+ * for informado, usa essa chave diretamente. Retorna `null` quando nao ha
+ * registro (resposta vazia ou so metadados).
+ */
+export function extractRestRecord<T>(response: Record<string, unknown>, key?: string): T | null {
+  if (key) {
+    const value = response[key];
+    return value && typeof value === 'object' && !Array.isArray(value) ? (value as T) : null;
+  }
+  for (const [k, value] of Object.entries(response)) {
+    if (k === 'pagination' || k === 'status' || k === 'statusMessage') continue;
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as T;
+    }
+  }
+  return null;
+}
+
+/**
+ * Como `extractRestRecord`, mas lanca `SankhyaError('NOT_FOUND')` quando a
+ * resposta nao traz registro — mantendo o contrato nao-nulo dos metodos `buscar*`.
+ */
+export function extractRestRecordOrThrow<T>(
+  response: Record<string, unknown>,
+  notFoundMessage: string,
+  key?: string,
+): T {
+  const record = extractRestRecord<T>(response, key);
+  if (!record) {
+    throw new SankhyaError(notFoundMessage, 'NOT_FOUND');
+  }
+  return record;
 }
 
 export type FetchPage<T> = (page: number) => Promise<PaginatedResult<T>>;

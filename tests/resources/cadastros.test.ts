@@ -78,7 +78,8 @@ describe('CadastrosResource', () => {
     it('calls restGet with id in path', async () => {
       const http = createMockHttp();
       const cad = new CadastrosResource(http);
-      http.restGet.mockResolvedValue({ id: 5 });
+      // Shape real do Sankhya: GET-por-id embrulha o registro sob a chave do recurso.
+      http.restGet.mockResolvedValue({ tiposOperacao: { id: 5 } });
 
       const result = await cad.buscarTipoOperacao(5);
 
@@ -106,7 +107,7 @@ describe('CadastrosResource', () => {
     it('calls restGet with id in path', async () => {
       const http = createMockHttp();
       const cad = new CadastrosResource(http);
-      http.restGet.mockResolvedValue({ id: 2 });
+      http.restGet.mockResolvedValue({ naturezas: { id: 2 } });
 
       await cad.buscarNatureza(2);
 
@@ -133,7 +134,7 @@ describe('CadastrosResource', () => {
     it('calls restGet with id in path', async () => {
       const http = createMockHttp();
       const cad = new CadastrosResource(http);
-      http.restGet.mockResolvedValue({ id: 3 });
+      http.restGet.mockResolvedValue({ projetos: { id: 3 } });
 
       await cad.buscarProjeto(3);
 
@@ -160,7 +161,7 @@ describe('CadastrosResource', () => {
     it('calls restGet with id in path', async () => {
       const http = createMockHttp();
       const cad = new CadastrosResource(http);
-      http.restGet.mockResolvedValue({ id: 4 });
+      http.restGet.mockResolvedValue({ centrosResultado: { id: 4 } });
 
       await cad.buscarCentroResultado(4);
 
@@ -187,11 +188,19 @@ describe('CadastrosResource', () => {
     it('calls restGet with id in path', async () => {
       const http = createMockHttp();
       const cad = new CadastrosResource(http);
-      http.restGet.mockResolvedValue({ id: 1 });
+      http.restGet.mockResolvedValue({ empresas: { id: 1 } });
 
       await cad.buscarEmpresa(1);
 
       expect(http.restGet).toHaveBeenCalledWith('/empresas/1');
+    });
+
+    it('throws NOT_FOUND when the response carries no record', async () => {
+      const http = createMockHttp();
+      const cad = new CadastrosResource(http);
+      http.restGet.mockResolvedValue({});
+
+      await expect(cad.buscarEmpresa(999)).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
   });
 

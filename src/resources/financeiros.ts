@@ -1,5 +1,10 @@
 import type { HttpClient } from '../core/http.js';
-import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
+import {
+  createPaginator,
+  extractRestData,
+  extractRestRecordOrThrow,
+  normalizeRestPagination,
+} from '../core/pagination.js';
 import {
   validateRegistrarDespesaInput,
   validateRegistrarReceitaInput,
@@ -65,7 +70,13 @@ export class FinanceirosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   async buscarTipoPagamento(codigoTipoPagamento: number): Promise<TipoPagamento> {
-    return this.http.restGet(`/financeiros/tipos-pagamento/${codigoTipoPagamento}`);
+    const raw = await this.http.restGet<Record<string, unknown>>(
+      `/financeiros/tipos-pagamento/${codigoTipoPagamento}`,
+    );
+    return extractRestRecordOrThrow<TipoPagamento>(
+      raw,
+      `Tipo de pagamento ${codigoTipoPagamento} nao encontrado`,
+    );
   }
 
   // --- Receitas ---
@@ -238,7 +249,10 @@ export class FinanceirosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   async buscarMoeda(codigoMoeda: number): Promise<Moeda> {
-    return this.http.restGet(`/financeiros/moedas/${codigoMoeda}`);
+    const raw = await this.http.restGet<Record<string, unknown>>(
+      `/financeiros/moedas/${codigoMoeda}`,
+    );
+    return extractRestRecordOrThrow<Moeda>(raw, `Moeda ${codigoMoeda} nao encontrada`);
   }
 
   // --- Contas Bancarias ---
@@ -265,7 +279,13 @@ export class FinanceirosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   async buscarContaBancaria(codigoContaBancaria: number): Promise<ContaBancaria> {
-    return this.http.restGet(`/financeiros/contas-bancaria/${codigoContaBancaria}`);
+    const raw = await this.http.restGet<Record<string, unknown>>(
+      `/financeiros/contas-bancaria/${codigoContaBancaria}`,
+    );
+    return extractRestRecordOrThrow<ContaBancaria>(
+      raw,
+      `Conta bancaria ${codigoContaBancaria} nao encontrada`,
+    );
   }
 
   // --- Iteradores ---

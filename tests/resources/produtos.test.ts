@@ -102,7 +102,7 @@ describe('ProdutosResource', () => {
 
   it('buscarVolume() calls restGet with /produtos/volumes/{id}', async () => {
     const http = createMockHttp({
-      restGet: vi.fn().mockResolvedValue({ codigoVolume: 'CX', descricao: 'Caixa' }),
+      restGet: vi.fn().mockResolvedValue({ volumes: { codigoVolume: 'CX', descricao: 'Caixa' } }),
     });
     const resource = new ProdutosResource(http);
     const result = await resource.buscarVolume('CX');
@@ -127,7 +127,9 @@ describe('ProdutosResource', () => {
 
   it('buscarGrupo() calls restGet with /grupos-produto/{id}', async () => {
     const http = createMockHttp({
-      restGet: vi.fn().mockResolvedValue({ codigoGrupoProduto: 3, descricao: 'Ferramentas' }),
+      restGet: vi
+        .fn()
+        .mockResolvedValue({ grupos: { codigoGrupoProduto: 3, descricao: 'Ferramentas' } }),
     });
     const resource = new ProdutosResource(http);
     const result = await resource.buscarGrupo(3);

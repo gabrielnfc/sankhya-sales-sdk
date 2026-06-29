@@ -1,5 +1,10 @@
 import type { HttpClient } from '../core/http.js';
-import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
+import {
+  createPaginator,
+  extractRestData,
+  extractRestRecordOrThrow,
+  normalizeRestPagination,
+} from '../core/pagination.js';
 import type { PaginatedResult } from '../types/common.js';
 import type {
   ComponenteProduto,
@@ -124,7 +129,10 @@ export class ProdutosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   async buscarVolume(codigoVolume: string): Promise<Volume> {
-    return this.http.restGet(`/produtos/volumes/${codigoVolume}`);
+    const raw = await this.http.restGet<Record<string, unknown>>(
+      `/produtos/volumes/${codigoVolume}`,
+    );
+    return extractRestRecordOrThrow<Volume>(raw, `Volume ${codigoVolume} nao encontrado`);
   }
 
   /**
@@ -153,7 +161,13 @@ export class ProdutosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   async buscarGrupo(codigoGrupoProduto: number): Promise<GrupoProduto> {
-    return this.http.restGet(`/grupos-produto/${codigoGrupoProduto}`);
+    const raw = await this.http.restGet<Record<string, unknown>>(
+      `/grupos-produto/${codigoGrupoProduto}`,
+    );
+    return extractRestRecordOrThrow<GrupoProduto>(
+      raw,
+      `Grupo de produto ${codigoGrupoProduto} nao encontrado`,
+    );
   }
 
   /**
