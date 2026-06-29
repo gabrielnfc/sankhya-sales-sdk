@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-06-29
+
+### Fixed
+- **`buscar*` (GET-por-id) retornavam o envelope REST cru** em vez do objeto tipado.
+  11 métodos — `produtos.buscarGrupo/buscarVolume`, `cadastros.buscarTipoOperacao/
+  buscarNatureza/buscarProjeto/buscarCentroResultado/buscarEmpresa`, `estoque.buscarLocal`,
+  `financeiros.buscarTipoPagamento/buscarMoeda/buscarContaBancaria` — devolviam
+  `{ "<recurso>": { ...campos } }` (ex.: `{ grupos: {...} }`) apesar do tipo prometer
+  o registro desempacotado. Agora desempacotam via `extractRestRecord` e lançam
+  `SankhyaError('NOT_FOUND')` quando o registro não existe. Bug exposto por novos
+  testes de integração ao vivo (os unit tests mascaravam com shape fabricado).
+
+### Tests
+- Novo `tests/integration/read-coverage.test.ts`: valida ao vivo os métodos de leitura
+  que antes só tinham cobertura mockada (incl. `precos.contextualizado`, catálogo de
+  produtos e todos os `buscar*`).
+- Mocks dos `buscar*` aterrados no shape real do Sankhya (envelope `{ "<recurso>": {...} }`).
+
 ## [1.2.0] - 2026-06-25
 
 ### Added

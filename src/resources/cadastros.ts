@@ -1,6 +1,11 @@
 import { deserializeRows } from '../core/gateway-serializer.js';
 import type { HttpClient } from '../core/http.js';
-import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
+import {
+  createPaginator,
+  extractRestData,
+  extractRestRecordOrThrow,
+  normalizeRestPagination,
+} from '../core/pagination.js';
 import { safeParseNumber } from '../core/parse-utils.js';
 import type {
   CentroResultado,
@@ -57,7 +62,13 @@ export class CadastrosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   async buscarTipoOperacao(codigoTipoOperacao: number): Promise<TipoOperacao> {
-    return this.http.restGet(`/tipos-operacao/${codigoTipoOperacao}`);
+    const raw = await this.http.restGet<Record<string, unknown>>(
+      `/tipos-operacao/${codigoTipoOperacao}`,
+    );
+    return extractRestRecordOrThrow<TipoOperacao>(
+      raw,
+      `Tipo de operacao ${codigoTipoOperacao} nao encontrado`,
+    );
   }
 
   // --- Naturezas ---
@@ -86,7 +97,8 @@ export class CadastrosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   async buscarNatureza(codigoNatureza: number): Promise<Natureza> {
-    return this.http.restGet(`/naturezas/${codigoNatureza}`);
+    const raw = await this.http.restGet<Record<string, unknown>>(`/naturezas/${codigoNatureza}`);
+    return extractRestRecordOrThrow<Natureza>(raw, `Natureza ${codigoNatureza} nao encontrada`);
   }
 
   // --- Projetos ---
@@ -115,7 +127,8 @@ export class CadastrosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   async buscarProjeto(codigoProjeto: number): Promise<Projeto> {
-    return this.http.restGet(`/projetos/${codigoProjeto}`);
+    const raw = await this.http.restGet<Record<string, unknown>>(`/projetos/${codigoProjeto}`);
+    return extractRestRecordOrThrow<Projeto>(raw, `Projeto ${codigoProjeto} nao encontrado`);
   }
 
   // --- Centros de Resultado ---
@@ -146,7 +159,13 @@ export class CadastrosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   async buscarCentroResultado(codigoCentroResultado: number): Promise<CentroResultado> {
-    return this.http.restGet(`/centros-resultado/${codigoCentroResultado}`);
+    const raw = await this.http.restGet<Record<string, unknown>>(
+      `/centros-resultado/${codigoCentroResultado}`,
+    );
+    return extractRestRecordOrThrow<CentroResultado>(
+      raw,
+      `Centro de resultado ${codigoCentroResultado} nao encontrado`,
+    );
   }
 
   // --- Empresas ---
@@ -175,7 +194,8 @@ export class CadastrosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   async buscarEmpresa(codigoEmpresa: number): Promise<Empresa> {
-    return this.http.restGet(`/empresas/${codigoEmpresa}`);
+    const raw = await this.http.restGet<Record<string, unknown>>(`/empresas/${codigoEmpresa}`);
+    return extractRestRecordOrThrow<Empresa>(raw, `Empresa ${codigoEmpresa} nao encontrada`);
   }
 
   // --- Usuarios ---

@@ -58,7 +58,7 @@ describe('EstoqueResource', () => {
 
   it('buscarLocal() calls restGet with /estoque/locais/{id}', async () => {
     const http = createMockHttp({
-      restGet: vi.fn().mockResolvedValue({ codigoLocal: 3, descricao: 'Filial' }),
+      restGet: vi.fn().mockResolvedValue({ locais: { codigoLocal: 3, descricao: 'Filial' } }),
     });
     const resource = new EstoqueResource(http);
     const result = await resource.buscarLocal(3);

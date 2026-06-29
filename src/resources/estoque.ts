@@ -1,5 +1,10 @@
 import type { HttpClient } from '../core/http.js';
-import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
+import {
+  createPaginator,
+  extractRestData,
+  extractRestRecordOrThrow,
+  normalizeRestPagination,
+} from '../core/pagination.js';
 import type { PaginatedResult } from '../types/common.js';
 import type { Estoque, LocalEstoque } from '../types/estoque.js';
 
@@ -66,7 +71,11 @@ export class EstoqueResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   async buscarLocal(codigoLocal: number): Promise<LocalEstoque> {
-    return this.http.restGet(`/estoque/locais/${codigoLocal}`);
+    const raw = await this.http.restGet<Record<string, unknown>>(`/estoque/locais/${codigoLocal}`);
+    return extractRestRecordOrThrow<LocalEstoque>(
+      raw,
+      `Local de estoque ${codigoLocal} nao encontrado`,
+    );
   }
 
   /**
