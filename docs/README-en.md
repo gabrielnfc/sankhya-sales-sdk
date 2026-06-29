@@ -69,24 +69,86 @@ const prices = await sankhya.precos.contextualizado({
   produtos: [{ codigoProduto: 1001, quantidade: 10 }],
 });
 
-// Create order
+// Create order — dates accepted as ISO (yyyy-MM-dd), converted internally
 const { codigoPedido } = await sankhya.pedidos.criar({
   notaModelo: 1,
-  data: '01/04/2026',
+  data: '2026-04-01',
   hora: '10:00:00',
   codigoCliente: 123,
   codigoVendedor: 10,
-  valorTotal: 255.00,
+  valorTotal: 255.0,
   itens: [
-    { codigoProduto: 1001, quantidade: 10, valorUnitario: 25.50, unidade: 'UN' },
+    {
+      codigoProduto: 1001,
+      quantidade: 10,
+      valorUnitario: 25.5,
+      codigoLocalEstoque: 101, // required when the product has per-location stock control
+      // `controle` is optional; the SDK sends ' ' (no control) when omitted
+      // `sequencia` is auto-filled (1, 2, 3...)
+    },
   ],
   financeiros: [
-    { codigoTipoPagamento: 1, valor: 255.00, dataVencimento: '01/05/2026', numeroParcela: 1 },
+    // canonical names: tipoPagamento / valorParcela (legacy
+    // codigoTipoPagamento / valor / numeroParcela still accepted as aliases)
+    { tipoPagamento: 1, valorParcela: 255.0, dataVencimento: '2026-05-01' },
   ],
 });
 
 // Confirm (required — via Gateway)
 await sankhya.pedidos.confirmar({ codigoPedido });
+```
+
+### Custom fields (`AD_*`)
+
+Every Sankhya install has its own custom fields (`AD_*`). Send them without
+changing types:
+
+```typescript
+// Discover an entity's AD_ fields
+const adFields = await sankhya.metadata.listFields('CabecalhoNota', { customOnly: true });
+
+// Order: camposExtras (flat) — also overrides values inherited from the model
+await sankhya.pedidos.criar({
+  notaModelo: 1, data: '2026-04-01', hora: '10:00:00', codigoCliente: 123, valorTotal: 100,
+  camposExtras: { AD_NUMPEDIDO: 'ECOM-9876', AD_CODRASTREIO: 'BR123' },
+  itens: [{ codigoProduto: 1001, quantidade: 1, valorUnitario: 100, codigoLocalEstoque: 101 }],
+  financeiros: [{ tipoPagamento: 1, valorParcela: 100, dataVencimento: '2026-05-01' }],
+});
+
+// Customer: camposAdicionais (nested object, per the official contract)
+await sankhya.clientes.criar({
+  nome: 'John Doe',
+  tipo: 'PF', // 'PF'/'PJ' (canonical); 'F'/'J' accepted as legacy aliases
+  cnpjCpf: '11144477735',
+  camposAdicionais: { AD_IDEXTERNO: 'EXT-42' },
+  endereco: {
+    logradouro: 'Av Paulista', numero: '1000', bairro: 'Bela Vista',
+    cidade: 'São Paulo', codigoIbge: '3550308', uf: 'SP', cep: '01310100',
+  },
+});
+```
+
+### Financial: query debt, register and settle
+
+```typescript
+// Open titles of a customer
+const debts = await sankhya.financeiros.listarReceitas({
+  codigoParceiro: 123,
+  statusFinanceiro: 1, // StatusFinanceiro.Aberto
+});
+
+// Register a revenue title (dates as ISO or dd/MM/yyyy)
+const { codigoFinanceiro } = await sankhya.financeiros.registrarReceita({
+  codigoEmpresa: 1, codigoTipoOperacao: 1650, codigoNatureza: 1010101,
+  codigoParceiro: 123, codigoTipoPagamento: 2,
+  dataNegociacao: '2026-04-01', dataVencimento: '2026-05-01',
+  numeroNota: 99001, numeroParcela: 1, valorParcela: 150.0,
+});
+
+// Settle (baixa) — pass the account when there is more than one
+await sankhya.financeiros.baixarReceita({
+  codigoFinanceiro, dataBaixa: '2026-05-01', valorBaixa: 150.0, codigoContaBancaria: 2,
+});
 ```
 
 ## Modules
@@ -99,9 +161,10 @@ await sankhya.pedidos.confirmar({ codigoPedido });
 | `sankhya.precos` | 4 | Price tables and contextualized pricing | [precos](./api-reference/precos.md) |
 | `sankhya.estoque` | 5 | Inventory and storage locations | [estoque](./api-reference/estoque.md) |
 | `sankhya.pedidos` | 9 | Create, query, confirm, invoice orders | [pedidos](./api-reference/pedidos.md) |
-| `sankhya.financeiros` | 13 | Revenue, expenses, payment types | [financeiros](./api-reference/financeiros.md) |
+| `sankhya.financeiros` | 13 | Customer debt, revenue, expenses, settlements | [financeiros](./api-reference/financeiros.md) |
 | `sankhya.cadastros` | 11 | Operations, natures, companies, negotiation types | [cadastros](./api-reference/cadastros.md) |
 | `sankhya.fiscal` | 2 | Tax calculation, NFS-e import | [fiscal](./api-reference/fiscal.md) |
+| `sankhya.metadata` | 1 | Field discovery (incl. `AD_*`) per entity | [metadata](./api-reference/metadata.md) |
 | `sankhya.gateway` | 3 | Generic CRUD (any entity) | [gateway](./api-reference/gateway-crud.md) |
 
 ## Features

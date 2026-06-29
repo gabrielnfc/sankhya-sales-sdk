@@ -69,24 +69,100 @@ const precos = await sankhya.precos.contextualizado({
   produtos: [{ codigoProduto: 1001, quantidade: 10 }],
 });
 
-// Criar pedido
+// Criar pedido — datas aceitas em ISO (yyyy-MM-dd) e convertidas internamente
 const { codigoPedido } = await sankhya.pedidos.criar({
   notaModelo: 1,
-  data: '01/04/2026',
+  data: '2026-04-01',
   hora: '10:00:00',
   codigoCliente: 123,
   codigoVendedor: 10,
-  valorTotal: 255.00,
+  valorTotal: 255.0,
   itens: [
-    { codigoProduto: 1001, quantidade: 10, valorUnitario: 25.50, unidade: 'UN' },
+    {
+      codigoProduto: 1001,
+      quantidade: 10,
+      valorUnitario: 25.5,
+      codigoLocalEstoque: 101, // necessário quando há controle de estoque por local
+      // `controle` é opcional; o SDK envia ' ' (sem controle) quando omitido
+      // `sequencia` é auto-preenchida (1, 2, 3...)
+    },
   ],
   financeiros: [
-    { codigoTipoPagamento: 1, valor: 255.00, dataVencimento: '01/05/2026', numeroParcela: 1 },
+    // nomes canônicos: tipoPagamento / valorParcela (os antigos
+    // codigoTipoPagamento / valor / numeroParcela seguem aceitos como aliases)
+    { tipoPagamento: 1, valorParcela: 255.0, dataVencimento: '2026-05-01' },
   ],
 });
 
 // Confirmar (obrigatório — via Gateway)
 await sankhya.pedidos.confirmar({ codigoPedido });
+```
+
+### Campos customizados (`AD_*`)
+
+Toda instalação Sankhya tem campos personalizados (`AD_*`) próprios. O SDK
+permite enviá-los sem alterar tipos:
+
+```typescript
+// Descobrir os campos AD_ de uma entidade
+const adFields = await sankhya.metadata.listFields('CabecalhoNota', { customOnly: true });
+
+// Pedido: camposExtras (flat) — mescla AD_* e atributos do dicionário no payload;
+// também sobrescreve valores herdados do modelo (CODTIPOPER, CODEMP, CODNAT)
+await sankhya.pedidos.criar({
+  notaModelo: 1,
+  data: '2026-04-01',
+  hora: '10:00:00',
+  codigoCliente: 123,
+  valorTotal: 100,
+  camposExtras: { AD_NUMPEDIDO: 'ECOM-9876', AD_CODRASTREIO: 'BR123' },
+  itens: [{ codigoProduto: 1001, quantidade: 1, valorUnitario: 100, codigoLocalEstoque: 101 }],
+  financeiros: [{ tipoPagamento: 1, valorParcela: 100, dataVencimento: '2026-05-01' }],
+});
+
+// Cliente: camposAdicionais (objeto aninhado, conforme o contrato oficial)
+await sankhya.clientes.criar({
+  nome: 'João da Silva',
+  tipo: 'PF', // 'PF'/'PJ' (canônico); 'F'/'J' aceitos como aliases legados
+  cnpjCpf: '11144477735',
+  camposAdicionais: { AD_IDEXTERNO: 'EXT-42' },
+  endereco: {
+    logradouro: 'Av Paulista', numero: '1000', bairro: 'Bela Vista',
+    cidade: 'São Paulo', codigoIbge: '3550308', uf: 'SP', cep: '01310100',
+  },
+});
+```
+
+### Financeiro: consultar débito, registrar e baixar
+
+```typescript
+// Títulos em aberto de um cliente
+const debitos = await sankhya.financeiros.listarReceitas({
+  codigoParceiro: 123,
+  statusFinanceiro: 1, // StatusFinanceiro.Aberto
+});
+
+// Registrar uma receita (datas em ISO ou dd/MM/yyyy)
+const { codigoFinanceiro } = await sankhya.financeiros.registrarReceita({
+  codigoEmpresa: 1,
+  codigoTipoOperacao: 1650, // TOP com TIPMOV='I'
+  codigoNatureza: 1010101,
+  codigoParceiro: 123,
+  codigoTipoPagamento: 2,
+  dataNegociacao: '2026-04-01',
+  dataVencimento: '2026-05-01',
+  numeroNota: 99001,
+  numeroParcela: 1,
+  valorParcela: 150.0,
+});
+
+// Baixar (liquidar) o título — informe a conta quando houver mais de uma
+await sankhya.financeiros.baixarReceita({
+  codigoFinanceiro,
+  dataBaixa: '2026-05-01',
+  valorBaixa: 150.0,
+  codigoContaBancaria: 2,
+});
 ```
 
 ## Módulos
@@ -99,15 +175,19 @@ await sankhya.pedidos.confirmar({ codigoPedido });
 | `sankhya.precos` | 4 | Tabelas de preço e preço contextualizado | [precos](./docs/api-reference/precos.md) |
 | `sankhya.estoque` | 5 | Estoque e locais de armazenamento | [estoque](./docs/api-reference/estoque.md) |
 | `sankhya.pedidos` | 9 | Criar, consultar, confirmar, faturar | [pedidos](./docs/api-reference/pedidos.md) |
-| `sankhya.financeiros` | 13 | Receitas, despesas, pagamentos | [financeiros](./docs/api-reference/financeiros.md) |
+| `sankhya.financeiros` | 13 | Débitos do cliente, receitas, despesas, baixas | [financeiros](./docs/api-reference/financeiros.md) |
 | `sankhya.cadastros` | 11 | TOPs, naturezas, empresas, tipos negociação | [cadastros](./docs/api-reference/cadastros.md) |
 | `sankhya.fiscal` | 2 | Cálculo de impostos, NFS-e | [fiscal](./docs/api-reference/fiscal.md) |
+| `sankhya.metadata` | 1 | Descoberta de campos (incl. `AD_*`) por entidade | [metadata](./docs/api-reference/metadata.md) |
 | `sankhya.gateway` | 3 | CRUD genérico (qualquer entidade) | [gateway](./docs/api-reference/gateway-crud.md) |
 
 ## Features
 
 - **Zero dependencies** — apenas `fetch` nativo (Node 20+)
 - **Tipagem completa** — todos os inputs/outputs com tipos TypeScript
+- **Campos customizados `AD_*`** — `camposExtras` (pedido/financeiro) e `camposAdicionais` (cliente), + `metadata.listFields` para descobri-los
+- **Datas flexíveis** — aceita ISO (`yyyy-MM-dd`) e converte para o formato Sankhya (`dd/MM/yyyy`) automaticamente
+- **Validação de entrada** — erros claros antes da chamada, com nomes de campo
 - **Paginação normalizada** — interface consistente para os 3 padrões da API
 - **Auth automático** — token cache, auto-refresh, mutex
 - **Token cache injetável** — memória (default) ou Redis/custom
