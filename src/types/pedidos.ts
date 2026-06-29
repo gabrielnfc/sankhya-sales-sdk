@@ -1,32 +1,155 @@
 import type { Cliente } from './clientes.js';
 import type { ModifiedSinceParams, PaginationParams } from './common.js';
 
-/** Dados de um item para inclusao em pedido. */
+/** Tipo de imposto suportado pela API de pedidos (IBS/CBS e legado). */
+export type TipoImpostoPedido = 'icms' | 'icms-st' | 'ipi' | 'ibs' | 'cbs' | 'is';
+
+/**
+ * Detalhamento de imposto de um item (entrada). Todos os campos sao opcionais —
+ * envie apenas os relevantes ao regime (IBS/CBS ou legado). Campos nao mapeados
+ * aqui mas presentes no dicionario de dados podem ir em {@link ImpostoPedidoInput.camposExtras}.
+ */
+export interface ImpostoPedidoInput {
+  /** Tipo do imposto. */
+  tipo?: TipoImpostoPedido;
+  /** Codigo de Situacao Tributaria (CST). */
+  cst?: string;
+  /** Codigo de tributacao do municipio (IBS/CBS). */
+  tributacaoMunicipio?: string;
+  /** Codigo de classificacao tributaria (IBS/CBS). */
+  classificacaoTributaria?: number;
+  /** Aliquota do imposto. */
+  aliquota?: number;
+  /** Aliquota efetiva regular (CBS/IBS). */
+  aliquotaEfetivaRegular?: number;
+  /** Aliquota especifica por unidade de medida. */
+  aliquotaUnidadeMedida?: number;
+  /** Aliquota efetiva aplicada a base de calculo. */
+  aliquotaEfetivaBaseCalculo?: number;
+  /** Percentual de reducao de aliquota. */
+  reducaoAliquota?: number;
+  /** Percentual do Fundo de Combate a Pobreza (FCP). */
+  percentualFCP?: number;
+  /** Percentual de reducao de aliquota governamental. */
+  percentualReducaoAliquotaGovernamental?: number;
+  /** Percentual de diferimento. */
+  percentualDiferimento?: number;
+  /** Valor da base de calculo. */
+  valorBase?: number;
+  /** Valor da base de calculo reduzida. */
+  valorBaseReduzida?: number;
+  /** Valor do imposto calculado. */
+  valorImposto?: number;
+  /** Valor do FCP. */
+  valorFCP?: number;
+  /** Valor regular do IBS/municipio. */
+  valorRegular?: number;
+  /** Valor do diferimento. */
+  valorDiferimento?: number;
+  /** Valor do tributo devolvido. */
+  valorTributoDevolvido?: number;
+}
+
+/** Dados de cheque usado como meio de pagamento (tipoPagamento Cheque). */
+export interface ChequePedidoInput {
+  codigoBarras?: string;
+  banco?: string;
+  agencia?: string;
+  conta?: string;
+  numero?: string;
+  nome?: string;
+  cnpjCpf?: string;
+}
+
+/** Dados de cartao usado como meio de pagamento. */
+export interface CartaoPedidoInput {
+  /** Bandeira (padrao NFe: 01 Visa, 02 Mastercard, 06 Elo, 99 Outros...). */
+  bandeira?: string;
+  /** Codigo de autorizacao da administradora. */
+  autorizacao?: string;
+}
+
+/**
+ * Dados de um item para inclusao em pedido.
+ *
+ * Mapeia a entidade `ItemNota`. `controle` e `codigoLocalEstoque` sao exigidos
+ * pela API quando o produto tem controle/local de estoque; o SDK envia
+ * `controle: ' '` (sem controle) quando omitido. `sequencia` e auto-preenchida
+ * (1, 2, 3...) na ordem do array se nao informada.
+ */
 export interface ItemPedidoInput {
-  /** Codigo do produto. */
+  /** Codigo do produto (CODPROD). */
   codigoProduto: number;
-  /** Quantidade do item. */
+  /** Quantidade do item (QTDNEG). */
   quantidade: number;
-  /** Valor unitario. */
+  /** Valor unitario (VLRUNIT). */
   valorUnitario: number;
-  /** Unidade de medida. */
-  unidade: string;
-  /** Percentual de desconto. */
+  /** Sequencia do item (1, 2, 3...). Auto-preenchida pelo SDK se omitida. */
+  sequencia?: number;
+  /** Unidade de medida (CODVOL). Opcional — usa a unidade do produto se omitida. */
+  unidade?: string;
+  /**
+   * Controle de estoque (cor/tamanho/lote/voltagem...). Obrigatorio na API;
+   * o SDK envia `' '` (sem controle) quando omitido. Use `metadata`/`Estoque`
+   * para descobrir o controle correto de produtos controlados.
+   */
+  controle?: string;
+  /** Codigo do local de estoque (CODLOCAL). Necessario quando ha controle por local. */
+  codigoLocalEstoque?: number;
+  /** Codigo CFOP. */
+  cfop?: string;
+  /** Sequencia do item de origem (ao faturar pedido lancado no Sankhya Om). */
+  sequenciaItemOrigem?: number;
+  /** Percentual de desconto. @deprecated A API documenta apenas `valorDesconto`. */
   percentualDesconto?: number;
   /** Valor de desconto absoluto. */
   valorDesconto?: number;
+  /** Impostos do item (IBS/CBS/ICMS...). */
+  impostos?: ImpostoPedidoInput[];
+  /**
+   * Campos extras (`AD_*` ou atributos da entidade `ItemNota`, como `QTDNEG`)
+   * mesclados no item. Permite customizacao por empresa sem alterar o SDK.
+   */
+  camposExtras?: Record<string, unknown>;
 }
 
-/** Dados do financeiro (parcela) para inclusao em pedido. */
+/**
+ * Dados do financeiro (parcela) para inclusao em pedido.
+ *
+ * Mapeia a entidade `Financeiro`. Os nomes canonicos sao `tipoPagamento`,
+ * `valorParcela` e `sequencia` (alinhados a API REST oficial). Os nomes antigos
+ * `codigoTipoPagamento`, `valor` e `numeroParcela` continuam aceitos como
+ * aliases depreciados para retrocompatibilidade.
+ */
 export interface FinanceiroPedidoInput {
-  /** Codigo do tipo de pagamento. */
-  codigoTipoPagamento: number;
-  /** Valor da parcela. */
-  valor: number;
-  /** Data de vencimento (ISO). */
+  /** Tipo de titulo (CODTIPTIT). */
+  tipoPagamento?: number;
+  /** Valor total da parcela. */
+  valorParcela?: number;
+  /** Data de vencimento (ISO `yyyy-MM-dd` ou `dd/MM/yyyy`). */
   dataVencimento: string;
-  /** Numero da parcela. */
-  numeroParcela: number;
+  /** Sequencia da parcela (1, 2, 3...). Auto-preenchida pelo SDK se omitida. */
+  sequencia?: number;
+  /** Data da baixa (ISO ou `dd/MM/yyyy`). Omita para deixar em aberto. */
+  dataBaixa?: string;
+  /** ID da transacao quando houver (ex.: protocolo PIX). */
+  idTransacao?: string;
+  /** Dados do cheque (quando tipoPagamento for Cheque). */
+  cheque?: ChequePedidoInput;
+  /** Dados do cartao (quando tipoPagamento for Cartao). */
+  cartao?: CartaoPedidoInput;
+  /**
+   * Campos extras (`AD_*` ou atributos da entidade `Financeiro`, como `DTVENC`)
+   * mesclados na parcela.
+   */
+  camposExtras?: Record<string, unknown>;
+
+  /** @deprecated Use `tipoPagamento`. */
+  codigoTipoPagamento?: number;
+  /** @deprecated Use `valorParcela`. */
+  valor?: number;
+  /** @deprecated Use `sequencia`. */
+  numeroParcela?: number;
 }
 
 /** Dados para criacao de um pedido de venda via REST. */
@@ -65,6 +188,17 @@ export interface PedidoVendaInput {
   itens: ItemPedidoInput[];
   /** Parcelas financeiras do pedido. */
   financeiros: FinanceiroPedidoInput[];
+  /**
+   * Campos extras mesclados no cabecalho do pedido. Aceita campos `AD_*` e
+   * qualquer atributo do dicionario da entidade `CabecalhoNota` — inclusive
+   * para sobrescrever valores herdados do modelo de nota (ex.: `CODTIPOPER`,
+   * `CODEMP`, `CODNAT`). Permite customizacao por empresa sem alterar o SDK.
+   *
+   * Mesclado por ultimo: chaves aqui sobrescrevem as do payload normalizado
+   * (incluindo `data`, `itens`, `financeiros`). Use apenas para campos do
+   * dicionario, nao para os ja modelados acima.
+   */
+  camposExtras?: Record<string, unknown>;
 }
 
 /** Imposto de um item de pedido. */

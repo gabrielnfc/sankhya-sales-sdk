@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { toISODate, toSankhyaDate, toSankhyaDateTime } from '../../src/core/date.js';
+import {
+  toISODate,
+  toSankhyaDate,
+  toSankhyaDateMaybe,
+  toSankhyaDateTime,
+} from '../../src/core/date.js';
 
 describe('toSankhyaDate', () => {
   it('deve converter Date para dd/mm/aaaa', () => {
@@ -31,6 +36,31 @@ describe('toSankhyaDateTime', () => {
   it('deve preencher zeros em hora/minuto/segundo', () => {
     const date = new Date(2026, 0, 1, 1, 2, 3);
     expect(toSankhyaDateTime(date)).toBe('01/01/2026 01:02:03');
+  });
+});
+
+describe('toSankhyaDateMaybe', () => {
+  it('converte ISO date-only yyyy-MM-dd sem deslocar fuso', () => {
+    expect(toSankhyaDateMaybe('2024-02-01')).toBe('01/02/2024');
+    expect(toSankhyaDateMaybe('2026-12-31')).toBe('31/12/2026');
+  });
+
+  it('repassa dd/MM/yyyy inalterada', () => {
+    expect(toSankhyaDateMaybe('15/03/2024')).toBe('15/03/2024');
+  });
+
+  it('aceita datetime ISO via fallback', () => {
+    expect(toSankhyaDateMaybe('2026-04-01T10:30:00')).toBe('01/04/2026');
+  });
+
+  it('lanca para entrada invalida', () => {
+    expect(() => toSankhyaDateMaybe('not-a-date')).toThrow('Data invalida');
+  });
+
+  it('rejeita ISO com data fora do calendario (nao repassa lixo)', () => {
+    expect(() => toSankhyaDateMaybe('2024-13-45')).toThrow('Data invalida');
+    expect(() => toSankhyaDateMaybe('2024-00-00')).toThrow('Data invalida');
+    expect(() => toSankhyaDateMaybe('2024-02-30')).toThrow('Data invalida');
   });
 });
 

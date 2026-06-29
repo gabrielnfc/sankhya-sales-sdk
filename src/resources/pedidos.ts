@@ -1,3 +1,5 @@
+import { toSankhyaDateMaybe } from '../core/date.js';
+import { SankhyaError } from '../core/errors.js';
 import { serialize } from '../core/gateway-serializer.js';
 import type { HttpClient } from '../core/http.js';
 import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
@@ -15,8 +17,10 @@ import type {
   ConfirmarPedidoInput,
   ConsultarPedidosParams,
   FaturarPedidoInput,
+  FinanceiroPedidoInput,
   IncluirNotaGatewayInput,
   ItemNotaGatewayInput,
+  ItemPedidoInput,
   PedidoVenda,
   PedidoVendaInput,
 } from '../types/pedidos.js';
@@ -91,7 +95,99 @@ export class PedidosResource {
     options?: RequestOptions,
   ): Promise<{ codigoPedido: number }> {
     validatePedidoVendaInput(pedido, 'PedidoVendaInput');
-    return this.http.restPost('/vendas/pedidos', pedido, options);
+    const raw = await this.http.restPost<Record<string, unknown>>(
+      '/vendas/pedidos',
+      this.buildPedidoPayload(pedido),
+      options,
+    );
+    return { codigoPedido: this.extractCodigoPedido(raw) };
+  }
+
+  /**
+   * Desempacota o codigo do pedido do envelope REST.
+   *
+   * A API responde `{ codigo, tipo, mensagem, retorno: { codigoPedido } }` com
+   * o id (string) em `retorno.codigoPedido`. Tolerante a respostas ja
+   * desempacotadas (`{ codigoPedido }`) e ao campo de topo `codigo`. Lanca
+   * quando nenhum desses campos esta presente — preferivel a fabricar um id `0`
+   * silencioso que o chamador passaria adiante para `confirmar`/`cancelar`.
+   *
+   * @internal
+   */
+  private extractCodigoPedido(raw: unknown): number {
+    const envelope = (raw ?? {}) as Record<string, unknown>;
+    const retorno = (envelope.retorno ?? {}) as Record<string, unknown>;
+    const value = retorno.codigoPedido ?? envelope.codigoPedido ?? envelope.codigo;
+    if (value === undefined || value === null) {
+      throw new SankhyaError(
+        'Resposta de pedido sem codigoPedido (envelope inesperado da API)',
+        'API_ERROR',
+      );
+    }
+    return safeParseNumber(value, 'codigoPedido');
+  }
+
+  /**
+   * Monta o payload REST do pedido a partir do input tipado.
+   *
+   * Normaliza datas (ISO → `dd/MM/yyyy`), auto-preenche `sequencia` de itens e
+   * financeiros, aplica o default `controle: ' '`, mapeia os aliases
+   * depreciados do financeiro (`codigoTipoPagamento`/`valor`/`numeroParcela`)
+   * para os nomes canonicos e mescla `camposExtras` em cada nivel.
+   *
+   * @internal
+   */
+  private buildPedidoPayload(pedido: PedidoVendaInput): Record<string, unknown> {
+    const { itens, financeiros, data, camposExtras, ...rest } = pedido;
+    const payload: Record<string, unknown> = {
+      ...rest,
+      data: toSankhyaDateMaybe(data),
+      itens: itens.map((item, i) => this.buildItemPayload(item, i)),
+      financeiros: financeiros.map((fin, i) => this.buildFinanceiroPayload(fin, i)),
+    };
+    if (camposExtras) Object.assign(payload, camposExtras);
+    return payload;
+  }
+
+  /** @internal */
+  private buildItemPayload(item: ItemPedidoInput, index: number): Record<string, unknown> {
+    const { sequencia, controle, camposExtras, ...rest } = item;
+    const out: Record<string, unknown> = {
+      ...rest,
+      sequencia: sequencia ?? index + 1,
+      controle: controle ?? ' ',
+    };
+    if (camposExtras) Object.assign(out, camposExtras);
+    return out;
+  }
+
+  /** @internal */
+  private buildFinanceiroPayload(
+    fin: FinanceiroPedidoInput,
+    index: number,
+  ): Record<string, unknown> {
+    const {
+      tipoPagamento,
+      valorParcela,
+      sequencia,
+      dataVencimento,
+      dataBaixa,
+      codigoTipoPagamento,
+      valor,
+      numeroParcela,
+      camposExtras,
+      ...rest
+    } = fin;
+    const out: Record<string, unknown> = {
+      ...rest,
+      sequencia: sequencia ?? numeroParcela ?? index + 1,
+      tipoPagamento: tipoPagamento ?? codigoTipoPagamento,
+      valorParcela: valorParcela ?? valor,
+      dataVencimento: toSankhyaDateMaybe(dataVencimento),
+    };
+    if (dataBaixa !== undefined) out.dataBaixa = toSankhyaDateMaybe(dataBaixa);
+    if (camposExtras) Object.assign(out, camposExtras);
+    return out;
   }
 
   /**
@@ -110,7 +206,12 @@ export class PedidosResource {
     options?: RequestOptions,
   ): Promise<{ codigoPedido: number }> {
     validatePedidoVendaInput(pedido, 'PedidoVendaInput');
-    return this.http.restPut(`/vendas/pedidos/${codigoPedido}`, pedido, options);
+    const raw = await this.http.restPut<Record<string, unknown>>(
+      `/vendas/pedidos/${codigoPedido}`,
+      this.buildPedidoPayload(pedido),
+      options,
+    );
+    return { codigoPedido: this.extractCodigoPedido(raw) };
   }
 
   /**
@@ -127,13 +228,15 @@ export class PedidosResource {
     options?: RequestOptions,
   ): Promise<{ codigoPedido: number }> {
     validateCancelarPedidoInput(input, 'CancelarPedidoInput');
-    return this.http.restPost(
+    await this.http.restPost(
       `/vendas/pedidos/${input.codigoPedido}/cancela`,
       {
         motivo: input.motivo,
       },
       options,
     );
+    // O id cancelado e o proprio input — nao depende do shape da resposta.
+    return { codigoPedido: input.codigoPedido };
   }
 
   /**
@@ -148,7 +251,7 @@ export class PedidosResource {
     validateConfirmarPedidoInput(input, 'ConfirmarPedidoInput');
     await this.http.gatewayCall(
       'mgecom',
-      'ServicosNfeSP.confirmarNota',
+      'CACSP.confirmarNota',
       {
         nota: {
           NUNOTA: { $: String(input.codigoPedido) },

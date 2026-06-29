@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-06-29
+
+### Fixed
+- **`pedidos.criar`/`pedidos.atualizar` não conseguiam criar um pedido pela API tipada.**
+  O contrato oficial (`POST /vendas/pedidos`, conferido na doc OpenAPI e no sandbox ao
+  vivo) exige no item os campos `controle` e `codigoLocalEstoque` — ausentes do tipo — e
+  no financeiro os nomes `tipoPagamento`/`valorParcela`/`sequencia`, enquanto o SDK
+  enviava `codigoTipoPagamento`/`valor`/`numeroParcela`. Ambos os níveis foram alinhados
+  ao contrato e o payload passou a ser montado pelo SDK (datas, sequência e defaults),
+  fechando o round-trip de criação que nunca havia passado (Issue #4).
+- **`pedidos.confirmar` chamava um serviço inexistente nesta versão do Om.**
+  `ServicosNfeSP.confirmarNota` retornava *"Método confirmarNota não encontrado"*; o
+  serviço correto, verificado ao vivo (transição `STATUSNOTA` A → L), é
+  `CACSP.confirmarNota`.
+- **`criar`/`atualizar`/`cancelar` retornavam o envelope REST cru** em vez de
+  `{ codigoPedido }`. A API responde `{ codigo, retorno: { codigoPedido } }` com o id
+  (string) aninhado; agora é desempacotado e coagido para número. Bug mascarado pelos
+  unit tests, que mockavam o shape já desempacotado.
+
+### Added
+- **Campos do contrato oficial agora tipados** em `ItemPedidoInput`/`FinanceiroPedidoInput`
+  como opcionais: `controle` (default `' '` quando omitido), `codigoLocalEstoque`,
+  `sequencia` (auto-preenchida 1, 2, 3…), `cfop`, `sequenciaItemOrigem`, `impostos`
+  (IBS/CBS/ICMS via novo `ImpostoPedidoInput`), `dataBaixa`, `idTransacao`, `cheque`
+  e `cartao` (novos `ChequePedidoInput`/`CartaoPedidoInput`). `unidade` passou a ser
+  opcional (a API usa a unidade do produto quando omitida).
+- **Escape hatch `camposExtras?: Record<string, unknown>`** em cabeçalho, item e
+  financeiro — mescla campos `AD_*` e quaisquer atributos do dicionário de dados
+  (ex.: `QTDNEG`, `DTVENC`) ou sobrescreve valores herdados do modelo de nota
+  (`CODTIPOPER`, `CODEMP`, `CODNAT`), cobrindo customizações por empresa sem alterar o SDK.
+- **Datas aceitas em ISO (`yyyy-MM-dd`)** em `data`/`dataVencimento`/`dataBaixa` e
+  convertidas para o formato Sankhya `dd/MM/yyyy` via novo `toSankhyaDateMaybe`
+  (sem deslocamento de fuso; repassa datas já no formato brasileiro).
+
+### Changed
+- Nomes canônicos do financeiro passam a ser `tipoPagamento`/`valorParcela`/`sequencia`.
+  Os antigos `codigoTipoPagamento`/`valor`/`numeroParcela` continuam aceitos como
+  **aliases depreciados** (sem quebra de compatibilidade).
+
+### Tests
+- Novo `tests/integration/pedido-roundtrip.test.ts`: cria + confirma um pedido REAL no
+  sandbox e verifica a transição de status via Gateway (parametrizável por env para
+  outros tenants). Fecha o ciclo de escrita que o Issue #4 provou estar quebrado.
+
 ## [1.2.1] - 2026-06-29
 
 ### Fixed
