@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-06-30
+
+### Docs
+- README (pt + en) atualizado para os recursos do 1.2.3: pedido com nomes
+  canonicos do financeiro (`tipoPagamento`/`valorParcela`) e datas ISO, secoes
+  de campos personalizados `AD_*` (`camposExtras`/`camposAdicionais` +
+  `metadata.listFields`) e de fluxo financeiro (consultar debito / registrar /
+  baixar); tabela de modulos com a linha `metadata`.
+- Nova pagina `docs/api-reference/metadata.md` (documenta `metadata.listFields` e
+  o fluxo `AD_*` ponta a ponta).
+- `examples/03-criar-pedido.ts` alinhado aos nomes canonicos + data ISO.
+
+Apenas documentacao — sem mudanca de codigo. Publicado para refletir o novo
+README na pagina do npm.
+
 ## [1.2.3] - 2026-06-29
 
 Fechamento dos gaps de cobertura de vendas levantados na auditoria doc-oficial ×
