@@ -231,8 +231,10 @@ describe('AUTH-RETRY: backoff exponencial + jitter em falhas transientes', () =>
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
-    vi.useRealTimers();
+    // restoreAllMocks ANTES de useRealTimers: o spy de setTimeout capturou a
+    // implementacao fake — restaurar depois re-instalaria o timer fake.
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('deve recuperar de 502 transiente (502 -> 502 -> 200)', async () => {
@@ -290,6 +292,53 @@ describe('AUTH-RETRY: backoff exponencial + jitter em falhas transientes', () =>
     await vi.runAllTimersAsync();
     await assertion;
     expect(globalThis.fetch).toHaveBeenCalledTimes(3); // 1 + 2 retries
+  });
+});
+
+describe('AUTH-RETRY: classificacao transiente vs permanente de excecoes de fetch', () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    vi.clearAllMocks();
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('TypeError sem cause.code de rede e permanente — falha sem retry', async () => {
+    // Caso real: CRLF no .env corrompe header e undici lanca TypeError
+    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError('invalid header value'));
+    const auth = createAuthManagerWithOpts({ authRetry: { maxRetries: 3, baseDelayMs: 1 } });
+
+    const err = await auth.getToken().catch((e) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    expect((err as AuthError).message).toContain('TypeError');
+    expect(globalThis.fetch).toHaveBeenCalledOnce();
+  });
+
+  it('TypeError com cause.code de rede (ECONNREFUSED) e transiente — retenta', async () => {
+    const netErr = new TypeError('fetch failed');
+    (netErr as Error & { cause: unknown }).cause = { code: 'ECONNREFUSED' };
+    globalThis.fetch = vi
+      .fn()
+      .mockRejectedValueOnce(netErr)
+      .mockResolvedValue(okResponse('recovered-token'));
+    const auth = createAuthManagerWithOpts({ authRetry: { maxRetries: 2, baseDelayMs: 1 } });
+
+    const token = await auth.getToken();
+    expect(token).toBe('recovered-token');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('razao do erro inclui name e cause.code (diagnostico) sem ecoar valores', async () => {
+    const netErr = new TypeError('fetch failed');
+    (netErr as Error & { cause: unknown }).cause = { code: 'ENOTFOUND' };
+    globalThis.fetch = vi.fn().mockRejectedValue(netErr);
+    const auth = createAuthManagerWithOpts({ authRetry: { maxRetries: 0, baseDelayMs: 1 } });
+
+    const err = await auth.getToken().catch((e) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    expect((err as AuthError).message).toContain('ENOTFOUND');
   });
 });
 
@@ -367,8 +416,9 @@ describe('AUTH-TIMEOUT: timeout de auth configuravel (default 30s)', () => {
   });
   afterEach(() => {
     globalThis.fetch = originalFetch;
-    vi.useRealTimers();
+    // restoreAllMocks ANTES de useRealTimers (spy de setTimeout sob fake timers)
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('deve usar o timeout configurado (5000ms) e nao o hardcoded 30000', async () => {

@@ -19,6 +19,23 @@ const DEFAULT_AUTH_TIMEOUT_MS = 30_000;
  */
 const RETRYABLE_AUTH_STATUS = new Set([408, 429, 500, 502, 503, 504]);
 
+/**
+ * Codigos de erro de rede (Node/undici) que marcam uma excecao de fetch como
+ * transiente. TypeError SEM um destes codigos e erro permanente de
+ * programacao/config (URL invalida, header com caractere invalido) — retry
+ * seria futil.
+ */
+const NETWORK_ERROR_CODES = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'ETIMEDOUT',
+  'EPIPE',
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_SOCKET',
+]);
+
 interface ResolvedAuthRetry {
   maxRetries: number;
   baseDelayMs: number;
@@ -264,8 +281,15 @@ export class AuthManager {
       if (error instanceof Error && error.name === 'AbortError') {
         throw new TransientAuthFailure(`timeout apos ${this.timeout}ms`);
       }
-      // Erro de rede — transiente. NUNCA inclui credenciais.
-      throw new TransientAuthFailure('erro de conexao com servidor de autenticacao');
+      // Identificadores seguros (name + cause.code) — NUNCA valores de header/env.
+      const causeCode = extractCauseCode(error);
+      const label = `${error instanceof Error ? error.name : 'Error'}${
+        causeCode ? `: ${causeCode}` : ''
+      }`;
+      if (error instanceof TypeError && (!causeCode || !NETWORK_ERROR_CODES.has(causeCode))) {
+        throw new AuthError(`Falha permanente na autenticacao (${label})`, undefined, error);
+      }
+      throw new TransientAuthFailure(`erro de conexao (${label})`);
     } finally {
       clearTimeout(timeoutId);
     }
@@ -298,4 +322,18 @@ export class AuthManager {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Extrai `cause.code` (string) de um erro, se presente. */
+function extractCauseCode(error: unknown): string | undefined {
+  if (
+    error instanceof Error &&
+    error.cause &&
+    typeof error.cause === 'object' &&
+    'code' in error.cause &&
+    typeof (error.cause as { code?: unknown }).code === 'string'
+  ) {
+    return (error.cause as { code: string }).code;
+  }
+  return undefined;
 }
