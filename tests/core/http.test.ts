@@ -394,6 +394,26 @@ describe('HttpClient', () => {
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     });
 
+    it('flag idempotent em servico fora da allowlist e ignorada (sem retry) com warn', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        statusText: 'Bad Gateway',
+        headers: { get: () => null },
+        text: () => Promise.resolve(''),
+      });
+
+      const client = createHttpClient();
+
+      await expect(
+        client.gatewayCall('mgecom', 'CACSP.incluirNota', {}, undefined, true),
+      ).rejects.toThrow(ApiError);
+      expect(globalThis.fetch).toHaveBeenCalledOnce();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('flag idempotent ignorada'),
+      );
+    });
+
     it('escrita (default, nao-idempotente) NAO deve retentar em 502', async () => {
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,

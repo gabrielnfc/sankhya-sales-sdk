@@ -4,6 +4,12 @@ import type { AuthManager } from './auth.js';
 import { ApiError, GatewayError, TimeoutError } from './errors.js';
 import { parseRetryAfterMs, withRetry } from './retry.js';
 
+/** Servicos do Gateway reconhecidos como LEITURA — unicos elegiveis a `idempotent`. */
+const IDEMPOTENT_GATEWAY_SERVICE_PREFIXES = [
+  'CRUDServiceProvider.load',
+  'DbExplorerSP.executeQuery',
+];
+
 export class HttpClient {
   private readonly baseUrl: string;
   private readonly xToken: string;
@@ -80,6 +86,20 @@ export class HttpClient {
 
     this.logger.debug(`Gateway: ${serviceName}`);
 
+    // Guard: a flag idempotent so vale para leituras conhecidas do Gateway —
+    // marcar uma escrita como idempotente habilitaria retry com risco de
+    // duplicacao no ERP. Fora da allowlist, a flag e ignorada.
+    let effectiveIdempotent = idempotent;
+    if (
+      idempotent &&
+      !IDEMPOTENT_GATEWAY_SERVICE_PREFIXES.some((prefix) => serviceName.startsWith(prefix))
+    ) {
+      this.logger.warn(
+        `gatewayCall: servico ${serviceName} nao e leitura conhecida — flag idempotent ignorada`,
+      );
+      effectiveIdempotent = false;
+    }
+
     const result = await this.requestWithRetry<GatewayResponse<T>>(
       url,
       'POST',
@@ -87,7 +107,7 @@ export class HttpClient {
       { requestBody },
       0,
       options,
-      idempotent,
+      effectiveIdempotent,
     );
 
     if (result.status === '0') {
