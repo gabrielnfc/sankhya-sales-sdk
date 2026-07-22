@@ -2,7 +2,7 @@ import type { GatewayResponse } from '../types/common.js';
 import type { Logger, RequestOptions } from '../types/config.js';
 import type { AuthManager } from './auth.js';
 import { ApiError, GatewayError, TimeoutError } from './errors.js';
-import { withRetry } from './retry.js';
+import { parseRetryAfterMs, withRetry } from './retry.js';
 
 export class HttpClient {
   private readonly baseUrl: string;
@@ -278,19 +278,6 @@ function isAbortError(error: unknown): boolean {
     (error instanceof DOMException && error.name === 'AbortError') ||
     (error instanceof Error && error.name === 'AbortError')
   );
-}
-
-/** Converte o header Retry-After (segundos ou HTTP-date) para ms, ou undefined. */
-function parseRetryAfterMs(value: string | null): number | undefined {
-  if (!value) return undefined;
-  const seconds = Number(value);
-  if (Number.isFinite(seconds)) {
-    return seconds > 0 ? seconds * 1000 : undefined;
-  }
-  const dateMs = Date.parse(value);
-  if (Number.isNaN(dateMs)) return undefined;
-  const delta = dateMs - Date.now();
-  return delta > 0 ? delta : undefined;
 }
 
 function sanitizeUrl(url: string): string {

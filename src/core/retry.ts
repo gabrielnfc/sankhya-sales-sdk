@@ -92,6 +92,19 @@ export async function withRetry<T>(
   throw lastError;
 }
 
+/** Converte o header Retry-After (segundos ou HTTP-date) para ms com teto, ou undefined. */
+export function parseRetryAfterMs(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) {
+    return seconds > 0 ? Math.min(seconds * 1000, MAX_RETRY_AFTER_MS) : undefined;
+  }
+  const dateMs = Date.parse(value);
+  if (Number.isNaN(dateMs)) return undefined;
+  const delta = dateMs - Date.now();
+  return delta > 0 ? Math.min(delta, MAX_RETRY_AFTER_MS) : undefined;
+}
+
 /** Extrai Retry-After (em ms) de um erro, se presente. */
 function getRetryAfterMs(error: unknown): number | undefined {
   if (

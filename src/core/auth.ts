@@ -6,6 +6,7 @@ import type {
   TokenCacheProvider,
 } from '../types/config.js';
 import { AuthError, CircuitOpenError } from './errors.js';
+import { parseRetryAfterMs } from './retry.js';
 
 const TOKEN_CACHE_KEY = 'sankhya_sdk_token';
 const SAFETY_MARGIN_SECONDS = 60;
@@ -62,7 +63,11 @@ export interface AuthManagerOptions {
  * Nunca carrega corpo de resposta nem credenciais (apenas a razao/status).
  */
 class TransientAuthFailure extends Error {
-  constructor(readonly reason: string) {
+  constructor(
+    readonly reason: string,
+    /** Delay ditado pelo servidor (Retry-After, ja com teto) para a proxima tentativa. */
+    readonly retryAfterMs?: number,
+  ) {
     super(reason);
     this.name = 'TransientAuthFailure';
   }
@@ -235,7 +240,7 @@ export class AuthManager {
 
         const base = baseDelayMs * factor ** attempt;
         const jitter = base * jitterRatio * (Math.random() * 2 - 1);
-        const delay = Math.max(0, Math.round(base + jitter));
+        const delay = error.retryAfterMs ?? Math.max(0, Math.round(base + jitter));
         this.logger.warn(
           `Autenticacao: tentativa ${attempt + 1} falhou (${lastReason}), retentando em ${delay}ms`,
         );
@@ -299,7 +304,12 @@ export class AuthManager {
     if (!response.ok) {
       // Corpo da resposta NAO e incluido no erro (pode ecoar token/credencial).
       if (RETRYABLE_AUTH_STATUS.has(response.status)) {
-        throw new TransientAuthFailure(`HTTP ${response.status}`);
+        // 429: honra Retry-After (com teto) como delay da proxima tentativa.
+        const retryAfterMs =
+          response.status === 429
+            ? parseRetryAfterMs(response.headers?.get?.('retry-after') ?? null)
+            : undefined;
+        throw new TransientAuthFailure(`HTTP ${response.status}`, retryAfterMs);
       }
       throw new AuthError(`Autenticacao falhou: HTTP ${response.status}`, response.status);
     }

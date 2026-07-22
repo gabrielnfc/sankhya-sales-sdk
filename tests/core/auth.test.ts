@@ -281,6 +281,35 @@ describe('AUTH-RETRY: backoff exponencial + jitter em falhas transientes', () =>
     expect(backoffDelays).toEqual([500, 1000]);
   });
 
+  it('OAuth 429 honra Retry-After como delay da proxima tentativa', async () => {
+    vi.useFakeTimers();
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        headers: { get: (k: string) => (k.toLowerCase() === 'retry-after' ? '2' : null) },
+        text: () => Promise.resolve(''),
+      } as unknown as Response)
+      .mockResolvedValueOnce(okResponse('recovered-token'));
+
+    const auth = createAuthManagerWithOpts({ authRetry: { maxRetries: 2, baseDelayMs: 500 } });
+
+    const p = auth.getToken();
+    await vi.runAllTimersAsync();
+    const token = await p;
+
+    expect(token).toBe('recovered-token');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    // delay usado foi o do header (2000ms), nao o backoff (~500ms)
+    const delays = setTimeoutSpy.mock.calls
+      .map((c) => c[1])
+      .filter((ms): ms is number => typeof ms === 'number' && ms > 0 && ms < 30_000);
+    expect(delays).toEqual([2000]);
+  });
+
   it('deve exaurir retries transientes e lancar AuthError', async () => {
     vi.useFakeTimers();
     globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(504));
