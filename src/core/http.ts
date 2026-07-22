@@ -173,6 +173,8 @@ export class HttpClient {
 
       if (response.status === 401 && authRetryDepth < 2) {
         this.logger.warn('Token expirado, renovando...');
+        // Libera a conexao do 401 (undici segura a conexao ate consumir o body).
+        await response.body?.cancel().catch(() => {});
         await this.auth.invalidateToken();
         const newToken = await this.auth.getToken();
         if (newToken === token) {
