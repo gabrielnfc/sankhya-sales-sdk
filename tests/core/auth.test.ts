@@ -432,21 +432,6 @@ describe('CIRCUIT-BREAKER: contagem por fluxo, CircuitOpenError, jitter', () => 
     expect(vi.mocked(globalThis.fetch).mock.calls.length).toBe(fetchCallsBefore); // nao chamou fetch
   });
 
-  it('falhas encadeadas no MESMO fluxo (401 cascade) contam como 1', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(500));
-    const auth = createAuthManagerWithOpts({
-      authRetry: { maxRetries: 0, baseDelayMs: 1 },
-      circuitBreaker: { threshold: 3, resetTimeoutMs: 30_000 },
-    });
-
-    const flow = Symbol('business-call');
-    // 5 falhas encadeadas no mesmo fluxo => conta como 1 => breaker NUNCA abre
-    for (let i = 0; i < 5; i++) {
-      const err = await auth.getToken(flow).catch((e) => e);
-      expect(err).toBeInstanceOf(AuthError);
-      expect(err).not.toBeInstanceOf(CircuitOpenError);
-    }
-  });
 });
 
 describe('CORE-04: TTL lower-bound guard', () => {

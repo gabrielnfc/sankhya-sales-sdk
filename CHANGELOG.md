@@ -33,9 +33,10 @@ Mudanças aditivas e retrocompatíveis; comportamento de escrita inalterado.
 ### Fixed
 - `AuthManager.authenticate()`: timeout hardcoded de 30s substituído pelo
   `timeout` do client (30s continua default).
-- Circuit breaker: cascata de refresh de 401 de UMA chamada de negócio agora
-  conta como **1 falha** (dedupe por fluxo), não 3 — uma única chamada ruim
-  não arma mais o breaker sozinha.
+- Circuit breaker: cascata de refresh de 401 de UMA chamada de negócio conta
+  como **1 falha**, não 3 — a falha de auth propaga e encerra a chamada (a
+  cascata só continua após refresh com sucesso), então uma única chamada ruim
+  não arma o breaker sozinha.
 - Corpo da resposta do servidor OAuth não é mais incluído em mensagem/details
   de `AuthError` (podia ecoar credencial/token). Logs de retry registram
   apenas tentativa, status e delay.

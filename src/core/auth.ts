@@ -66,8 +66,6 @@ export class AuthManager {
   private refreshPromise: Promise<string> | null = null;
   private consecutiveFailures = 0;
   private circuitOpenUntil = 0;
-  /** Ultimo fluxo (business call) que ja contabilizou uma falha, para nao contar em dobro. */
-  private lastFailedFlowId: symbol | undefined;
 
   constructor(
     baseUrl: string,
@@ -101,16 +99,16 @@ export class AuthManager {
   /**
    * Obtem um token valido (do cache ou autenticando).
    *
-   * @param flowId - Identificador opcional do fluxo de negocio. Falhas de
-   *   autenticacao encadeadas no mesmo fluxo (ex.: cascata de 401) contam
-   *   como UMA falha para o circuit breaker.
+   * Nota sobre o circuit breaker: uma falha de autenticacao propaga e encerra
+   * a chamada de negocio (a cascata de 401 so recursa apos refresh com
+   * SUCESSO), entao cada chamada de negocio conta no maximo UMA falha.
    */
-  async getToken(flowId?: symbol): Promise<string> {
+  async getToken(): Promise<string> {
     if (this.refreshPromise) {
       this.logger.debug('Aguardando refresh em andamento');
       return this.refreshPromise;
     }
-    this.refreshPromise = this._doGetToken(flowId);
+    this.refreshPromise = this._doGetToken();
     try {
       return await this.refreshPromise;
     } finally {
@@ -118,7 +116,7 @@ export class AuthManager {
     }
   }
 
-  private async _doGetToken(flowId?: symbol): Promise<string> {
+  private async _doGetToken(): Promise<string> {
     // Circuit breaker: fast-fail local sem contatar o servidor.
     if (
       this.consecutiveFailures >= this.circuitBreaker.threshold &&
@@ -137,21 +135,16 @@ export class AuthManager {
     try {
       const token = await this.authenticate();
       this.consecutiveFailures = 0;
-      this.lastFailedFlowId = undefined;
       return token;
     } catch (error) {
-      this.recordFailure(flowId);
+      this.recordFailure();
       throw error;
     }
   }
 
-  /** Contabiliza uma falha, deduplicando por fluxo, e abre o breaker no threshold. */
-  private recordFailure(flowId: symbol | undefined): void {
-    const sameFlowAlreadyCounted = flowId !== undefined && flowId === this.lastFailedFlowId;
-    if (sameFlowAlreadyCounted) return;
-
+  /** Contabiliza uma falha e abre o breaker no threshold. */
+  private recordFailure(): void {
     this.consecutiveFailures++;
-    this.lastFailedFlowId = flowId;
 
     if (this.consecutiveFailures >= this.circuitBreaker.threshold) {
       const jitter = Math.floor(

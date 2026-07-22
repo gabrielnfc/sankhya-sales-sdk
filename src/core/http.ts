@@ -123,12 +123,8 @@ export class HttpClient {
     authRetryDepth = 0,
     options?: RequestOptions,
     idempotent = false,
-    authFlowId?: symbol,
   ): Promise<T> {
-    // Um unico flow symbol por chamada de negocio: a cascata de refresh de 401
-    // reusa o mesmo symbol para que o circuit breaker conte como UMA falha.
-    const flowId = authFlowId ?? Symbol('authFlow');
-    const token = await this.auth.getToken(flowId);
+    const token = await this.auth.getToken();
     const timeoutMs = options?.timeout ?? this.timeout;
 
     try {
@@ -178,7 +174,7 @@ export class HttpClient {
       if (response.status === 401 && authRetryDepth < 2) {
         this.logger.warn('Token expirado, renovando...');
         await this.auth.invalidateToken();
-        const newToken = await this.auth.getToken(flowId);
+        const newToken = await this.auth.getToken();
         if (newToken === token) {
           throw new ApiError(
             'API error: HTTP 401 — token refresh retornou o mesmo token',
@@ -196,7 +192,6 @@ export class HttpClient {
           authRetryDepth + 1,
           options,
           idempotent,
-          flowId,
         );
       }
 
