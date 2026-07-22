@@ -137,7 +137,8 @@ O SDK faz retry automático com **exponential backoff** para erros transientes:
 | Leituras do Gateway (`loadRecords`, `loadRecord`, `metadata.listFields`) — POST no transporte | Sim |
 | Escritas (criar/confirmar/cancelar/`saveRecord`, REST `POST`/`PUT`/`DELETE`) | **Nunca** — risco de duplicação no ERP; use `idempotencyKey` |
 
-O header `Retry-After` do servidor, quando presente, é respeitado no delay.
+O header `Retry-After` do servidor, quando presente, é respeitado no delay —
+com teto de 60s por espera.
 
 A **autenticação OAuth** tem política própria (`authRetry`): backoff exponencial
 com jitter só para falha transiente (timeout, 5xx, rede); HTTP 400/401/403
@@ -156,6 +157,11 @@ const sankhya = new SankhyaClient({
 });
 ```
 
+> **Defaults desde a 1.3.0:** sem nenhuma config, a autenticação retenta 3× em
+> falha transiente (pior caso de obtenção de token sob indisponibilidade total:
+> ~2min) e o timeout de cada tentativa de auth segue `timeout` (antes: 30s
+> fixos). `authRetry: { maxRetries: 0 }` restaura o fail-fast pré-1.3.0.
+
 ### Backoff exponencial
 
 ```
@@ -164,6 +170,21 @@ Tentativa 2: após ~1s
 Tentativa 3: após ~2s
 Tentativa 4: após ~4s (se retries=4)
 ```
+
+### Envelope de pior caso (retries aninhados)
+
+Em degradação severa, os retries se **multiplicam** entre camadas para uma
+leitura idempotente: cada passe da cascata de 401 (até 3 passes) executa até
+`1 + retries` fetches HTTP, e cada passe pode disparar uma autenticação com
+até `1 + authRetry.maxRetries` tentativas (cada uma limitada por `timeout`,
+que vale por tentativa — não pela chamada inteira).
+
+Com os defaults (`retries: 3`, `authRetry.maxRetries: 3`), o pior caso teórico
+de UMA chamada de leitura chega a ~12 fetches de API + ~12 fetches de auth, e
+o tempo de relógio pode alcançar vários minutos. Escritas não participam: são
+sempre 1 única tentativa HTTP por passe. Para falhar mais rápido, reduza
+`retries`, `authRetry.maxRetries` e/ou `timeout` — o circuit breaker corta as
+tentativas de auth após `threshold` falhas consecutivas.
 
 ## Códigos HTTP da API
 
