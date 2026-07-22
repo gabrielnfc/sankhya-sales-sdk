@@ -100,16 +100,18 @@ export class AuthManager {
     this.logger = logger;
     this.cacheProvider = cacheProvider;
     this.timeout = options?.timeout ?? DEFAULT_AUTH_TIMEOUT_MS;
+    // Clamp de config: valores fora de faixa (negativos, NaN, jitter > 1)
+    // produziriam breaker que nunca abre ou retry loop quente.
     this.authRetry = {
-      maxRetries: options?.authRetry?.maxRetries ?? 3,
-      baseDelayMs: options?.authRetry?.baseDelayMs ?? 500,
-      factor: options?.authRetry?.factor ?? 2,
-      jitterRatio: options?.authRetry?.jitterRatio ?? 0.5,
+      maxRetries: Math.floor(clampConfig(options?.authRetry?.maxRetries, 3, 0)),
+      baseDelayMs: clampConfig(options?.authRetry?.baseDelayMs, 500, 0),
+      factor: clampConfig(options?.authRetry?.factor, 2, 1),
+      jitterRatio: clampConfig(options?.authRetry?.jitterRatio, 0.5, 0, 1),
     };
     this.circuitBreaker = {
-      threshold: options?.circuitBreaker?.threshold ?? 3,
-      resetTimeoutMs: options?.circuitBreaker?.resetTimeoutMs ?? 30_000,
-      jitterRatio: options?.circuitBreaker?.jitterRatio ?? 0.2,
+      threshold: Math.max(1, Math.floor(clampConfig(options?.circuitBreaker?.threshold, 3, 1))),
+      resetTimeoutMs: clampConfig(options?.circuitBreaker?.resetTimeoutMs, 30_000, 0),
+      jitterRatio: clampConfig(options?.circuitBreaker?.jitterRatio, 0.2, 0, 1),
     };
   }
 
@@ -322,6 +324,18 @@ export class AuthManager {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Clampa valor de config ao intervalo [min, max]; ausente ou nao-finito usa o fallback. */
+function clampConfig(
+  value: number | undefined,
+  fallback: number,
+  min: number,
+  max = Number.POSITIVE_INFINITY,
+): number {
+  const v = value ?? fallback;
+  if (!Number.isFinite(v)) return fallback;
+  return Math.min(max, Math.max(min, v));
 }
 
 /** Extrai `cause.code` (string) de um erro, se presente. */

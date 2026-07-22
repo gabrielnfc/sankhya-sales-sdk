@@ -484,6 +484,58 @@ describe('CIRCUIT-BREAKER: contagem por fluxo, CircuitOpenError, jitter', () => 
 
 });
 
+describe('CONFIG-CLAMP: valores de resiliencia fora de faixa sao clampados', () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    vi.clearAllMocks();
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('maxRetries negativo ainda faz 1 tentativa real (fetch e chamado)', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(500));
+    const auth = createAuthManagerWithOpts({ authRetry: { maxRetries: -1, baseDelayMs: 1 } });
+
+    const err = await auth.getToken().catch((e) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    expect((err as AuthError).message).toContain('1 tentativa(s)');
+    expect(globalThis.fetch).toHaveBeenCalledOnce();
+  });
+
+  it('threshold 0 e clampado para 1 — breaker abre apos 1 falha', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(500));
+    const auth = createAuthManagerWithOpts({
+      authRetry: { maxRetries: 0, baseDelayMs: 1 },
+      circuitBreaker: { threshold: 0, resetTimeoutMs: 30_000 },
+    });
+
+    const err1 = await auth.getToken().catch((e) => e);
+    expect(err1).toBeInstanceOf(AuthError);
+    expect(err1).not.toBeInstanceOf(CircuitOpenError);
+
+    const err2 = await auth.getToken().catch((e) => e);
+    expect(err2).toBeInstanceOf(CircuitOpenError);
+    expect(globalThis.fetch).toHaveBeenCalledOnce(); // 2a chamada nao toca o servidor
+  });
+
+  it('resetTimeoutMs negativo e clampado para 0 — breaker nunca bloqueia', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(500));
+    const auth = createAuthManagerWithOpts({
+      authRetry: { maxRetries: 0, baseDelayMs: 1 },
+      circuitBreaker: { threshold: 1, resetTimeoutMs: -5000, jitterRatio: 0 },
+    });
+
+    for (let i = 0; i < 3; i++) {
+      const err = await auth.getToken().catch((e) => e);
+      expect(err).toBeInstanceOf(AuthError);
+      expect(err).not.toBeInstanceOf(CircuitOpenError);
+    }
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3); // toda chamada contata o servidor
+  });
+});
+
 describe('CORE-04: TTL lower-bound guard', () => {
   let originalFetch: typeof globalThis.fetch;
 
