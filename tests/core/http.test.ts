@@ -429,6 +429,37 @@ describe('HttpClient', () => {
       expect(globalThis.fetch).toHaveBeenCalledOnce();
     });
 
+    it('escrita NAO deve retentar em erro de rede (ECONNRESET)', async () => {
+      globalThis.fetch = vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }));
+
+      const client = createHttpClient();
+
+      await expect(client.gatewayCall('mgecom', 'CACSP.incluirNota', {})).rejects.toThrow(
+        'socket hang up',
+      );
+      expect(globalThis.fetch).toHaveBeenCalledOnce();
+    });
+
+    it('escrita NAO deve retentar em timeout de tentativa', async () => {
+      globalThis.fetch = vi.fn().mockImplementation(
+        (_url: string, init?: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              reject(new DOMException('The operation was aborted.', 'AbortError'));
+            });
+          }),
+      );
+
+      const client = createHttpClient(undefined, 10);
+
+      await expect(client.gatewayCall('mgecom', 'CACSP.incluirNota', {})).rejects.toThrow(
+        TimeoutError,
+      );
+      expect(globalThis.fetch).toHaveBeenCalledOnce();
+    });
+
     it('deve honrar Retry-After do header e recuperar em leitura idempotente (429 -> 200)', async () => {
       vi.useFakeTimers();
       let calls = 0;

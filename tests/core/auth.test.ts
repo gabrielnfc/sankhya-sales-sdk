@@ -510,7 +510,106 @@ describe('CIRCUIT-BREAKER: contagem por fluxo, CircuitOpenError, jitter', () => 
     expect((err as CircuitOpenError).retryAfterMs).toBeGreaterThan(0);
     expect(vi.mocked(globalThis.fetch).mock.calls.length).toBe(fetchCallsBefore); // nao chamou fetch
   });
+});
 
+describe('CIRCUIT-BREAKER: ciclo half-open, joiners concorrentes, retryAfterMs', () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    vi.clearAllMocks();
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('half-open: apos a janela um probe e permitido e o sucesso reseta o breaker', async () => {
+    vi.useFakeTimers();
+    globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(500));
+    const auth = createAuthManagerWithOpts({
+      authRetry: { maxRetries: 0, baseDelayMs: 1 },
+      circuitBreaker: { threshold: 2, resetTimeoutMs: 1000, jitterRatio: 0 },
+    });
+
+    // 2 falhas => breaker abre
+    await expect(auth.getToken()).rejects.toBeInstanceOf(AuthError);
+    await expect(auth.getToken()).rejects.toBeInstanceOf(AuthError);
+    await expect(auth.getToken()).rejects.toBeInstanceOf(CircuitOpenError);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+
+    // janela expira (jitterRatio 0 => exatamente 1000ms) => probe toca o servidor
+    vi.advanceTimersByTime(1001);
+    globalThis.fetch = mockFetchSuccess('probe-token');
+    const token = await auth.getToken();
+    expect(token).toBe('probe-token');
+
+    // sucesso resetou o contador: 1 falha nova NAO reabre (threshold 2)
+    await auth.invalidateToken();
+    globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(500));
+    const err = await auth.getToken().catch((e) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    expect(err).not.toBeInstanceOf(CircuitOpenError);
+    const err2 = await auth.getToken().catch((e) => e);
+    expect(err2).toBeInstanceOf(AuthError);
+  });
+
+  it('half-open: probe que falha re-abre o breaker com nova janela', async () => {
+    vi.useFakeTimers();
+    globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(500));
+    const auth = createAuthManagerWithOpts({
+      authRetry: { maxRetries: 0, baseDelayMs: 1 },
+      circuitBreaker: { threshold: 2, resetTimeoutMs: 1000, jitterRatio: 0 },
+    });
+
+    await expect(auth.getToken()).rejects.toBeInstanceOf(AuthError);
+    await expect(auth.getToken()).rejects.toBeInstanceOf(AuthError);
+    vi.advanceTimersByTime(1001);
+
+    // probe permitido, falha de verdade (contata o servidor)
+    const probeErr = await auth.getToken().catch((e) => e);
+    expect(probeErr).toBeInstanceOf(AuthError);
+    expect(probeErr).not.toBeInstanceOf(CircuitOpenError);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3);
+
+    // nova janela armada: fast-fail local sem fetch
+    const err = await auth.getToken().catch((e) => e);
+    expect(err).toBeInstanceOf(CircuitOpenError);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('N getToken concorrentes durante outage: 1 fetch e 1 falha no breaker', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(500));
+    const auth = createAuthManagerWithOpts({
+      authRetry: { maxRetries: 0, baseDelayMs: 1 },
+      circuitBreaker: { threshold: 2, resetTimeoutMs: 30_000 },
+    });
+
+    const results = await Promise.allSettled([auth.getToken(), auth.getToken(), auth.getToken()]);
+    expect(results.every((r) => r.status === 'rejected')).toBe(true);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1); // 3 joiners, 1 fetch
+
+    // apenas 1 falha contada: proxima chamada ainda NAO e CircuitOpenError
+    const err = await auth.getToken().catch((e) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    expect(err).not.toBeInstanceOf(CircuitOpenError);
+  });
+
+  it('CircuitOpenError.retryAfterMs fica dentro da janela configurada (com jitter)', async () => {
+    vi.useFakeTimers();
+    globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(500));
+    const auth = createAuthManagerWithOpts({
+      authRetry: { maxRetries: 0, baseDelayMs: 1 },
+      circuitBreaker: { threshold: 1, resetTimeoutMs: 10_000, jitterRatio: 0.2 },
+    });
+
+    await expect(auth.getToken()).rejects.toBeInstanceOf(AuthError);
+    const err = await auth.getToken().catch((e) => e);
+    expect(err).toBeInstanceOf(CircuitOpenError);
+    const { retryAfterMs } = err as CircuitOpenError;
+    expect(retryAfterMs).toBeGreaterThan(0);
+    expect(retryAfterMs).toBeLessThanOrEqual(10_000 * 1.2);
+  });
 });
 
 describe('AUTH-CONTRACT: getToken sempre lanca AuthError; cache quebrado nao falha auth', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError, AuthError, GatewayError } from '../../src/core/errors.js';
-import { withRetry } from '../../src/core/retry.js';
+import { MAX_RETRY_AFTER_MS, parseRetryAfterMs, withRetry } from '../../src/core/retry.js';
 
 describe('withRetry', () => {
   it('deve retornar resultado na primeira tentativa sem retry', async () => {
@@ -159,6 +159,84 @@ describe('idempotent: retry por semantica de operacao (nao por metodo HTTP)', ()
     await withRetry(fn, { maxRetries: 3, baseDelay: 1, method: 'POST', idempotent: true });
 
     expect(sleepCalls[0]).toBe(4321);
+    vi.restoreAllMocks();
+  });
+});
+
+describe('parseRetryAfterMs: limites do header Retry-After', () => {
+  it('null ou vazio => undefined', () => {
+    expect(parseRetryAfterMs(null)).toBeUndefined();
+    expect(parseRetryAfterMs('')).toBeUndefined();
+  });
+
+  it('segundos negativos => undefined (cai no backoff)', () => {
+    expect(parseRetryAfterMs('-5')).toBeUndefined();
+  });
+
+  it('0 => undefined', () => {
+    expect(parseRetryAfterMs('0')).toBeUndefined();
+  });
+
+  it('86400s e capado em MAX_RETRY_AFTER_MS (60s)', () => {
+    expect(parseRetryAfterMs('86400')).toBe(MAX_RETRY_AFTER_MS);
+  });
+
+  it('HTTP-date no passado => undefined', () => {
+    expect(parseRetryAfterMs('Wed, 22 Jul 2020 12:00:00 GMT')).toBeUndefined();
+  });
+
+  it('HTTP-date horas no futuro e capado em MAX_RETRY_AFTER_MS', () => {
+    const far = new Date(Date.now() + 3_600_000).toUTCString();
+    expect(parseRetryAfterMs(far)).toBe(MAX_RETRY_AFTER_MS);
+  });
+
+  it('lixo => undefined', () => {
+    expect(parseRetryAfterMs('garbage')).toBeUndefined();
+  });
+});
+
+describe('withRetry: bounds do delay de retryAfterMs no erro', () => {
+  it('retryAfterMs enorme (10min) e capado em MAX_RETRY_AFTER_MS', async () => {
+    const originalSetTimeout = globalThis.setTimeout;
+    const sleepCalls: number[] = [];
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation((fn: () => void, ms?: number) => {
+      if (ms !== undefined && ms > 0) sleepCalls.push(ms);
+      return originalSetTimeout(fn, 0);
+    });
+
+    const error = Object.assign(new ApiError('slow down', '/g', 'GET', 429), {
+      retryAfterMs: 600_000,
+    });
+    const fn = vi.fn().mockRejectedValueOnce(error).mockResolvedValue('ok');
+
+    await withRetry(fn, { maxRetries: 3, baseDelay: 1 });
+
+    expect(sleepCalls[0]).toBe(MAX_RETRY_AFTER_MS);
+    vi.restoreAllMocks();
+  });
+
+  it('retryAfterMs negativo/NaN cai no backoff exponencial', async () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const originalSetTimeout = globalThis.setTimeout;
+    const sleepCalls: number[] = [];
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation((fn: () => void, ms?: number) => {
+      if (ms !== undefined && ms > 0) sleepCalls.push(ms);
+      return originalSetTimeout(fn, 0);
+    });
+
+    const negErr = Object.assign(new ApiError('x', '/g', 'GET', 429), { retryAfterMs: -100 });
+    const nanErr = Object.assign(new ApiError('x', '/g', 'GET', 429), { retryAfterMs: Number.NaN });
+    const fn = vi
+      .fn()
+      .mockRejectedValueOnce(negErr)
+      .mockRejectedValueOnce(nanErr)
+      .mockResolvedValue('ok');
+
+    await withRetry(fn, { maxRetries: 3, baseDelay: 100 });
+
+    // full jitter com random=0.5: 50 (attempt 0) e 100 (attempt 1)
+    expect(sleepCalls).toEqual([50, 100]);
+    randomSpy.mockRestore();
     vi.restoreAllMocks();
   });
 });
