@@ -314,7 +314,12 @@ export class AuthManager {
       throw new AuthError(`Autenticacao falhou: HTTP ${response.status}`, response.status);
     }
 
-    const data: AuthResponse = await response.json();
+    let data: AuthResponse;
+    try {
+      data = await response.json();
+    } catch {
+      throw new TransientAuthFailure('resposta invalida do servidor de autenticacao');
+    }
     const ttlSeconds = Math.max(data.expires_in - SAFETY_MARGIN_SECONDS, MINIMUM_TTL_SECONDS);
     const tokenData: TokenData = {
       accessToken: data.access_token,
@@ -322,7 +327,13 @@ export class AuthManager {
     };
 
     if (this.cacheProvider) {
-      await this.cacheProvider.set(TOKEN_CACHE_KEY, JSON.stringify(tokenData), ttlSeconds);
+      try {
+        await this.cacheProvider.set(TOKEN_CACHE_KEY, JSON.stringify(tokenData), ttlSeconds);
+      } catch {
+        // Cache externo quebrado NAO pode falhar a auth nem contar no breaker.
+        this.logger.warn('Falha ao gravar token no cache externo; mantendo em memoria');
+        this.memoryCache = tokenData;
+      }
     } else {
       this.memoryCache = tokenData;
     }

@@ -513,6 +513,54 @@ describe('CIRCUIT-BREAKER: contagem por fluxo, CircuitOpenError, jitter', () => 
 
 });
 
+describe('AUTH-CONTRACT: getToken sempre lanca AuthError; cache quebrado nao falha auth', () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    vi.clearAllMocks();
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('resposta 200 com JSON invalido vira AuthError (nao SyntaxError crua)', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.reject(new SyntaxError('Unexpected token < in JSON')),
+    } as unknown as Response);
+    const auth = createAuthManagerWithOpts({ authRetry: { maxRetries: 0, baseDelayMs: 1 } });
+
+    const err = await auth.getToken().catch((e) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    expect((err as AuthError).message).toContain('resposta invalida');
+  });
+
+  it('falha do cacheProvider.set NAO falha a auth nem conta no breaker', async () => {
+    globalThis.fetch = mockFetchSuccess();
+    const cacheProvider = {
+      get: vi.fn(async () => null),
+      set: vi.fn(async () => {
+        throw new Error('redis down');
+      }),
+      del: vi.fn(async () => {}),
+    };
+    const auth = createAuthManagerWithOpts(
+      { circuitBreaker: { threshold: 1, resetTimeoutMs: 30_000 } },
+      cacheProvider,
+    );
+
+    // Token retornado apesar do cache quebrado
+    const token = await auth.getToken();
+    expect(token).toBe('access-token-123');
+    expect(mockLogger.warn).toHaveBeenCalled();
+
+    // Breaker nao contou falha: proxima chamada NAO e CircuitOpenError
+    const token2 = await auth.getToken();
+    expect(token2).toBe('access-token-123');
+  });
+});
+
 describe('CONFIG-CLAMP: valores de resiliencia fora de faixa sao clampados', () => {
   let originalFetch: typeof globalThis.fetch;
   beforeEach(() => {
