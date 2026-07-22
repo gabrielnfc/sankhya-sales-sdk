@@ -18,8 +18,8 @@ jobs:
       SANKHYA_CLIENT_SECRET: ${{ secrets.SANKHYA_CLIENT_SECRET }}
       SANKHYA_X_TOKEN: ${{ secrets.SANKHYA_X_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: 'npm'
