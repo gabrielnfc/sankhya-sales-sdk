@@ -130,17 +130,6 @@ export class HttpClient {
     const flowId = authFlowId ?? Symbol('authFlow');
     const token = await this.auth.getToken(flowId);
     const timeoutMs = options?.timeout ?? this.timeout;
-    const internalController = new AbortController();
-    const timeoutId = setTimeout(() => internalController.abort(), timeoutMs);
-
-    const signals: AbortSignal[] = [internalController.signal];
-    if (options?.signal) signals.push(options.signal);
-    const combinedSignal =
-      signals.length === 1
-        ? signals[0]
-        : typeof AbortSignal.any === 'function'
-          ? AbortSignal.any(signals)
-          : internalController.signal;
 
     try {
       const headers: Record<string, string> = {
@@ -161,27 +150,11 @@ export class HttpClient {
 
       let response: Response;
       try {
+        // Timeout POR TENTATIVA (timer criado dentro do fn): um timeout de
+        // tentativa vira TimeoutError retryavel em leituras idempotentes.
         response = await withRetry(
-          async () => {
-            const res = await fetch(url, {
-              method,
-              headers,
-              ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-              ...(combinedSignal ? { signal: combinedSignal } : {}),
-            });
-            if (!res.ok && [429, 500, 502, 503, 504].includes(res.status)) {
-              const err = new Error(`HTTP ${res.status}`) as Error & {
-                statusCode: number;
-                retryAfterMs?: number;
-              };
-              err.statusCode = res.status;
-              const retryAfterMs = parseRetryAfterMs(res.headers?.get?.('retry-after') ?? null);
-              if (retryAfterMs !== undefined) err.retryAfterMs = retryAfterMs;
-              throw err;
-            }
-            return res;
-          },
-          { maxRetries: this.retries, method, signal: combinedSignal, idempotent },
+          () => this.attemptFetch(url, method, path, headers, body, timeoutMs, options?.signal),
+          { maxRetries: this.retries, method, signal: options?.signal, idempotent },
         );
       } catch (retryErr) {
         if (
@@ -244,7 +217,58 @@ export class HttpClient {
       if (error instanceof ApiError || error instanceof GatewayError) {
         throw error;
       }
-      if (error instanceof DOMException && error.name === 'AbortError') {
+      // Abort iniciado pelo caller (options.signal) chega aqui como AbortError.
+      if (isAbortError(error)) {
+        throw new TimeoutError(`Request timeout após ${timeoutMs}ms: ${method} ${path}`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Uma tentativa de fetch com timer de timeout proprio (fresh por tentativa).
+   * Timeout do timer interno vira `TimeoutError` (retryavel para leituras);
+   * abort iniciado pelo caller propaga como AbortError e NAO e retentado.
+   * @internal
+   */
+  private async attemptFetch(
+    url: string,
+    method: string,
+    path: string,
+    headers: Record<string, string>,
+    body: unknown,
+    timeoutMs: number,
+    callerSignal?: AbortSignal,
+  ): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const signal = callerSignal
+      ? typeof AbortSignal.any === 'function'
+        ? AbortSignal.any([controller.signal, callerSignal])
+        : controller.signal
+      : controller.signal;
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers,
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        signal,
+      });
+      if (!res.ok && [429, 500, 502, 503, 504].includes(res.status)) {
+        const err = new Error(`HTTP ${res.status}`) as Error & {
+          statusCode: number;
+          retryAfterMs?: number;
+        };
+        err.statusCode = res.status;
+        const retryAfterMs = parseRetryAfterMs(res.headers?.get?.('retry-after') ?? null);
+        if (retryAfterMs !== undefined) err.retryAfterMs = retryAfterMs;
+        throw err;
+      }
+      return res;
+    } catch (error) {
+      if (isAbortError(error) && !callerSignal?.aborted) {
+        // Timer da tentativa disparou — timeout genuino desta tentativa.
         throw new TimeoutError(`Request timeout após ${timeoutMs}ms: ${method} ${path}`);
       }
       throw error;
@@ -252,6 +276,13 @@ export class HttpClient {
       clearTimeout(timeoutId);
     }
   }
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    (error instanceof DOMException && error.name === 'AbortError') ||
+    (error instanceof Error && error.name === 'AbortError')
+  );
 }
 
 /** Converte o header Retry-After (segundos ou HTTP-date) para ms, ou undefined. */

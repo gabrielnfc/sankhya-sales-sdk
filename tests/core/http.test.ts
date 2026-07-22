@@ -18,13 +18,14 @@ function createMockAuth() {
   } as unknown as AuthManager;
 }
 
-function createHttpClient(auth?: AuthManager, timeout = 30000) {
+function createHttpClient(auth?: AuthManager, timeout = 30000, retries = 3) {
   return new HttpClient(
     'https://api.sankhya.com.br',
     'x-token',
     timeout,
     mockLogger,
     auth ?? createMockAuth(),
+    retries,
   );
 }
 
@@ -217,9 +218,41 @@ describe('HttpClient', () => {
           }),
       );
 
-      const client = createHttpClient(undefined, 10);
+      const client = createHttpClient(undefined, 10, 0);
 
       await expect(client.restGet('/slow')).rejects.toThrow(TimeoutError);
+    });
+
+    it('leitura idempotente deve retentar apos timeout de tentativa (timeout -> 200)', async () => {
+      let calls = 0;
+      globalThis.fetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+        calls++;
+        if (calls === 1) {
+          // Primeira tentativa nunca resolve — o timer da tentativa aborta
+          return new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              reject(new DOMException('The operation was aborted.', 'AbortError'));
+            });
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({ status: '1', statusMessage: 'OK', responseBody: { records: [] } }),
+        });
+      });
+
+      const client = createHttpClient(undefined, 20);
+      const result = await client.gatewayCall(
+        'mge',
+        'CRUDServiceProvider.loadRecords',
+        {},
+        undefined,
+        true,
+      );
+
+      expect(result).toEqual({ records: [] });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     });
   });
 
