@@ -1,5 +1,7 @@
 export type {
   SankhyaConfig,
+  AuthRetryConfig,
+  CircuitBreakerConfig,
   TokenCacheProvider,
   LoggerOptions,
   LogLevel,

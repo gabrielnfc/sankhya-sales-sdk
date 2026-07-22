@@ -7,6 +7,13 @@ export interface RetryOptions {
   method?: string;
   /** Force retry even for unsafe methods (consumer explicitly opts in) */
   forceRetry?: boolean;
+  /**
+   * Marca a operacao como idempotente (leitura) e elegivel a retry
+   * independentemente do metodo HTTP do transporte. Reads do gateway
+   * (loadRecords/loadRecord/executeQuery) sao POST no transporte mas
+   * semanticamente seguras — usam esta flag. Escritas NAO a usam.
+   */
+  idempotent?: boolean;
 }
 
 const DEFAULT_MAX_RETRIES = 3;
@@ -47,10 +54,14 @@ export async function withRetry<T>(
   options?: RetryOptions & { signal?: AbortSignal | undefined },
 ): Promise<T> {
   const method = options?.method?.toUpperCase();
-  const effectiveMaxRetries =
-    method && !SAFE_METHODS.has(method) && !options?.forceRetry
-      ? 0
-      : (options?.maxRetries ?? DEFAULT_MAX_RETRIES);
+  // Retry eligibility follows OPERATION SEMANTICS, not the transport HTTP method:
+  // safe methods, forceRetry, or an explicitly idempotent read are eligible.
+  const retryEligible =
+    method === undefined ||
+    SAFE_METHODS.has(method) ||
+    options?.forceRetry === true ||
+    options?.idempotent === true;
+  const effectiveMaxRetries = retryEligible ? (options?.maxRetries ?? DEFAULT_MAX_RETRIES) : 0;
   const baseDelay = options?.baseDelay ?? DEFAULT_BASE_DELAY;
 
   let lastError: unknown;
@@ -66,12 +77,28 @@ export async function withRetry<T>(
       }
 
       if (options?.signal?.aborted) throw lastError;
-      const delay = Math.random() * baseDelay * 2 ** attempt;
+      // Honor server-provided Retry-After when present; else full jitter backoff.
+      const retryAfterMs = getRetryAfterMs(error);
+      const delay = retryAfterMs ?? Math.random() * baseDelay * 2 ** attempt;
       await sleep(delay);
     }
   }
 
   throw lastError;
+}
+
+/** Extrai Retry-After (em ms) de um erro, se presente. */
+function getRetryAfterMs(error: unknown): number | undefined {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'retryAfterMs' in error &&
+    typeof (error as { retryAfterMs: unknown }).retryAfterMs === 'number'
+  ) {
+    const ms = (error as { retryAfterMs: number }).retryAfterMs;
+    return ms > 0 ? ms : undefined;
+  }
+  return undefined;
 }
 
 function sleep(ms: number): Promise<void> {

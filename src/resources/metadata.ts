@@ -131,7 +131,13 @@ export class MetadataResource {
         ? ` AND OWNER = (SELECT MIN(OWNER) FROM ALL_TAB_COLUMNS WHERE TABLE_NAME = '${table}')`
         : '';
     const sql = `${select}${ownerClause} ORDER BY COLUMN_ID`;
-    return this.http.gatewayCall<DbExplorerResponse>('mge', 'DbExplorerSP.executeQuery', { sql });
+    return this.http.gatewayCall<DbExplorerResponse>(
+      'mge',
+      'DbExplorerSP.executeQuery',
+      { sql },
+      undefined,
+      true, // idempotent: leitura (consulta SQL de metadata), elegivel a retry
+    );
   }
 
   /** Resolve entidade logica -> tabela fisica, com passthrough e validacao. */

@@ -38,6 +38,8 @@ describe('HttpClient', () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   describe('restGet', () => {
@@ -316,6 +318,181 @@ describe('HttpClient', () => {
       await client.gatewayCall('mge', 'CRUDServiceProvider.loadRecords', {}, { timeout: 5000 });
 
       expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('gateway idempotente: retry por semantica de operacao', () => {
+    it('leitura idempotente (loadRecords) deve retentar em 502 -> 200', async () => {
+      let calls = 0;
+      globalThis.fetch = vi.fn().mockImplementation(() => {
+        calls++;
+        if (calls === 1) {
+          return Promise.resolve({
+            ok: false,
+            status: 502,
+            statusText: 'Bad Gateway',
+            headers: { get: () => null },
+            text: () => Promise.resolve(''),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({ status: '1', statusMessage: 'OK', responseBody: { records: [] } }),
+        });
+      });
+
+      const client = createHttpClient();
+      const result = await client.gatewayCall(
+        'mge',
+        'CRUDServiceProvider.loadRecords',
+        {},
+        undefined,
+        true, // idempotent
+      );
+
+      expect(result).toEqual({ records: [] });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('escrita (default, nao-idempotente) NAO deve retentar em 502', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        statusText: 'Bad Gateway',
+        headers: { get: () => null },
+        text: () => Promise.resolve(''),
+      });
+
+      const client = createHttpClient();
+
+      await expect(client.gatewayCall('mgecom', 'CACSP.incluirNota', {})).rejects.toThrow(ApiError);
+      expect(globalThis.fetch).toHaveBeenCalledOnce();
+    });
+
+    it('deve honrar Retry-After do header e recuperar em leitura idempotente (429 -> 200)', async () => {
+      vi.useFakeTimers();
+      let calls = 0;
+      globalThis.fetch = vi.fn().mockImplementation(() => {
+        calls++;
+        if (calls === 1) {
+          return Promise.resolve({
+            ok: false,
+            status: 429,
+            statusText: 'Too Many Requests',
+            headers: { get: (k: string) => (k.toLowerCase() === 'retry-after' ? '2' : null) },
+            text: () => Promise.resolve(''),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({ status: '1', statusMessage: 'OK', responseBody: { records: [] } }),
+        });
+      });
+
+      const client = createHttpClient();
+      const p = client.gatewayCall('mge', 'CRUDServiceProvider.loadRecords', {}, undefined, true);
+      // avanca exatamente 2000ms (Retry-After) — se o backoff respeitou o header, resolve
+      await vi.advanceTimersByTimeAsync(2000);
+      const result = await p;
+
+      expect(result).toEqual({ records: [] });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('deve honrar Retry-After em formato HTTP-date', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-07-22T12:00:00Z'));
+      let calls = 0;
+      globalThis.fetch = vi.fn().mockImplementation(() => {
+        calls++;
+        if (calls === 1) {
+          return Promise.resolve({
+            ok: false,
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: {
+              // 3s no futuro relativo ao system time fixado
+              get: (k: string) =>
+                k.toLowerCase() === 'retry-after' ? 'Wed, 22 Jul 2026 12:00:03 GMT' : null,
+            },
+            text: () => Promise.resolve(''),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({ status: '1', statusMessage: 'OK', responseBody: { records: [] } }),
+        });
+      });
+
+      const client = createHttpClient();
+      const p = client.gatewayCall('mge', 'CRUDServiceProvider.loadRecords', {}, undefined, true);
+      await vi.advanceTimersByTimeAsync(3000);
+      const result = await p;
+
+      expect(result).toEqual({ records: [] });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('Retry-After invalido cai no backoff com jitter e ainda recupera', async () => {
+      vi.useFakeTimers();
+      let calls = 0;
+      globalThis.fetch = vi.fn().mockImplementation(() => {
+        calls++;
+        if (calls === 1) {
+          return Promise.resolve({
+            ok: false,
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: { get: (k: string) => (k.toLowerCase() === 'retry-after' ? 'garbage' : null) },
+            text: () => Promise.resolve(''),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({ status: '1', statusMessage: 'OK', responseBody: { records: [] } }),
+        });
+      });
+
+      const client = createHttpClient();
+      const p = client.gatewayCall('mge', 'CRUDServiceProvider.loadRecords', {}, undefined, true);
+      await vi.runAllTimersAsync();
+      const result = await p;
+
+      expect(result).toEqual({ records: [] });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('flowId: cascata de 401 compartilha um unico flow symbol', () => {
+    it('getToken inicial e refresh apos 401 recebem o MESMO flowId', async () => {
+      const auth = createMockAuth();
+      auth.getToken = vi.fn().mockResolvedValueOnce('test-token').mockResolvedValue('new-token');
+      let calls = 0;
+      globalThis.fetch = vi.fn().mockImplementation(() => {
+        calls++;
+        if (calls === 1) {
+          return Promise.resolve({
+            ok: false,
+            status: 401,
+            statusText: 'Unauthorized',
+            text: () => Promise.resolve(''),
+          });
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: 'ok' }) });
+      });
+
+      const client = createHttpClient(auth);
+      await client.restGet('/test');
+
+      const getTokenCalls = vi.mocked(auth.getToken).mock.calls;
+      expect(getTokenCalls.length).toBeGreaterThanOrEqual(2);
+      expect(typeof getTokenCalls[0][0]).toBe('symbol');
+      // mesmo simbolo de fluxo na chamada inicial e no refresh pos-401
+      expect(getTokenCalls[1][0]).toBe(getTokenCalls[0][0]);
     });
   });
 

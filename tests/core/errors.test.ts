@@ -2,16 +2,50 @@ import { describe, expect, it } from 'vitest';
 import {
   ApiError,
   AuthError,
+  CircuitOpenError,
   GatewayError,
   SankhyaError,
   TimeoutError,
   isApiError,
   isAuthError,
+  isCircuitOpenError,
   isGatewayError,
   isSankhyaError,
   isTimeoutError,
 } from '../../src/core/errors.js';
 import type { SankhyaErrorCode } from '../../src/core/errors.js';
+
+describe('CircuitOpenError', () => {
+  it('deve ter code CIRCUIT_OPEN e retryAfterMs', () => {
+    const error = new CircuitOpenError('breaker aberto', 25_000);
+    expect(error.code).toBe('CIRCUIT_OPEN');
+    expect(error.retryAfterMs).toBe(25_000);
+    expect(error.name).toBe('CircuitOpenError');
+    expect(error.message).toBe('breaker aberto');
+  });
+
+  it('deve ser instanceof AuthError (retrocompat) e SankhyaError', () => {
+    const error = new CircuitOpenError('breaker aberto', 1000);
+    expect(error).toBeInstanceOf(AuthError);
+    expect(error).toBeInstanceOf(SankhyaError);
+    expect(error).toBeInstanceOf(Error);
+  });
+
+  it('isCircuitOpenError deve distinguir de AuthError generico', () => {
+    const circuit = new CircuitOpenError('x', 1000);
+    const auth = new AuthError('y');
+    expect(isCircuitOpenError(circuit)).toBe(true);
+    expect(isCircuitOpenError(auth)).toBe(false);
+    // isAuthError continua true para ambos (retrocompat)
+    expect(isAuthError(circuit)).toBe(true);
+    expect(isAuthError(auth)).toBe(true);
+  });
+
+  it('CIRCUIT_OPEN deve ser um SankhyaErrorCode valido', () => {
+    const code: SankhyaErrorCode = 'CIRCUIT_OPEN';
+    expect(code).toBe('CIRCUIT_OPEN');
+  });
+});
 
 describe('SankhyaError', () => {
   it('deve criar erro base com code e statusCode', () => {

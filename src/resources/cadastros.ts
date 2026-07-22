@@ -303,6 +303,8 @@ export class CadastrosResource {
           },
         },
       },
+      undefined,
+      true, // idempotent: leitura, elegivel a retry em falha transiente
     );
 
     const { rows } = deserializeRows(result, this.http.getLogger());
@@ -342,6 +344,8 @@ export class CadastrosResource {
           },
         },
       },
+      undefined,
+      true, // idempotent: leitura, elegivel a retry em falha transiente
     );
 
     const { rows } = deserializeRows(result, this.http.getLogger());

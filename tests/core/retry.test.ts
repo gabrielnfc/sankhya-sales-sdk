@@ -118,6 +118,51 @@ describe('CORE-05: jitter no backoff', () => {
   });
 });
 
+describe('idempotent: retry por semantica de operacao (nao por metodo HTTP)', () => {
+  it('deve retentar leitura idempotente em POST (ex.: gateway loadRecords) em 502', async () => {
+    const error = new ApiError('bad gateway', '/gateway', 'POST', 502);
+    const fn = vi.fn().mockRejectedValueOnce(error).mockResolvedValue('ok');
+
+    const result = await withRetry(fn, {
+      maxRetries: 3,
+      baseDelay: 1,
+      method: 'POST',
+      idempotent: true,
+    });
+    expect(result).toBe('ok');
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it('NAO deve retentar escrita (POST sem idempotent) em 502', async () => {
+    const error = new ApiError('bad gateway', '/gateway', 'POST', 502);
+    const fn = vi.fn().mockRejectedValue(error);
+
+    await expect(withRetry(fn, { maxRetries: 3, baseDelay: 1, method: 'POST' })).rejects.toThrow(
+      ApiError,
+    );
+    expect(fn).toHaveBeenCalledOnce();
+  });
+
+  it('deve honrar Retry-After (ms) do erro no delay', async () => {
+    const originalSetTimeout = globalThis.setTimeout;
+    const sleepCalls: number[] = [];
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation((fn: () => void, ms?: number) => {
+      if (ms !== undefined && ms > 0) sleepCalls.push(ms);
+      return originalSetTimeout(fn, 0);
+    });
+
+    const error = Object.assign(new ApiError('slow down', '/gateway', 'POST', 429), {
+      retryAfterMs: 4321,
+    });
+    const fn = vi.fn().mockRejectedValueOnce(error).mockResolvedValue('ok');
+
+    await withRetry(fn, { maxRetries: 3, baseDelay: 1, method: 'POST', idempotent: true });
+
+    expect(sleepCalls[0]).toBe(4321);
+    vi.restoreAllMocks();
+  });
+});
+
 describe('CORE-07: method-aware retry', () => {
   it('nao deve retentar POST em erro 429', async () => {
     const error = new ApiError('rate limit', '/pedidos', 'POST', 429);

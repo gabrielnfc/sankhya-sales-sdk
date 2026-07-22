@@ -20,11 +20,13 @@ export {
 export {
   SankhyaError,
   AuthError,
+  CircuitOpenError,
   ApiError,
   GatewayError,
   TimeoutError,
   isSankhyaError,
   isAuthError,
+  isCircuitOpenError,
   isApiError,
   isGatewayError,
   isTimeoutError,
@@ -51,6 +53,8 @@ export {
 // Types
 export type {
   SankhyaConfig,
+  AuthRetryConfig,
+  CircuitBreakerConfig,
   TokenCacheProvider,
   LoggerOptions,
   LogLevel,

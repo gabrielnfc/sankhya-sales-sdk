@@ -38,6 +38,8 @@ describe('MetadataResource', () => {
         'mge',
         'DbExplorerSP.executeQuery',
         expect.objectContaining({ sql: expect.stringContaining("TABLE_NAME = 'TGFCAB'") }),
+        undefined,
+        true, // idempotent: leitura
       );
     });
 

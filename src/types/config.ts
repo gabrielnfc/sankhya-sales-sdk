@@ -12,10 +12,49 @@ export interface SankhyaConfig {
   timeout?: number;
   /** Numero maximo de tentativas em caso de erro transiente. */
   retries?: number;
+  /** Politica de retry da autenticacao OAuth (backoff exponencial + jitter). */
+  authRetry?: AuthRetryConfig;
+  /** Politica do circuit breaker de autenticacao. */
+  circuitBreaker?: CircuitBreakerConfig;
   /** Provedor externo de cache de token (default: cache em memoria). */
   tokenCacheProvider?: TokenCacheProvider;
   /** Opcoes de logging do SDK. */
   logger?: LoggerOptions;
+}
+
+/**
+ * Politica de retry para a autenticacao OAuth 2.0.
+ *
+ * Aplica backoff exponencial com jitter APENAS a falhas transientes
+ * (timeout, 5xx, 429, erro de rede). Erros de credencial/request
+ * (HTTP 400/401/403) falham imediatamente, sem retry, para evitar
+ * lockout por retentativa de credencial invalida.
+ */
+export interface AuthRetryConfig {
+  /** Numero maximo de retentativas apos a 1a tentativa (default: 3). */
+  maxRetries?: number;
+  /** Delay base em ms (default: 500). */
+  baseDelayMs?: number;
+  /** Fator de crescimento exponencial (default: 2). */
+  factor?: number;
+  /** Amplitude do jitter como fracao do delay, +-ratio (default: 0.5). */
+  jitterRatio?: number;
+}
+
+/**
+ * Politica do circuit breaker de autenticacao.
+ *
+ * Apos `threshold` falhas consecutivas de autenticacao, o breaker abre
+ * e chamadas subsequentes falham rapido com `CircuitOpenError` (sem
+ * contatar o servidor) durante a janela de reabertura.
+ */
+export interface CircuitBreakerConfig {
+  /** Falhas consecutivas para abrir o breaker (default: 3). */
+  threshold?: number;
+  /** Janela base de reabertura em ms (default: 30000). */
+  resetTimeoutMs?: number;
+  /** Jitter aditivo na janela como fracao, 0..ratio (default: 0.2). Evita thundering herd. */
+  jitterRatio?: number;
 }
 
 /**

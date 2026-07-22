@@ -60,16 +60,22 @@ describe('GatewayResource', () => {
         fields: 'CODPROD,DESCRPROD',
       });
 
-      expect(http.gatewayCall).toHaveBeenCalledWith('mge', 'CRUDServiceProvider.loadRecords', {
-        dataSet: {
-          rootEntity: 'Produto',
-          includePresentationFields: 'N',
-          offsetPage: '0',
-          entity: {
-            fieldset: { list: 'CODPROD,DESCRPROD' },
+      expect(http.gatewayCall).toHaveBeenCalledWith(
+        'mge',
+        'CRUDServiceProvider.loadRecords',
+        {
+          dataSet: {
+            rootEntity: 'Produto',
+            includePresentationFields: 'N',
+            offsetPage: '0',
+            entity: {
+              fieldset: { list: 'CODPROD,DESCRPROD' },
+            },
           },
         },
-      });
+        undefined,
+        true, // idempotent: leitura
+      );
 
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual({ CODPROD: '100', DESCRPROD: 'Produto A' });

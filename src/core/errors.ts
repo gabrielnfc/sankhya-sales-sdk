@@ -27,7 +27,8 @@ export class SankhyaError extends Error {
  * `code = 'AUTH_ERROR'`
  */
 export class AuthError extends SankhyaError {
-  override readonly code = 'AUTH_ERROR' as const;
+  // Union para permitir a subclasse CircuitOpenError sobrescrever com 'CIRCUIT_OPEN'.
+  override readonly code: 'AUTH_ERROR' | 'CIRCUIT_OPEN' = 'AUTH_ERROR';
 
   constructor(message: string, statusCode?: number, details?: unknown) {
     super(message, 'AUTH_ERROR', statusCode, details);
@@ -93,6 +94,30 @@ export class GatewayError extends SankhyaError {
 }
 
 /**
+ * Erro de circuit breaker de autenticacao aberto (falha rapida local).
+ *
+ * Lancado quando o breaker local esta aberto apos multiplas falhas
+ * consecutivas de autenticacao. Distingue "breaker local aberto" de
+ * "servidor rejeitou": o servidor NAO foi contatado nesta chamada.
+ *
+ * Estende `AuthError` (retrocompat: `instanceof AuthError` continua `true`),
+ * mas expoe `code = 'CIRCUIT_OPEN'` e `retryAfterMs` (ms ate a reabertura).
+ *
+ * `code = 'CIRCUIT_OPEN'`
+ */
+export class CircuitOpenError extends AuthError {
+  override readonly code = 'CIRCUIT_OPEN' as const;
+  /** Milissegundos estimados ate o breaker reabrir. */
+  readonly retryAfterMs: number;
+
+  constructor(message: string, retryAfterMs: number, details?: unknown) {
+    super(message, undefined, details);
+    this.name = 'CircuitOpenError';
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+/**
  * Erro de timeout de requisicao.
  *
  * Lancado quando uma requisicao excede o tempo limite configurado
@@ -114,7 +139,12 @@ export class TimeoutError extends SankhyaError {
  *
  * Util para switch/case exaustivo em tratamento de erros.
  */
-export type SankhyaErrorCode = 'AUTH_ERROR' | 'API_ERROR' | 'GATEWAY_ERROR' | 'TIMEOUT_ERROR';
+export type SankhyaErrorCode =
+  | 'AUTH_ERROR'
+  | 'API_ERROR'
+  | 'GATEWAY_ERROR'
+  | 'TIMEOUT_ERROR'
+  | 'CIRCUIT_OPEN';
 
 /**
  * Verifica se o erro e uma instancia de SankhyaError.
@@ -134,6 +164,19 @@ export function isSankhyaError(err: unknown): err is SankhyaError {
  */
 export function isAuthError(err: unknown): err is AuthError {
   return err instanceof AuthError;
+}
+
+/**
+ * Verifica se o erro e uma instancia de CircuitOpenError.
+ *
+ * Diferencia "breaker local aberto" de "servidor rejeitou". Note que
+ * `isAuthError` tambem retorna `true` para `CircuitOpenError` (retrocompat).
+ *
+ * @param err - Erro a verificar.
+ * @returns `true` se o erro e um CircuitOpenError.
+ */
+export function isCircuitOpenError(err: unknown): err is CircuitOpenError {
+  return err instanceof CircuitOpenError;
 }
 
 /**
