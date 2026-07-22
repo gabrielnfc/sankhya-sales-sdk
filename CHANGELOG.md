@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-22
+
+Resiliência: correção de três falhas de desenho que transformavam degradação
+transiente do servidor Sankhya em falha dura no cliente (diagnóstico TrueForce).
+Mudanças aditivas e retrocompatíveis; comportamento de escrita inalterado.
+
+### Added
+- `authRetry` em `SankhyaConfig`: retry da autenticação OAuth com backoff
+  exponencial + jitter (default: 3 retries, base 500ms, fator 2, jitter ±50%)
+  **apenas** para falhas transientes (timeout, erro de rede, 408/429/5xx).
+  HTTP 400/401/403 (credencial/request inválida) falha imediatamente, sem
+  retry — evita vetor de lockout.
+- `circuitBreaker` em `SankhyaConfig`: `threshold` e `resetTimeoutMs`
+  configuráveis + jitter na janela de reabertura (evita thundering herd).
+- `CircuitOpenError` (estende `AuthError`, `code: 'CIRCUIT_OPEN'`, campo
+  `retryAfterMs`) + guard `isCircuitOpenError`: diferencia "breaker local
+  aberto" de "servidor rejeitou". `instanceof AuthError` continua `true`.
+- Flag `idempotent` no retry HTTP: leituras do Gateway (`loadRecords`,
+  `loadRecord`, `DbExplorerSP.executeQuery`, reads de cadastros) agora são
+  retentadas em erro transiente (502/503/504/timeout/429), mesmo sendo POST
+  no transporte. Retry por semântica da operação, não por método HTTP.
+- Header `Retry-After` (segundos ou HTTP-date) respeitado no delay de retry.
+
+### Fixed
+- `AuthManager.authenticate()`: timeout hardcoded de 30s substituído pelo
+  `timeout` do client (30s continua default).
+- Circuit breaker: cascata de refresh de 401 de UMA chamada de negócio agora
+  conta como **1 falha** (dedupe por fluxo), não 3 — uma única chamada ruim
+  não arma mais o breaker sozinha.
+- Corpo da resposta do servidor OAuth não é mais incluído em mensagem/details
+  de `AuthError` (podia ecoar credencial/token). Logs de retry registram
+  apenas tentativa, status e delay.
+
+### Security
+- Escritas (criar/confirmar/cancelar/`saveRecord`/`faturar`) permanecem SEM
+  retry automático — retry de write é risco de duplicação no ERP.
+
 ## [1.2.4] - 2026-06-30
 
 ### Docs

@@ -39,7 +39,7 @@ export class HttpClient {
     options?: RequestOptions,
   ): Promise<T> {
     const url = this.buildUrl(`/v1${path}`, params);
-    return this.requestWithRetry<T>(url, 'GET', path, undefined, 0, options);
+    return this.requestWithRetry<T>(url, 'GET', path, undefined, 0, options, true);
   }
 
   async restPost<T>(path: string, body: unknown, options?: RequestOptions): Promise<T> {
@@ -57,11 +57,20 @@ export class HttpClient {
     return this.requestWithRetry<T>(url, 'DELETE', path, undefined, 0, options);
   }
 
+  /**
+   * Chama um servico do Gateway Sankhya.
+   *
+   * @param idempotent - `true` para operacoes de LEITURA (loadRecords,
+   *   loadRecord, executeQuery). Reads sao POST no transporte mas
+   *   semanticamente seguras, entao ficam elegiveis a retry em falha
+   *   transiente. Escritas mantem `false` (default) — sem retry automatico.
+   */
   async gatewayCall<T>(
     modulo: string,
     serviceName: string,
     requestBody: Record<string, unknown>,
     options?: RequestOptions,
+    idempotent = false,
   ): Promise<T> {
     const path = `/gateway/v1/${modulo}/service.sbr`;
     const url = this.buildUrl(path, {
@@ -78,6 +87,7 @@ export class HttpClient {
       { requestBody },
       0,
       options,
+      idempotent,
     );
 
     if (result.status === '0') {
@@ -112,8 +122,13 @@ export class HttpClient {
     body?: unknown,
     authRetryDepth = 0,
     options?: RequestOptions,
+    idempotent = false,
+    authFlowId?: symbol,
   ): Promise<T> {
-    const token = await this.auth.getToken();
+    // Um unico flow symbol por chamada de negocio: a cascata de refresh de 401
+    // reusa o mesmo symbol para que o circuit breaker conte como UMA falha.
+    const flowId = authFlowId ?? Symbol('authFlow');
+    const token = await this.auth.getToken(flowId);
     const timeoutMs = options?.timeout ?? this.timeout;
     const internalController = new AbortController();
     const timeoutId = setTimeout(() => internalController.abort(), timeoutMs);
@@ -155,13 +170,18 @@ export class HttpClient {
               ...(combinedSignal ? { signal: combinedSignal } : {}),
             });
             if (!res.ok && [429, 500, 502, 503, 504].includes(res.status)) {
-              const err = new Error(`HTTP ${res.status}`) as Error & { statusCode: number };
+              const err = new Error(`HTTP ${res.status}`) as Error & {
+                statusCode: number;
+                retryAfterMs?: number;
+              };
               err.statusCode = res.status;
+              const retryAfterMs = parseRetryAfterMs(res.headers?.get?.('retry-after') ?? null);
+              if (retryAfterMs !== undefined) err.retryAfterMs = retryAfterMs;
               throw err;
             }
             return res;
           },
-          { maxRetries: this.retries, method, signal: combinedSignal },
+          { maxRetries: this.retries, method, signal: combinedSignal, idempotent },
         );
       } catch (retryErr) {
         if (
@@ -185,7 +205,7 @@ export class HttpClient {
       if (response.status === 401 && authRetryDepth < 2) {
         this.logger.warn('Token expirado, renovando...');
         await this.auth.invalidateToken();
-        const newToken = await this.auth.getToken();
+        const newToken = await this.auth.getToken(flowId);
         if (newToken === token) {
           throw new ApiError(
             'API error: HTTP 401 — token refresh retornou o mesmo token',
@@ -195,7 +215,16 @@ export class HttpClient {
             '',
           );
         }
-        return this.requestWithRetry<T>(url, method, path, body, authRetryDepth + 1, options);
+        return this.requestWithRetry<T>(
+          url,
+          method,
+          path,
+          body,
+          authRetryDepth + 1,
+          options,
+          idempotent,
+          flowId,
+        );
       }
 
       if (!response.ok) {
@@ -223,6 +252,19 @@ export class HttpClient {
       clearTimeout(timeoutId);
     }
   }
+}
+
+/** Converte o header Retry-After (segundos ou HTTP-date) para ms, ou undefined. */
+function parseRetryAfterMs(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) {
+    return seconds > 0 ? seconds * 1000 : undefined;
+  }
+  const dateMs = Date.parse(value);
+  if (Number.isNaN(dateMs)) return undefined;
+  const delta = dateMs - Date.now();
+  return delta > 0 ? delta : undefined;
 }
 
 function sanitizeUrl(url: string): string {

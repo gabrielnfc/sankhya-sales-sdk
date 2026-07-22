@@ -67,6 +67,11 @@ export class SankhyaClient {
       config.xToken,
       this.logger,
       config.tokenCacheProvider,
+      {
+        timeout: config.timeout ?? 30_000,
+        authRetry: config.authRetry,
+        circuitBreaker: config.circuitBreaker,
+      },
     );
     this.http = new HttpClient(
       config.baseUrl,

@@ -244,6 +244,8 @@ describe('CadastrosResource', () => {
             criteria: { expression: { $: "this.ATIVO = 'S'" } },
           }),
         }),
+        undefined,
+        true, // idempotent: leitura
       );
 
       expect(result).toEqual([
@@ -371,6 +373,8 @@ describe('CadastrosResource', () => {
             rootEntity: 'ModeloNota',
           }),
         }),
+        undefined,
+        true, // idempotent: leitura
       );
 
       expect(result).toEqual([

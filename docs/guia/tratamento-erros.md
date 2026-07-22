@@ -7,6 +7,7 @@ Como o `sankhya-sales-sdk` lida com erros da API Sankhya e como você deve trat�
 ```
 SankhyaError (base)
 ├── AuthError         — Falha de autenticação (401, credenciais inválidas)
+│   └── CircuitOpenError — Circuit breaker local aberto (servidor NÃO foi contatado)
 ├── ApiError          — Erro da API REST v1 (4xx, 5xx)
 ├── GatewayError      — Erro de negócio do Gateway (HTTP 200, status "0")
 └── TimeoutError      — Timeout na comunicação
@@ -20,11 +21,19 @@ Todos os erros estendem `SankhyaError`, que estende `Error`. Você pode usar `in
 import {
   SankhyaError,
   AuthError,
+  CircuitOpenError,
   ApiError,
   GatewayError,
   TimeoutError,
 } from 'sankhya-sales-sdk';
 ```
+
+> **`CircuitOpenError`** estende `AuthError` (retrocompatível: `instanceof
+> AuthError` continua `true`), mas tem `code: 'CIRCUIT_OPEN'` e o campo
+> `retryAfterMs` (ms até o breaker reabrir). Ele indica que o **breaker local**
+> abriu após falhas consecutivas de autenticação — o servidor **não** foi
+> contatado nesta chamada. Cheque `isCircuitOpenError(error)` **antes** de
+> `isAuthError(error)`.
 
 ## O Problema do Gateway HTTP 200
 
@@ -120,13 +129,30 @@ O SDK faz retry automático com **exponential backoff** para erros transientes:
 | `GatewayError` | **Não** | Erro de negócio — não faz sentido retried |
 | `AuthError` | **Não** | Credenciais inválidas — não melhora com retry |
 
+**Retry segue a semântica da operação, não o método HTTP do transporte:**
+
+| Operação | Retry automático? |
+|----------|-------------------|
+| Leituras REST (`GET`) | Sim |
+| Leituras do Gateway (`loadRecords`, `loadRecord`, `metadata.listFields`) — POST no transporte | Sim |
+| Escritas (criar/confirmar/cancelar/`saveRecord`, REST `POST`/`PUT`/`DELETE`) | **Nunca** — risco de duplicação no ERP; use `idempotencyKey` |
+
+O header `Retry-After` do servidor, quando presente, é respeitado no delay.
+
+A **autenticação OAuth** tem política própria (`authRetry`): backoff exponencial
+com jitter só para falha transiente (timeout, 5xx, rede); HTTP 400/401/403
+(credencial inválida) falha imediatamente, sem retry. Após falhas consecutivas,
+o **circuit breaker** (`circuitBreaker`) abre e lança `CircuitOpenError`.
+
 Configuração de retry:
 
 ```typescript
 const sankhya = new SankhyaClient({
   // ...credenciais
-  retries: 3,        // Número de tentativas (default: 3)
-  timeout: 30000,    // Timeout por request em ms (default: 30000)
+  retries: 3,        // Número de tentativas HTTP (default: 3)
+  timeout: 30000,    // Timeout por request e por tentativa de auth, em ms (default: 30000)
+  authRetry: { maxRetries: 3, baseDelayMs: 500 },        // retry do OAuth (transiente)
+  circuitBreaker: { threshold: 3, resetTimeoutMs: 30000 }, // breaker de auth
 });
 ```
 

@@ -48,6 +48,8 @@ export class GatewayResource {
           },
         },
       },
+      undefined,
+      true, // idempotent: leitura, elegivel a retry em falha transiente
     );
 
     return deserializeRows(result, this.http.getLogger()).rows;
@@ -101,6 +103,8 @@ export class GatewayResource {
           },
         },
       },
+      undefined,
+      true, // idempotent: leitura, elegivel a retry em falha transiente
     );
 
     return deserializeRows(result, this.http.getLogger()).rows[0] ?? null;

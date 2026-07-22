@@ -46,6 +46,35 @@ const sankhya = new SankhyaClient({
 });
 ```
 
+### Resiliência (opcional)
+
+Todos os knobs têm defaults seguros — configure apenas se precisar ajustar:
+
+```typescript
+const sankhya = new SankhyaClient({
+  // ...credenciais...
+  timeout: 30_000,   // timeout por request E por tentativa de autenticação (ms)
+  retries: 3,        // retries HTTP para leituras (429/5xx/timeout)
+  authRetry: {
+    // retry da autenticação OAuth — SÓ para falhas transientes (timeout, 5xx, rede).
+    // HTTP 400/401/403 (credencial inválida) falha imediatamente, sem retry.
+    maxRetries: 3,   // tentativas extras (default: 3)
+    baseDelayMs: 500, // backoff exponencial: base * 2^tentativa, jitter ±50%
+  },
+  circuitBreaker: {
+    // após N falhas consecutivas de auth, falha rápido com CircuitOpenError
+    threshold: 3,          // falhas para abrir (default: 3)
+    resetTimeoutMs: 30_000, // janela de reabertura + jitter (default: 30s)
+  },
+});
+```
+
+Semântica de retry: **leituras** (REST GET e reads do Gateway como `loadRecords`,
+`loadRecord`, `metadata.listFields`) são retentadas automaticamente em erro
+transiente, mesmo sendo POST no transporte. **Escritas** (criar/confirmar/
+cancelar/`saveRecord`) **nunca** são retentadas automaticamente — evita
+duplicação no ERP; use `idempotencyKey` e trate idempotência no consumidor.
+
 ### Listar produtos
 
 ```typescript
@@ -191,9 +220,10 @@ await sankhya.financeiros.baixarReceita({
 - **Paginação normalizada** — interface consistente para os 3 padrões da API
 - **Auth automático** — token cache, auto-refresh, mutex
 - **Token cache injetável** — memória (default) ou Redis/custom
-- **Erros tipados** — `AuthError`, `ApiError`, `GatewayError`, `TimeoutError`
+- **Erros tipados** — `AuthError`, `ApiError`, `GatewayError`, `TimeoutError`, `CircuitOpenError`
 - **Gateway HTTP 200 errors** — detectados automaticamente
-- **Retry com backoff** — para erros transientes (429, 5xx)
+- **Retry com backoff** — leituras (REST e Gateway) retentadas em erro transiente (429, 5xx, timeout), com jitter e respeito a `Retry-After`; escritas nunca
+- **Auth resiliente** — retry com backoff exponencial no OAuth (só transiente) + circuit breaker configurável com erro tipado (`CircuitOpenError`)
 - **AsyncGenerator** — paginação automática com `for await...of`
 
 ## Tratamento de Erros
@@ -201,13 +231,24 @@ await sankhya.financeiros.baixarReceita({
 O SDK exporta type guards para identificar cada tipo de erro:
 
 ```typescript
-import { isApiError, isGatewayError, isAuthError, isTimeoutError } from 'sankhya-sales-sdk';
+import {
+  isApiError,
+  isGatewayError,
+  isAuthError,
+  isCircuitOpenError,
+  isTimeoutError,
+} from 'sankhya-sales-sdk';
 
 try {
   await sankhya.pedidos.criar({ /* ... */ });
 } catch (error) {
-  if (isAuthError(error)) {
+  if (isCircuitOpenError(error)) {
+    // Circuit breaker LOCAL aberto — o servidor nao foi contatado nesta chamada.
+    // error.retryAfterMs indica quando tentar de novo.
+    console.error(`Breaker aberto, aguarde ${error.retryAfterMs}ms`);
+  } else if (isAuthError(error)) {
     // Credenciais invalidas ou token expirado
+    // (CircuitOpenError tambem e AuthError — cheque isCircuitOpenError antes)
     console.error('Falha na autenticacao:', error.message);
   } else if (isGatewayError(error)) {
     // Erro de negocio Sankhya (HTTP 200, mas erro no body)

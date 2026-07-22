@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
 import { HttpClient } from '../../src/core/http.js';
 import { CadastrosResource } from '../../src/resources/cadastros.js';
@@ -41,6 +41,71 @@ describe('SankhyaClient', () => {
 
     it('throws on missing xToken', () => {
       expect(() => new SankhyaClient({ ...validConfig, xToken: '' })).toThrow('xToken');
+    });
+
+    it('accepts authRetry and circuitBreaker config', () => {
+      const client = new SankhyaClient({
+        ...validConfig,
+        authRetry: { maxRetries: 5, baseDelayMs: 250 },
+        circuitBreaker: { threshold: 4, resetTimeoutMs: 15_000 },
+      });
+      expect(client).toBeInstanceOf(SankhyaClient);
+    });
+  });
+
+  describe('resilience config wiring', () => {
+    let originalFetch: typeof globalThis.fetch;
+    beforeEach(() => {
+      originalFetch = globalThis.fetch;
+      vi.clearAllMocks();
+    });
+    afterEach(() => {
+      globalThis.fetch = originalFetch;
+      vi.useRealTimers();
+    });
+
+    it('authRetry override wired: maxRetries=0 suppresses retry em 502 (1 unica chamada)', async () => {
+      // Prova o wiring: sem passar a config para o AuthManager, o default
+      // (maxRetries=3) retentaria e faria varias chamadas. maxRetries=0 so
+      // tem efeito se a config foi realmente propagada.
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        statusText: 'Bad Gateway',
+        text: () => Promise.resolve(''),
+      });
+
+      const client = new SankhyaClient({
+        ...validConfig,
+        authRetry: { maxRetries: 0 },
+      });
+
+      await expect(client.authenticate()).rejects.toThrow();
+      expect(globalThis.fetch).toHaveBeenCalledOnce();
+    });
+
+    it('circuitBreaker override wired: threshold=2 abre apos 2 falhas', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        text: () => Promise.resolve(''),
+      });
+
+      const client = new SankhyaClient({
+        ...validConfig,
+        authRetry: { maxRetries: 0 },
+        circuitBreaker: { threshold: 2, resetTimeoutMs: 30_000 },
+      });
+
+      // 2 falhas distintas => breaker arma (default threshold=3 nao armaria aqui)
+      await expect(client.authenticate()).rejects.toThrow();
+      await expect(client.authenticate()).rejects.toThrow();
+
+      const fetchCalls = vi.mocked(globalThis.fetch).mock.calls.length;
+      // 3a chamada: breaker aberto => nao chama fetch
+      await expect(client.authenticate()).rejects.toThrow();
+      expect(vi.mocked(globalThis.fetch).mock.calls.length).toBe(fetchCalls);
     });
   });
 
