@@ -18,6 +18,8 @@ export interface RetryOptions {
 
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_BASE_DELAY = 1000;
+/** Teto para delay ditado pelo servidor (Retry-After) — evita stall de horas. */
+export const MAX_RETRY_AFTER_MS = 60_000;
 
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 502, 503, 504]);
 const RETRYABLE_ERROR_CODES = new Set(['ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND', 'UND_ERR_SOCKET']);
@@ -77,14 +79,30 @@ export async function withRetry<T>(
       }
 
       if (options?.signal?.aborted) throw lastError;
-      // Honor server-provided Retry-After when present; else full jitter backoff.
+      // Honor server-provided Retry-After when present (capped); else full jitter backoff.
       const retryAfterMs = getRetryAfterMs(error);
-      const delay = retryAfterMs ?? Math.random() * baseDelay * 2 ** attempt;
-      await sleep(delay);
+      const delay = Math.min(
+        retryAfterMs ?? Math.random() * baseDelay * 2 ** attempt,
+        MAX_RETRY_AFTER_MS,
+      );
+      await sleep(delay, options?.signal);
     }
   }
 
   throw lastError;
+}
+
+/** Converte o header Retry-After (segundos ou HTTP-date) para ms com teto, ou undefined. */
+export function parseRetryAfterMs(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) {
+    return seconds > 0 ? Math.min(seconds * 1000, MAX_RETRY_AFTER_MS) : undefined;
+  }
+  const dateMs = Date.parse(value);
+  if (Number.isNaN(dateMs)) return undefined;
+  const delta = dateMs - Date.now();
+  return delta > 0 ? Math.min(delta, MAX_RETRY_AFTER_MS) : undefined;
 }
 
 /** Extrai Retry-After (em ms) de um erro, se presente. */
@@ -96,11 +114,21 @@ function getRetryAfterMs(error: unknown): number | undefined {
     typeof (error as { retryAfterMs: unknown }).retryAfterMs === 'number'
   ) {
     const ms = (error as { retryAfterMs: number }).retryAfterMs;
-    return ms > 0 ? ms : undefined;
+    // Negativo/NaN/Infinity cai no backoff exponencial padrao.
+    return Number.isFinite(ms) && ms > 0 ? ms : undefined;
   }
   return undefined;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/** Sleep que resolve cedo se o signal abortar (nao deixa a promise pendurada). */
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const id = setTimeout(done, ms);
+    function done(): void {
+      signal?.removeEventListener('abort', done);
+      clearTimeout(id);
+      resolve();
+    }
+    signal?.addEventListener('abort', done, { once: true });
+  });
 }

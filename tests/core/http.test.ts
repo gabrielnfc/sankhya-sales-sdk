@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AuthManager } from '../../src/core/auth.js';
-import { ApiError, GatewayError, TimeoutError } from '../../src/core/errors.js';
+import { AuthManager } from '../../src/core/auth.js';
+import {
+  ApiError,
+  AuthError,
+  CircuitOpenError,
+  GatewayError,
+  TimeoutError,
+} from '../../src/core/errors.js';
 import { HttpClient } from '../../src/core/http.js';
 import type { Logger } from '../../src/types/config.js';
 
@@ -18,13 +24,14 @@ function createMockAuth() {
   } as unknown as AuthManager;
 }
 
-function createHttpClient(auth?: AuthManager, timeout = 30000) {
+function createHttpClient(auth?: AuthManager, timeout = 30000, retries = 3) {
   return new HttpClient(
     'https://api.sankhya.com.br',
     'x-token',
     timeout,
     mockLogger,
     auth ?? createMockAuth(),
+    retries,
   );
 }
 
@@ -217,9 +224,41 @@ describe('HttpClient', () => {
           }),
       );
 
-      const client = createHttpClient(undefined, 10);
+      const client = createHttpClient(undefined, 10, 0);
 
       await expect(client.restGet('/slow')).rejects.toThrow(TimeoutError);
+    });
+
+    it('leitura idempotente deve retentar apos timeout de tentativa (timeout -> 200)', async () => {
+      let calls = 0;
+      globalThis.fetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+        calls++;
+        if (calls === 1) {
+          // Primeira tentativa nunca resolve — o timer da tentativa aborta
+          return new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              reject(new DOMException('The operation was aborted.', 'AbortError'));
+            });
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({ status: '1', statusMessage: 'OK', responseBody: { records: [] } }),
+        });
+      });
+
+      const client = createHttpClient(undefined, 20);
+      const result = await client.gatewayCall(
+        'mge',
+        'CRUDServiceProvider.loadRecords',
+        {},
+        undefined,
+        true,
+      );
+
+      expect(result).toEqual({ records: [] });
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -355,6 +394,26 @@ describe('HttpClient', () => {
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     });
 
+    it('flag idempotent em servico fora da allowlist e ignorada (sem retry) com warn', async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        statusText: 'Bad Gateway',
+        headers: { get: () => null },
+        text: () => Promise.resolve(''),
+      });
+
+      const client = createHttpClient();
+
+      await expect(
+        client.gatewayCall('mgecom', 'CACSP.incluirNota', {}, undefined, true),
+      ).rejects.toThrow(ApiError);
+      expect(globalThis.fetch).toHaveBeenCalledOnce();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('flag idempotent ignorada'),
+      );
+    });
+
     it('escrita (default, nao-idempotente) NAO deve retentar em 502', async () => {
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,
@@ -367,6 +426,37 @@ describe('HttpClient', () => {
       const client = createHttpClient();
 
       await expect(client.gatewayCall('mgecom', 'CACSP.incluirNota', {})).rejects.toThrow(ApiError);
+      expect(globalThis.fetch).toHaveBeenCalledOnce();
+    });
+
+    it('escrita NAO deve retentar em erro de rede (ECONNRESET)', async () => {
+      globalThis.fetch = vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }));
+
+      const client = createHttpClient();
+
+      await expect(client.gatewayCall('mgecom', 'CACSP.incluirNota', {})).rejects.toThrow(
+        'socket hang up',
+      );
+      expect(globalThis.fetch).toHaveBeenCalledOnce();
+    });
+
+    it('escrita NAO deve retentar em timeout de tentativa', async () => {
+      globalThis.fetch = vi.fn().mockImplementation(
+        (_url: string, init?: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              reject(new DOMException('The operation was aborted.', 'AbortError'));
+            });
+          }),
+      );
+
+      const client = createHttpClient(undefined, 10);
+
+      await expect(client.gatewayCall('mgecom', 'CACSP.incluirNota', {})).rejects.toThrow(
+        TimeoutError,
+      );
       expect(globalThis.fetch).toHaveBeenCalledOnce();
     });
 
@@ -467,32 +557,46 @@ describe('HttpClient', () => {
     });
   });
 
-  describe('flowId: cascata de 401 compartilha um unico flow symbol', () => {
-    it('getToken inicial e refresh apos 401 recebem o MESMO flowId', async () => {
-      const auth = createMockAuth();
-      auth.getToken = vi.fn().mockResolvedValueOnce('test-token').mockResolvedValue('new-token');
-      let calls = 0;
-      globalThis.fetch = vi.fn().mockImplementation(() => {
-        calls++;
-        if (calls === 1) {
-          return Promise.resolve({
-            ok: false,
-            status: 401,
-            statusText: 'Unauthorized',
-            text: () => Promise.resolve(''),
-          });
-        }
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: 'ok' }) });
+  describe('circuit breaker: uma chamada de negocio conta no maximo 1 falha', () => {
+    it('chamada com auth falhando registra exatamente 1 falha no breaker', async () => {
+      // AuthManager real: falha de auth propaga e encerra a chamada de negocio,
+      // entao cada chamada conta 1 falha — com threshold 2, a 2a chamada ainda
+      // NAO ve CircuitOpenError e a 3a ve.
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        text: () => Promise.resolve(''),
       });
-
+      const auth = new AuthManager(
+        'https://api.sankhya.com.br',
+        'client-id',
+        'client-secret',
+        'x-token',
+        mockLogger,
+        undefined,
+        {
+          authRetry: { maxRetries: 0, baseDelayMs: 1 },
+          circuitBreaker: { threshold: 2, resetTimeoutMs: 30_000 },
+        },
+      );
       const client = createHttpClient(auth);
-      await client.restGet('/test');
 
-      const getTokenCalls = vi.mocked(auth.getToken).mock.calls;
-      expect(getTokenCalls.length).toBeGreaterThanOrEqual(2);
-      expect(typeof getTokenCalls[0][0]).toBe('symbol');
-      // mesmo simbolo de fluxo na chamada inicial e no refresh pos-401
-      expect(getTokenCalls[1][0]).toBe(getTokenCalls[0][0]);
+      const err1 = await client.restGet('/test').catch((e) => e);
+      expect(err1).toBeInstanceOf(AuthError);
+      expect(err1).not.toBeInstanceOf(CircuitOpenError);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1); // 1 fetch de auth, 0 de negocio
+
+      // Se a 1a chamada tivesse contado 2+ falhas, esta ja seria CircuitOpenError
+      const err2 = await client.restGet('/test').catch((e) => e);
+      expect(err2).toBeInstanceOf(AuthError);
+      expect(err2).not.toBeInstanceOf(CircuitOpenError);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+
+      // threshold 2 atingido apos 2 chamadas — breaker aberto, sem fetch novo
+      const err3 = await client.restGet('/test').catch((e) => e);
+      expect(err3).toBeInstanceOf(CircuitOpenError);
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     });
   });
 

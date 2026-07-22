@@ -231,8 +231,10 @@ describe('AUTH-RETRY: backoff exponencial + jitter em falhas transientes', () =>
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
-    vi.useRealTimers();
+    // restoreAllMocks ANTES de useRealTimers: o spy de setTimeout capturou a
+    // implementacao fake — restaurar depois re-instalaria o timer fake.
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('deve recuperar de 502 transiente (502 -> 502 -> 200)', async () => {
@@ -279,6 +281,35 @@ describe('AUTH-RETRY: backoff exponencial + jitter em falhas transientes', () =>
     expect(backoffDelays).toEqual([500, 1000]);
   });
 
+  it('OAuth 429 honra Retry-After como delay da proxima tentativa', async () => {
+    vi.useFakeTimers();
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        headers: { get: (k: string) => (k.toLowerCase() === 'retry-after' ? '2' : null) },
+        text: () => Promise.resolve(''),
+      } as unknown as Response)
+      .mockResolvedValueOnce(okResponse('recovered-token'));
+
+    const auth = createAuthManagerWithOpts({ authRetry: { maxRetries: 2, baseDelayMs: 500 } });
+
+    const p = auth.getToken();
+    await vi.runAllTimersAsync();
+    const token = await p;
+
+    expect(token).toBe('recovered-token');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    // delay usado foi o do header (2000ms), nao o backoff (~500ms)
+    const delays = setTimeoutSpy.mock.calls
+      .map((c) => c[1])
+      .filter((ms): ms is number => typeof ms === 'number' && ms > 0 && ms < 30_000);
+    expect(delays).toEqual([2000]);
+  });
+
   it('deve exaurir retries transientes e lancar AuthError', async () => {
     vi.useFakeTimers();
     globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(504));
@@ -290,6 +321,53 @@ describe('AUTH-RETRY: backoff exponencial + jitter em falhas transientes', () =>
     await vi.runAllTimersAsync();
     await assertion;
     expect(globalThis.fetch).toHaveBeenCalledTimes(3); // 1 + 2 retries
+  });
+});
+
+describe('AUTH-RETRY: classificacao transiente vs permanente de excecoes de fetch', () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    vi.clearAllMocks();
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('TypeError sem cause.code de rede e permanente — falha sem retry', async () => {
+    // Caso real: CRLF no .env corrompe header e undici lanca TypeError
+    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError('invalid header value'));
+    const auth = createAuthManagerWithOpts({ authRetry: { maxRetries: 3, baseDelayMs: 1 } });
+
+    const err = await auth.getToken().catch((e) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    expect((err as AuthError).message).toContain('TypeError');
+    expect(globalThis.fetch).toHaveBeenCalledOnce();
+  });
+
+  it('TypeError com cause.code de rede (ECONNREFUSED) e transiente — retenta', async () => {
+    const netErr = new TypeError('fetch failed');
+    (netErr as Error & { cause: unknown }).cause = { code: 'ECONNREFUSED' };
+    globalThis.fetch = vi
+      .fn()
+      .mockRejectedValueOnce(netErr)
+      .mockResolvedValue(okResponse('recovered-token'));
+    const auth = createAuthManagerWithOpts({ authRetry: { maxRetries: 2, baseDelayMs: 1 } });
+
+    const token = await auth.getToken();
+    expect(token).toBe('recovered-token');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('razao do erro inclui name e cause.code (diagnostico) sem ecoar valores', async () => {
+    const netErr = new TypeError('fetch failed');
+    (netErr as Error & { cause: unknown }).cause = { code: 'ENOTFOUND' };
+    globalThis.fetch = vi.fn().mockRejectedValue(netErr);
+    const auth = createAuthManagerWithOpts({ authRetry: { maxRetries: 0, baseDelayMs: 1 } });
+
+    const err = await auth.getToken().catch((e) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    expect((err as AuthError).message).toContain('ENOTFOUND');
   });
 });
 
@@ -367,8 +445,9 @@ describe('AUTH-TIMEOUT: timeout de auth configuravel (default 30s)', () => {
   });
   afterEach(() => {
     globalThis.fetch = originalFetch;
-    vi.useRealTimers();
+    // restoreAllMocks ANTES de useRealTimers (spy de setTimeout sob fake timers)
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('deve usar o timeout configurado (5000ms) e nao o hardcoded 30000', async () => {
@@ -431,21 +510,205 @@ describe('CIRCUIT-BREAKER: contagem por fluxo, CircuitOpenError, jitter', () => 
     expect((err as CircuitOpenError).retryAfterMs).toBeGreaterThan(0);
     expect(vi.mocked(globalThis.fetch).mock.calls.length).toBe(fetchCallsBefore); // nao chamou fetch
   });
+});
 
-  it('falhas encadeadas no MESMO fluxo (401 cascade) contam como 1', async () => {
+describe('CIRCUIT-BREAKER: ciclo half-open, joiners concorrentes, retryAfterMs', () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    vi.clearAllMocks();
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('half-open: apos a janela um probe e permitido e o sucesso reseta o breaker', async () => {
+    vi.useFakeTimers();
     globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(500));
     const auth = createAuthManagerWithOpts({
       authRetry: { maxRetries: 0, baseDelayMs: 1 },
-      circuitBreaker: { threshold: 3, resetTimeoutMs: 30_000 },
+      circuitBreaker: { threshold: 2, resetTimeoutMs: 1000, jitterRatio: 0 },
     });
 
-    const flow = Symbol('business-call');
-    // 5 falhas encadeadas no mesmo fluxo => conta como 1 => breaker NUNCA abre
-    for (let i = 0; i < 5; i++) {
-      const err = await auth.getToken(flow).catch((e) => e);
+    // 2 falhas => breaker abre
+    await expect(auth.getToken()).rejects.toBeInstanceOf(AuthError);
+    await expect(auth.getToken()).rejects.toBeInstanceOf(AuthError);
+    await expect(auth.getToken()).rejects.toBeInstanceOf(CircuitOpenError);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+
+    // janela expira (jitterRatio 0 => exatamente 1000ms) => probe toca o servidor
+    vi.advanceTimersByTime(1001);
+    globalThis.fetch = mockFetchSuccess('probe-token');
+    const token = await auth.getToken();
+    expect(token).toBe('probe-token');
+
+    // sucesso resetou o contador: 1 falha nova NAO reabre (threshold 2)
+    await auth.invalidateToken();
+    globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(500));
+    const err = await auth.getToken().catch((e) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    expect(err).not.toBeInstanceOf(CircuitOpenError);
+    const err2 = await auth.getToken().catch((e) => e);
+    expect(err2).toBeInstanceOf(AuthError);
+  });
+
+  it('half-open: probe que falha re-abre o breaker com nova janela', async () => {
+    vi.useFakeTimers();
+    globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(500));
+    const auth = createAuthManagerWithOpts({
+      authRetry: { maxRetries: 0, baseDelayMs: 1 },
+      circuitBreaker: { threshold: 2, resetTimeoutMs: 1000, jitterRatio: 0 },
+    });
+
+    await expect(auth.getToken()).rejects.toBeInstanceOf(AuthError);
+    await expect(auth.getToken()).rejects.toBeInstanceOf(AuthError);
+    vi.advanceTimersByTime(1001);
+
+    // probe permitido, falha de verdade (contata o servidor)
+    const probeErr = await auth.getToken().catch((e) => e);
+    expect(probeErr).toBeInstanceOf(AuthError);
+    expect(probeErr).not.toBeInstanceOf(CircuitOpenError);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3);
+
+    // nova janela armada: fast-fail local sem fetch
+    const err = await auth.getToken().catch((e) => e);
+    expect(err).toBeInstanceOf(CircuitOpenError);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('N getToken concorrentes durante outage: 1 fetch e 1 falha no breaker', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(500));
+    const auth = createAuthManagerWithOpts({
+      authRetry: { maxRetries: 0, baseDelayMs: 1 },
+      circuitBreaker: { threshold: 2, resetTimeoutMs: 30_000 },
+    });
+
+    const results = await Promise.allSettled([auth.getToken(), auth.getToken(), auth.getToken()]);
+    expect(results.every((r) => r.status === 'rejected')).toBe(true);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1); // 3 joiners, 1 fetch
+
+    // apenas 1 falha contada: proxima chamada ainda NAO e CircuitOpenError
+    const err = await auth.getToken().catch((e) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    expect(err).not.toBeInstanceOf(CircuitOpenError);
+  });
+
+  it('CircuitOpenError.retryAfterMs fica dentro da janela configurada (com jitter)', async () => {
+    vi.useFakeTimers();
+    globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(500));
+    const auth = createAuthManagerWithOpts({
+      authRetry: { maxRetries: 0, baseDelayMs: 1 },
+      circuitBreaker: { threshold: 1, resetTimeoutMs: 10_000, jitterRatio: 0.2 },
+    });
+
+    await expect(auth.getToken()).rejects.toBeInstanceOf(AuthError);
+    const err = await auth.getToken().catch((e) => e);
+    expect(err).toBeInstanceOf(CircuitOpenError);
+    const { retryAfterMs } = err as CircuitOpenError;
+    expect(retryAfterMs).toBeGreaterThan(0);
+    expect(retryAfterMs).toBeLessThanOrEqual(10_000 * 1.2);
+  });
+});
+
+describe('AUTH-CONTRACT: getToken sempre lanca AuthError; cache quebrado nao falha auth', () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    vi.clearAllMocks();
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('resposta 200 com JSON invalido vira AuthError (nao SyntaxError crua)', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.reject(new SyntaxError('Unexpected token < in JSON')),
+    } as unknown as Response);
+    const auth = createAuthManagerWithOpts({ authRetry: { maxRetries: 0, baseDelayMs: 1 } });
+
+    const err = await auth.getToken().catch((e) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    expect((err as AuthError).message).toContain('resposta invalida');
+  });
+
+  it('falha do cacheProvider.set NAO falha a auth nem conta no breaker', async () => {
+    globalThis.fetch = mockFetchSuccess();
+    const cacheProvider = {
+      get: vi.fn(async () => null),
+      set: vi.fn(async () => {
+        throw new Error('redis down');
+      }),
+      del: vi.fn(async () => {}),
+    };
+    const auth = createAuthManagerWithOpts(
+      { circuitBreaker: { threshold: 1, resetTimeoutMs: 30_000 } },
+      cacheProvider,
+    );
+
+    // Token retornado apesar do cache quebrado
+    const token = await auth.getToken();
+    expect(token).toBe('access-token-123');
+    expect(mockLogger.warn).toHaveBeenCalled();
+
+    // Breaker nao contou falha: proxima chamada NAO e CircuitOpenError
+    const token2 = await auth.getToken();
+    expect(token2).toBe('access-token-123');
+  });
+});
+
+describe('CONFIG-CLAMP: valores de resiliencia fora de faixa sao clampados', () => {
+  let originalFetch: typeof globalThis.fetch;
+  beforeEach(() => {
+    originalFetch = globalThis.fetch;
+    vi.clearAllMocks();
+  });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  it('maxRetries negativo ainda faz 1 tentativa real (fetch e chamado)', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(500));
+    const auth = createAuthManagerWithOpts({ authRetry: { maxRetries: -1, baseDelayMs: 1 } });
+
+    const err = await auth.getToken().catch((e) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    expect((err as AuthError).message).toContain('1 tentativa(s)');
+    expect(globalThis.fetch).toHaveBeenCalledOnce();
+  });
+
+  it('threshold 0 e clampado para 1 — breaker abre apos 1 falha', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(500));
+    const auth = createAuthManagerWithOpts({
+      authRetry: { maxRetries: 0, baseDelayMs: 1 },
+      circuitBreaker: { threshold: 0, resetTimeoutMs: 30_000 },
+    });
+
+    const err1 = await auth.getToken().catch((e) => e);
+    expect(err1).toBeInstanceOf(AuthError);
+    expect(err1).not.toBeInstanceOf(CircuitOpenError);
+
+    const err2 = await auth.getToken().catch((e) => e);
+    expect(err2).toBeInstanceOf(CircuitOpenError);
+    expect(globalThis.fetch).toHaveBeenCalledOnce(); // 2a chamada nao toca o servidor
+  });
+
+  it('resetTimeoutMs negativo e clampado para 0 — breaker nunca bloqueia', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(errorResponse(500));
+    const auth = createAuthManagerWithOpts({
+      authRetry: { maxRetries: 0, baseDelayMs: 1 },
+      circuitBreaker: { threshold: 1, resetTimeoutMs: -5000, jitterRatio: 0 },
+    });
+
+    for (let i = 0; i < 3; i++) {
+      const err = await auth.getToken().catch((e) => e);
       expect(err).toBeInstanceOf(AuthError);
       expect(err).not.toBeInstanceOf(CircuitOpenError);
     }
+    expect(globalThis.fetch).toHaveBeenCalledTimes(3); // toda chamada contata o servidor
   });
 });
 

@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Resiliência: correção de três falhas de desenho que transformavam degradação
 transiente do servidor Sankhya em falha dura no cliente (diagnóstico TrueForce).
-Mudanças aditivas e retrocompatíveis; comportamento de escrita inalterado.
+Escritas permanecem SEM retry automático, mas os **novos defaults mudam o
+comportamento mesmo sem nenhuma config** — veja "Changed".
 
 ### Added
 - `authRetry` em `SankhyaConfig`: retry da autenticação OAuth com backoff
@@ -28,14 +29,31 @@ Mudanças aditivas e retrocompatíveis; comportamento de escrita inalterado.
   `loadRecord`, `DbExplorerSP.executeQuery`, reads de cadastros) agora são
   retentadas em erro transiente (502/503/504/timeout/429), mesmo sendo POST
   no transporte. Retry por semântica da operação, não por método HTTP.
-- Header `Retry-After` (segundos ou HTTP-date) respeitado no delay de retry.
+- Header `Retry-After` (segundos ou HTTP-date) respeitado no delay de retry,
+  com teto de 60s.
+
+### Changed
+- **Sem nenhuma config, a autenticação agora retenta 3× por default** (antes
+  da 1.3.0, falha transiente do OAuth falhava imediatamente). Pior caso de
+  obtenção de token sob indisponibilidade total: ~2min (4 tentativas × timeout
+  de 30s + backoff) antes do erro chegar ao caller.
+  `authRetry: { maxRetries: 0 }` restaura o fail-fast pré-1.3.0.
+- **O timeout de cada tentativa de auth agora segue `config.timeout`** (antes:
+  30s fixos). Com `timeout: 5000`, cada tentativa de auth aborta em 5s.
+- `isAuthError` agora também retorna `true` para `CircuitOpenError` (que
+  estende `AuthError`) — cheque `isCircuitOpenError` **antes** de
+  `isAuthError`. O tipo de `AuthError.code` foi ampliado para
+  `'AUTH_ERROR' | 'CIRCUIT_OPEN'`.
+- A janela de reabertura do circuit breaker ganha jitter aditivo de 0–20%
+  (30s → 30–36s com defaults).
 
 ### Fixed
 - `AuthManager.authenticate()`: timeout hardcoded de 30s substituído pelo
   `timeout` do client (30s continua default).
-- Circuit breaker: cascata de refresh de 401 de UMA chamada de negócio agora
-  conta como **1 falha** (dedupe por fluxo), não 3 — uma única chamada ruim
-  não arma mais o breaker sozinha.
+- Circuit breaker: cascata de refresh de 401 de UMA chamada de negócio conta
+  como **1 falha**, não 3 — a falha de auth propaga e encerra a chamada (a
+  cascata só continua após refresh com sucesso), então uma única chamada ruim
+  não arma o breaker sozinha.
 - Corpo da resposta do servidor OAuth não é mais incluído em mensagem/details
   de `AuthError` (podia ecoar credencial/token). Logs de retry registram
   apenas tentativa, status e delay.

@@ -75,6 +75,12 @@ transiente, mesmo sendo POST no transporte. **Escritas** (criar/confirmar/
 cancelar/`saveRecord`) **nunca** são retentadas automaticamente — evita
 duplicação no ERP; use `idempotencyKey` e trate idempotência no consumidor.
 
+> **Defaults desde a 1.3.0** (mudam o comportamento mesmo sem config): a
+> autenticação retenta 3× em falha transiente — pior caso de obtenção de token
+> sob indisponibilidade total: ~2min — e o timeout de cada tentativa de auth
+> segue `timeout` (antes: 30s fixos). `authRetry: { maxRetries: 0 }` restaura
+> o fail-fast anterior.
+
 ### Listar produtos
 
 ```typescript

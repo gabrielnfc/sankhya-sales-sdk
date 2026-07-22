@@ -6,6 +6,7 @@ import type {
   TokenCacheProvider,
 } from '../types/config.js';
 import { AuthError, CircuitOpenError } from './errors.js';
+import { parseRetryAfterMs } from './retry.js';
 
 const TOKEN_CACHE_KEY = 'sankhya_sdk_token';
 const SAFETY_MARGIN_SECONDS = 60;
@@ -18,6 +19,23 @@ const DEFAULT_AUTH_TIMEOUT_MS = 30_000;
  * imediatamente para evitar lockout por retentativa de credencial errada.
  */
 const RETRYABLE_AUTH_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+
+/**
+ * Codigos de erro de rede (Node/undici) que marcam uma excecao de fetch como
+ * transiente. TypeError SEM um destes codigos e erro permanente de
+ * programacao/config (URL invalida, header com caractere invalido) — retry
+ * seria futil.
+ */
+const NETWORK_ERROR_CODES = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'ETIMEDOUT',
+  'EPIPE',
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_SOCKET',
+]);
 
 interface ResolvedAuthRetry {
   maxRetries: number;
@@ -45,7 +63,11 @@ export interface AuthManagerOptions {
  * Nunca carrega corpo de resposta nem credenciais (apenas a razao/status).
  */
 class TransientAuthFailure extends Error {
-  constructor(readonly reason: string) {
+  constructor(
+    readonly reason: string,
+    /** Delay ditado pelo servidor (Retry-After, ja com teto) para a proxima tentativa. */
+    readonly retryAfterMs?: number,
+  ) {
     super(reason);
     this.name = 'TransientAuthFailure';
   }
@@ -66,8 +88,6 @@ export class AuthManager {
   private refreshPromise: Promise<string> | null = null;
   private consecutiveFailures = 0;
   private circuitOpenUntil = 0;
-  /** Ultimo fluxo (business call) que ja contabilizou uma falha, para nao contar em dobro. */
-  private lastFailedFlowId: symbol | undefined;
 
   constructor(
     baseUrl: string,
@@ -85,32 +105,34 @@ export class AuthManager {
     this.logger = logger;
     this.cacheProvider = cacheProvider;
     this.timeout = options?.timeout ?? DEFAULT_AUTH_TIMEOUT_MS;
+    // Clamp de config: valores fora de faixa (negativos, NaN, jitter > 1)
+    // produziriam breaker que nunca abre ou retry loop quente.
     this.authRetry = {
-      maxRetries: options?.authRetry?.maxRetries ?? 3,
-      baseDelayMs: options?.authRetry?.baseDelayMs ?? 500,
-      factor: options?.authRetry?.factor ?? 2,
-      jitterRatio: options?.authRetry?.jitterRatio ?? 0.5,
+      maxRetries: Math.floor(clampConfig(options?.authRetry?.maxRetries, 3, 0)),
+      baseDelayMs: clampConfig(options?.authRetry?.baseDelayMs, 500, 0),
+      factor: clampConfig(options?.authRetry?.factor, 2, 1),
+      jitterRatio: clampConfig(options?.authRetry?.jitterRatio, 0.5, 0, 1),
     };
     this.circuitBreaker = {
-      threshold: options?.circuitBreaker?.threshold ?? 3,
-      resetTimeoutMs: options?.circuitBreaker?.resetTimeoutMs ?? 30_000,
-      jitterRatio: options?.circuitBreaker?.jitterRatio ?? 0.2,
+      threshold: Math.max(1, Math.floor(clampConfig(options?.circuitBreaker?.threshold, 3, 1))),
+      resetTimeoutMs: clampConfig(options?.circuitBreaker?.resetTimeoutMs, 30_000, 0),
+      jitterRatio: clampConfig(options?.circuitBreaker?.jitterRatio, 0.2, 0, 1),
     };
   }
 
   /**
    * Obtem um token valido (do cache ou autenticando).
    *
-   * @param flowId - Identificador opcional do fluxo de negocio. Falhas de
-   *   autenticacao encadeadas no mesmo fluxo (ex.: cascata de 401) contam
-   *   como UMA falha para o circuit breaker.
+   * Nota sobre o circuit breaker: uma falha de autenticacao propaga e encerra
+   * a chamada de negocio (a cascata de 401 so recursa apos refresh com
+   * SUCESSO), entao cada chamada de negocio conta no maximo UMA falha.
    */
-  async getToken(flowId?: symbol): Promise<string> {
+  async getToken(): Promise<string> {
     if (this.refreshPromise) {
       this.logger.debug('Aguardando refresh em andamento');
       return this.refreshPromise;
     }
-    this.refreshPromise = this._doGetToken(flowId);
+    this.refreshPromise = this._doGetToken();
     try {
       return await this.refreshPromise;
     } finally {
@@ -118,7 +140,7 @@ export class AuthManager {
     }
   }
 
-  private async _doGetToken(flowId?: symbol): Promise<string> {
+  private async _doGetToken(): Promise<string> {
     // Circuit breaker: fast-fail local sem contatar o servidor.
     if (
       this.consecutiveFailures >= this.circuitBreaker.threshold &&
@@ -137,21 +159,16 @@ export class AuthManager {
     try {
       const token = await this.authenticate();
       this.consecutiveFailures = 0;
-      this.lastFailedFlowId = undefined;
       return token;
     } catch (error) {
-      this.recordFailure(flowId);
+      this.recordFailure();
       throw error;
     }
   }
 
-  /** Contabiliza uma falha, deduplicando por fluxo, e abre o breaker no threshold. */
-  private recordFailure(flowId: symbol | undefined): void {
-    const sameFlowAlreadyCounted = flowId !== undefined && flowId === this.lastFailedFlowId;
-    if (sameFlowAlreadyCounted) return;
-
+  /** Contabiliza uma falha e abre o breaker no threshold. */
+  private recordFailure(): void {
     this.consecutiveFailures++;
-    this.lastFailedFlowId = flowId;
 
     if (this.consecutiveFailures >= this.circuitBreaker.threshold) {
       const jitter = Math.floor(
@@ -223,7 +240,7 @@ export class AuthManager {
 
         const base = baseDelayMs * factor ** attempt;
         const jitter = base * jitterRatio * (Math.random() * 2 - 1);
-        const delay = Math.max(0, Math.round(base + jitter));
+        const delay = error.retryAfterMs ?? Math.max(0, Math.round(base + jitter));
         this.logger.warn(
           `Autenticacao: tentativa ${attempt + 1} falhou (${lastReason}), retentando em ${delay}ms`,
         );
@@ -271,8 +288,15 @@ export class AuthManager {
       if (error instanceof Error && error.name === 'AbortError') {
         throw new TransientAuthFailure(`timeout apos ${this.timeout}ms`);
       }
-      // Erro de rede — transiente. NUNCA inclui credenciais.
-      throw new TransientAuthFailure('erro de conexao com servidor de autenticacao');
+      // Identificadores seguros (name + cause.code) — NUNCA valores de header/env.
+      const causeCode = extractCauseCode(error);
+      const label = `${error instanceof Error ? error.name : 'Error'}${
+        causeCode ? `: ${causeCode}` : ''
+      }`;
+      if (error instanceof TypeError && (!causeCode || !NETWORK_ERROR_CODES.has(causeCode))) {
+        throw new AuthError(`Falha permanente na autenticacao (${label})`, undefined, error);
+      }
+      throw new TransientAuthFailure(`erro de conexao (${label})`);
     } finally {
       clearTimeout(timeoutId);
     }
@@ -280,12 +304,22 @@ export class AuthManager {
     if (!response.ok) {
       // Corpo da resposta NAO e incluido no erro (pode ecoar token/credencial).
       if (RETRYABLE_AUTH_STATUS.has(response.status)) {
-        throw new TransientAuthFailure(`HTTP ${response.status}`);
+        // 429: honra Retry-After (com teto) como delay da proxima tentativa.
+        const retryAfterMs =
+          response.status === 429
+            ? parseRetryAfterMs(response.headers?.get?.('retry-after') ?? null)
+            : undefined;
+        throw new TransientAuthFailure(`HTTP ${response.status}`, retryAfterMs);
       }
       throw new AuthError(`Autenticacao falhou: HTTP ${response.status}`, response.status);
     }
 
-    const data: AuthResponse = await response.json();
+    let data: AuthResponse;
+    try {
+      data = await response.json();
+    } catch {
+      throw new TransientAuthFailure('resposta invalida do servidor de autenticacao');
+    }
     const ttlSeconds = Math.max(data.expires_in - SAFETY_MARGIN_SECONDS, MINIMUM_TTL_SECONDS);
     const tokenData: TokenData = {
       accessToken: data.access_token,
@@ -293,7 +327,13 @@ export class AuthManager {
     };
 
     if (this.cacheProvider) {
-      await this.cacheProvider.set(TOKEN_CACHE_KEY, JSON.stringify(tokenData), ttlSeconds);
+      try {
+        await this.cacheProvider.set(TOKEN_CACHE_KEY, JSON.stringify(tokenData), ttlSeconds);
+      } catch {
+        // Cache externo quebrado NAO pode falhar a auth nem contar no breaker.
+        this.logger.warn('Falha ao gravar token no cache externo; mantendo em memoria');
+        this.memoryCache = tokenData;
+      }
     } else {
       this.memoryCache = tokenData;
     }
@@ -305,4 +345,30 @@ export class AuthManager {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Clampa valor de config ao intervalo [min, max]; ausente ou nao-finito usa o fallback. */
+function clampConfig(
+  value: number | undefined,
+  fallback: number,
+  min: number,
+  max = Number.POSITIVE_INFINITY,
+): number {
+  const v = value ?? fallback;
+  if (!Number.isFinite(v)) return fallback;
+  return Math.min(max, Math.max(min, v));
+}
+
+/** Extrai `cause.code` (string) de um erro, se presente. */
+function extractCauseCode(error: unknown): string | undefined {
+  if (
+    error instanceof Error &&
+    error.cause &&
+    typeof error.cause === 'object' &&
+    'code' in error.cause &&
+    typeof (error.cause as { code?: unknown }).code === 'string'
+  ) {
+    return (error.cause as { code: string }).code;
+  }
+  return undefined;
 }

@@ -76,6 +76,12 @@ errors, even though they are POST at the transport level. **Writes**
 this prevents duplication in the ERP; use `idempotencyKey` and handle write
 idempotency in the consumer.
 
+> **Defaults since 1.3.0** (they change behavior even with no config): auth
+> retries 3x on transient failures -- worst-case token acquisition under a
+> total outage is ~2min -- and each auth attempt's timeout follows `timeout`
+> (previously hardcoded 30s). `authRetry: { maxRetries: 0 }` restores the
+> previous fail-fast behavior.
+
 ### List products
 
 ```typescript
