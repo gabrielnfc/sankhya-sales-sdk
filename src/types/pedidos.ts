@@ -324,6 +324,51 @@ export interface ConfirmarPedidoInput {
   compensarAutomaticamente?: boolean;
 }
 
+/**
+ * Uma solicitacao de liberacao aberta pelo `CACSP.confirmarNota` (ex.: evento
+ * 8 "Atraso" de limite de credito). Campos conforme a resposta real do
+ * Gateway — todos strings; o ERP pode anexar campos extras (`liberador`,
+ * `hashLiberacao`, ...), preservados pela index signature.
+ */
+export interface ConfirmarPedidoLiberacao {
+  /** Chave do registro travado (NUNOTA quando `tabela` = TGFCAB). */
+  chave?: string;
+  /** Codigo do evento de liberacao (8 = Atraso, 44/1000 = Analise de credito, ...). */
+  evento?: string;
+  /** Descricao humana do evento, vinda do ERP. */
+  descricaoEvento?: string;
+  /** Tabela travada (ex.: TGFCAB). */
+  tabela?: string;
+  sequencia?: string;
+  seqCascata?: string;
+  /** Data/hora da solicitacao — granularidade de MINUTO (a TSILIB guarda segundo). */
+  dhSolicitacao?: string;
+  solicitante?: string;
+  valorAtual?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Corpo da resposta de `CACSP.confirmarNota` com `liberacoes` NORMALIZADO:
+ * o bridge XML→JSON do Gateway entrega `liberacoes.liberacao` como OBJETO
+ * (uma pendencia) ou ARRAY (varias) — aqui vira SEMPRE um array plano.
+ * `avisos` e os demais campos (ex.: `pk`) sao preservados como vieram.
+ */
+export interface ConfirmarPedidoResponseBody {
+  avisos?: unknown;
+  liberacoes?: ConfirmarPedidoLiberacao[];
+  [key: string]: unknown;
+}
+
+/**
+ * Retorno de `pedidos.confirmar()` (v1.4.0). `responseBody` fica `undefined`
+ * quando o Gateway responde corpo vazio/ausente — consumidor antigo que
+ * ignora o retorno continua funcionando (antes o metodo devolvia `void`).
+ */
+export interface ConfirmarPedidoResult {
+  responseBody?: ConfirmarPedidoResponseBody;
+}
+
 /** Tipo de faturamento no Sankhya ERP. */
 export enum TipoFaturamento {
   /** Faturamento normal. */

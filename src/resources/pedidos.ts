@@ -15,6 +15,9 @@ import type { RequestOptions } from '../types/config.js';
 import type {
   CancelarPedidoInput,
   ConfirmarPedidoInput,
+  ConfirmarPedidoLiberacao,
+  ConfirmarPedidoResponseBody,
+  ConfirmarPedidoResult,
   ConsultarPedidosParams,
   FaturarPedidoInput,
   FinanceiroPedidoInput,
@@ -242,14 +245,24 @@ export class PedidosResource {
   /**
    * Confirma um pedido de venda via Gateway.
    *
+   * Desde a v1.4.0 devolve `{ responseBody }` normalizado: `status "1"` com
+   * `liberacoes.liberacao` objeto OU array vira SEMPRE `liberacoes` array;
+   * corpo vazio/ausente vira `responseBody` `undefined`. `status "0"` continua
+   * lancando `GatewayError` (nada mudou no caminho de erro) — consumidor
+   * antigo que ignorava o retorno `void` segue funcionando.
+   *
    * @param input - Codigo do pedido e opcao de compensacao.
    * @param options - Opcoes de requisicao.
+   * @returns Corpo da resposta do Gateway normalizado (avisos/liberacoes).
    * @throws {GatewayError} Em erro de negocio Sankhya.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  async confirmar(input: ConfirmarPedidoInput, options?: RequestOptions): Promise<void> {
+  async confirmar(
+    input: ConfirmarPedidoInput,
+    options?: RequestOptions,
+  ): Promise<ConfirmarPedidoResult> {
     validateConfirmarPedidoInput(input, 'ConfirmarPedidoInput');
-    await this.http.gatewayCall(
+    const raw = await this.http.gatewayCall<unknown>(
       'mgecom',
       'CACSP.confirmarNota',
       {
@@ -262,6 +275,39 @@ export class PedidosResource {
       },
       options,
     );
+    const responseBody = this.normalizeConfirmarResponseBody(raw);
+    return responseBody === undefined ? {} : { responseBody };
+  }
+
+  /**
+   * Normaliza o corpo da resposta do `confirmarNota`: corpo nao-objeto ou
+   * objeto vazio vira `undefined`; `liberacoes` vira array plano (ver
+   * {@link ConfirmarPedidoResponseBody}); marcador vazio do Gateway (`"{}"`)
+   * ou shape ilegivel de `liberacoes` e tratado como ausencia de pendencia.
+   *
+   * @internal
+   */
+  private normalizeConfirmarResponseBody(raw: unknown): ConfirmarPedidoResponseBody | undefined {
+    if (raw === null || raw === undefined || typeof raw !== 'object' || Array.isArray(raw)) {
+      return undefined;
+    }
+    const body = raw as Record<string, unknown>;
+    if (Object.keys(body).length === 0) return undefined;
+    const { liberacoes: rawLiberacoes, ...rest } = body;
+    const liberacoes = this.normalizeLiberacoes(rawLiberacoes);
+    return liberacoes === undefined ? rest : { ...rest, liberacoes };
+  }
+
+  /** @internal */
+  private normalizeLiberacoes(value: unknown): ConfirmarPedidoLiberacao[] | undefined {
+    const isRecord = (v: unknown): v is ConfirmarPedidoLiberacao =>
+      typeof v === 'object' && v !== null && !Array.isArray(v);
+    if (Array.isArray(value)) return value.filter(isRecord);
+    if (!isRecord(value)) return undefined;
+    const inner = (value as { liberacao?: unknown }).liberacao;
+    if (Array.isArray(inner)) return inner.filter(isRecord);
+    if (isRecord(inner)) return [inner];
+    return undefined;
   }
 
   /**
