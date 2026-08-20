@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { GatewayError } from '../../src/core/errors.js';
 import type { HttpClient } from '../../src/core/http.js';
 import { PedidosResource } from '../../src/resources/pedidos.js';
 
@@ -469,6 +470,126 @@ describe('PedidosResource', () => {
       expect(body).toEqual({
         nota: { NUNOTA: { $: '123' } },
       });
+    });
+  });
+
+  // Fixture com o shape REAL da resposta de CACSP.confirmarNota quando o
+  // parceiro tem liberacao de credito pendente (nota 1543007 / TFS-000775,
+  // sandbox 19/08/2026). O bridge XML→JSON do Gateway entrega `liberacao`
+  // como OBJETO quando ha uma pendencia e como ARRAY quando ha varias.
+  const LIBERACAO_FIXTURE = {
+    chave: '1543007',
+    evento: '8',
+    descricaoEvento: 'Atraso',
+    tabela: 'TGFCAB',
+    sequencia: '0',
+    seqCascata: '0',
+    dhSolicitacao: '19/08/2026 11:20',
+    solicitante: '11',
+    valorAtual: '61',
+    liberador: '38',
+    tipoEvento: '1',
+    editaLiberador: 'N',
+  };
+
+  const CONFIRMAR_RESPONSE_COM_LIBERACAO = {
+    avisos: {
+      aviso: {
+        $: 'Cliente em atraso desde o dia 19/06/2026.\nTotal atrasado: 36.683,37. Há liberação pendente.',
+      },
+    },
+    liberacoes: { liberacao: LIBERACAO_FIXTURE },
+    pk: { NUNOTA: { $: '1543007' } },
+  };
+
+  describe('confirmar() — responseBody normalizado (v1.4.0)', () => {
+    it('devolve responseBody com liberacoes normalizado para array quando o gateway entrega OBJETO', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue(CONFIRMAR_RESPONSE_COM_LIBERACAO);
+
+      const result = await pedidos.confirmar({ codigoPedido: 1543007 });
+
+      expect(result.responseBody).toBeDefined();
+      expect(result.responseBody?.liberacoes).toEqual([LIBERACAO_FIXTURE]);
+      expect(result.responseBody?.avisos).toEqual(CONFIRMAR_RESPONSE_COM_LIBERACAO.avisos);
+      // Campos fora de avisos/liberacoes sao preservados (o worker loga o corpo inteiro).
+      expect((result.responseBody as Record<string, unknown>).pk).toEqual({
+        NUNOTA: { $: '1543007' },
+      });
+    });
+
+    it('preserva o array quando o gateway ja entrega liberacao como ARRAY', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      const segunda = { ...LIBERACAO_FIXTURE, seqCascata: '1', dhSolicitacao: '19/08/2026 12:00' };
+      http.gatewayCall.mockResolvedValue({
+        ...CONFIRMAR_RESPONSE_COM_LIBERACAO,
+        liberacoes: { liberacao: [LIBERACAO_FIXTURE, segunda] },
+      });
+
+      const result = await pedidos.confirmar({ codigoPedido: 1543007 });
+
+      expect(result.responseBody?.liberacoes).toEqual([LIBERACAO_FIXTURE, segunda]);
+    });
+
+    it('caminho feliz ({pk} sem avisos/liberacoes) devolve responseBody sem liberacoes', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ pk: { NUNOTA: { $: '1543049' } } });
+
+      const result = await pedidos.confirmar({ codigoPedido: 1543049 });
+
+      expect(result.responseBody).toBeDefined();
+      expect(result.responseBody?.liberacoes).toBeUndefined();
+      expect(result.responseBody?.avisos).toBeUndefined();
+    });
+
+    it('corpo ausente (undefined) devolve responseBody undefined sem lancar', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue(undefined);
+
+      const result = await pedidos.confirmar({ codigoPedido: 123 });
+
+      expect(result).toEqual({});
+      expect(result.responseBody).toBeUndefined();
+    });
+
+    it('corpo vazio ({}) devolve responseBody undefined sem lancar', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({});
+
+      const result = await pedidos.confirmar({ codigoPedido: 123 });
+
+      expect(result.responseBody).toBeUndefined();
+    });
+
+    it('status 0 continua lancando GatewayError como hoje (o erro do gatewayCall propaga)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      const erro = new GatewayError(
+        'A nota 1543049 já foi confirmada.',
+        'CACSP.confirmarNota',
+        undefined,
+        undefined,
+        { status: '0' },
+      );
+      http.gatewayCall.mockRejectedValue(erro);
+
+      await expect(pedidos.confirmar({ codigoPedido: 1543049 })).rejects.toBe(erro);
+    });
+
+    it('liberacoes com marcador vazio do gateway ("{}") devolve responseBody sem liberacoes', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ pk: { NUNOTA: { $: '1' } }, liberacoes: '{}' });
+
+      const result = await pedidos.confirmar({ codigoPedido: 1 });
+
+      expect(result.responseBody).toBeDefined();
+      expect(result.responseBody?.liberacoes).toBeUndefined();
     });
   });
 

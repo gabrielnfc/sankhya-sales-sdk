@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-19
+
+### Added
+
+- `pedidos.confirmar()` passa a devolver `{ responseBody }` normalizado do
+  Gateway (`CACSP.confirmarNota`): `avisos` e demais campos preservados como
+  vieram; `liberacoes.liberacao` — objeto (uma pendência) ou array (várias),
+  conforme o bridge XML→JSON — vira SEMPRE `liberacoes: ConfirmarPedidoLiberacao[]`.
+  Corpo vazio/ausente ⇒ `responseBody` `undefined`. Motivação: `status "1"`
+  pode carregar liberação de crédito pendente (evento 8 "Atraso", 44/1000
+  "Análise de crédito") que era descartada — o consumidor via sucesso sem
+  saber que a nota ficou `STATUSNOTA='A'` aguardando liberação.
+- Tipos novos exportados: `ConfirmarPedidoResult`, `ConfirmarPedidoResponseBody`,
+  `ConfirmarPedidoLiberacao`.
+
+### Compatibility
+
+- Retorno anterior era `Promise<void>`: quem ignora o resultado continua
+  funcionando sem mudança. `status "0"` continua lançando `GatewayError`.
+
 ## [1.3.0] - 2026-07-22
 
 Resiliência: correção de três falhas de desenho que transformavam degradação
