@@ -32,6 +32,9 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/**/*.test.ts'],
     testTimeout: 30_000,
+    // beforeAll de integração faz várias chamadas live sequenciais; o default
+    // de 10s estoura quando o sandbox está lento.
+    hookTimeout: 30_000,
     env: loadEnv(),
     coverage: {
       provider: 'v8',
