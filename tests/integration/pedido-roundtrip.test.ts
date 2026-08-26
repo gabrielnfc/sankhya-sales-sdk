@@ -113,8 +113,14 @@ describe.skipIf(!has)('Pedido round-trip (criar + confirmar) - LIVE', { timeout:
     expect(criado?.TIPMOV).toBe('P');
     expect(criado?.PENDENTE).toBe('S');
 
-    // 3) CONFIRMA via Gateway (CACSP.confirmarNota).
-    await expect(sankhya.pedidos.confirmar({ codigoPedido })).resolves.toBeUndefined();
+    // 3) CONFIRMA via Gateway (CACSP.confirmarNota). Desde a v1.4.0 devolve
+    //    { responseBody } normalizado (`responseBody` fica undefined quando o
+    //    Gateway responde corpo vazio).
+    const confirmacao = await sankhya.pedidos.confirmar({ codigoPedido });
+    expect(confirmacao).toBeDefined();
+    if (confirmacao.responseBody !== undefined) {
+      expect(confirmacao.responseBody).toBeTypeOf('object');
+    }
 
     // 4) Confirma a transicao: nota deixou de estar "Aberta" (STATUSNOTA='A').
     const confirmado = await sankhya.gateway.loadRecord({
