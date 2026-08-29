@@ -416,21 +416,52 @@ Gotcha operacional: `.env` com CRLF quebra a autenticação com `401 invalid_cli
 
 ## 10. Lacunas conhecidas — a fechar no plano, antes de codificar
 
-Este documento distingue medido de inferido. O que ainda **não** foi medido:
+Este documento distingue medido de inferido. Medições complementares em
+[`2026-08-29-medicoes-complementares.md`](./2026-08-29-medicoes-complementares.md) fecharam a
+maior parte do que estava listado abaixo. Status atualizado:
 
-1. **Classificação dos call sites que não paginam.** Cerca de dez chamadas usam `extractRestData` descartando `pagination` de propósito: `produtos.componentes`, `produtos.alternativos`, `produtos.volumesDoProduto`, `estoque.porProduto`, `cadastros.listarUsuarios`, `financeiros.listarContasBancarias`, `precos.contextualizado`. Que esses endpoints legitimamente não tragam bloco `pagination` é **suposição** — nenhum foi sondado. D1 exige classificá-los; classificar errado gera falso-positivo de degradação num recurso inteiro. **Medir antes de escrever o descritor.**
+1. **Classificação dos call sites que não paginam.** ⚠️ **Parcialmente fechada** — ver
+   [medições complementares §Lacuna 1 e 5](./2026-08-29-medicoes-complementares.md#lacuna-1-e-5--classificação-dos-call-sites-sem-paginação--chave-de-sub-recursos).
+   `produtos.volumes` (o método real é `volumes`, não `volumesDoProduto`), `estoque.porProduto`,
+   `cadastros.listarUsuarios` e `financeiros.listarContasBancarias` foram medidos — e três deles
+   (`produtos.volumes`, `cadastros.listarUsuarios`, `financeiros.listarContasBancarias`) revelaram
+   que o endpoint **devolve um bloco `pagination` real que o call site descarta**, contrariando a
+   suposição original de "legitimamente sem paginação". `produtos.componentes` e
+   `produtos.alternativos` seguem **NÃO MEDIDOS**: 9 produtos testados, todos `404
+   RESOURCE_NOT_FOUND` — o sandbox não tem produto com kit/alternativos cadastrado.
+   `precos.contextualizado` segue **NÃO MEDIDO**: usa `POST` com corpo de negociação, fora do
+   alcance de uma sonda somente-leitura.
 
-2. **Base de página dos endpoints REST não sondados.** Só `/produtos` e `/parceiros/clientes` tiveram a base confirmada. `startPage` de qualquer outro paginador só muda mediante medição — o caso de `precos` mostra que simetria não é evidência.
+2. **Base de página dos endpoints REST não sondados.** ✅ **Fechada para os 13 endpoints
+   sondados** — ver [medições complementares §Lacuna 2](./2026-08-29-medicoes-complementares.md#lacuna-2--base-de-página-dos-endpoints-rest-não-sondados).
+   Todos 0-based (7 com evidência forte de dados distintos entre páginas, 4 com evidência mais
+   fraca por dataset pequeno). `financeiros/receitas` reconfirma o contrato Financeiros já
+   descrito acima. Fora desta sonda, `projetos`, `financeiros/despesas` e a base específica de
+   `financeiros/contas-bancaria` continuam sem medição direta.
 
-3. **Contrato Gateway.** `deserializeRows` foi lido, não exercitado. As três saídas de §3.6 vêm do código; nenhuma foi observada contra o servidor. Antes das mudanças da 2.0.0, sondar `loadRecords` com resultado vazio e com resultado único (o colapso objeto/array de §3.1 tem análogo declarado em `entities.entity`, que o código já trata — confirmar que a resposta real bate).
+3. **Contrato Gateway.** ✅ **Fechada** — ver [medições complementares §Lacuna 3](./2026-08-29-medicoes-complementares.md#lacuna-3--contrato-gateway-loadrecords).
+   `loadRecords` exercitado contra o servidor real com resultado único e resultado vazio. O
+   colapso objeto/array de `entities.entity` foi confirmado e já está coberto pelo guard
+   existente em `deserializeRows`. A saída silenciosa "`entities` presente, `entity` ausente"
+   também foi confirmada como alcançável e correta (retorna `total: 0`, sem degradação).
 
-4. **`pedidos.consultar` + `modifiedSince`.** Bloqueado pelo sandbox (§3.4). Permanece não-objetivo até que exista medição.
+4. **`pedidos.consultar` + `modifiedSince`.** ❌ **Continua aberta.** Bloqueado pelo sandbox
+   (§3.4, `LOGTABOPER` desabilitado). Permanece não-objetivo até que exista medição.
 
-5. **Chave de resposta dos endpoints de sub-recurso.** As 18 chaves medidas cobrem os endpoints de lista. As de sub-recurso (`/produtos/{id}/componentes` e afins) não foram medidas.
+5. **Chave de resposta dos endpoints de sub-recurso.** ⚠️ **Parcialmente fechada** — mesma
+   medição da Lacuna 1: `produtos.volumes` → chave `volumesProduto`; `estoque.porProduto` →
+   chave `estoque`; `pedidos.consultar` (`/vendas/pedidos`) → chave `pedido` (singular).
+   `produtos.componentes` e `produtos.alternativos` seguem sem chave conhecida — não medido,
+   mesmo motivo do item 1.
 
-6. **Deriva entre descritor e endpoint.** O contrato é propriedade do path, não da chamada. Descritores inline espalhados pelos métodos podem divergir sem que nada acuse. Mitigação barata na implementação: um `const` de descritores por módulo de resource, colocado junto do path — não literal solto em cada método.
+6. **Deriva entre descritor e endpoint.** Não é uma lacuna de medição — é orientação de
+   implementação (um `const` de descritores por módulo de resource, colocado junto do path).
+   Nenhuma sonda se aplica; segue como está, a ser seguido na implementação.
 
-Nenhum item acima bloqueia o desenho — todos bloqueiam a **implementação** do trecho correspondente.
+Itens 1 e 5 (para `componentes`/`alternativos`/`contextualizado`) e o restante do item 2
+(`projetos`, `financeiros/despesas`, base de `financeiros/contas-bancaria`) continuam
+bloqueando a **implementação** do trecho correspondente — a Task 3 trata essas células como
+bloqueio explícito, não como suposição. Os demais itens estão liberados para codificar.
 
 ## 11. Impacto em consumidores
 
