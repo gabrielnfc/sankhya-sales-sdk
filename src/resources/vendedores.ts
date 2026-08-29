@@ -8,6 +8,7 @@ const DESCRITOR_VENDEDORES: ResourceDescriptor = {
   resourceKey: 'vendedores',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/vendedores',
 };
 
 /** Operacoes de vendedores no Sankhya ERP. Acesse via `sankhya.vendedores`. */

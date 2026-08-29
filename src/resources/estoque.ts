@@ -13,18 +13,21 @@ const DESCRITOR_POR_PRODUTO: ResourceDescriptor = {
   resourceKey: 'estoque',
   contract: 'rest',
   expectPagination: false,
+  endpoint: '/estoque/produtos/{id}',
 };
 
 const DESCRITOR_ESTOQUE: ResourceDescriptor = {
   resourceKey: 'estoque',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/estoque/produtos',
 };
 
 const DESCRITOR_LOCAIS: ResourceDescriptor = {
   resourceKey: 'locais',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/estoque/locais',
 };
 
 /** Operacoes de estoque no Sankhya ERP. Acesse via `sankhya.estoque`. */

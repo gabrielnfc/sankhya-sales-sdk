@@ -35,6 +35,7 @@ const DESCRITOR_CONSULTAR: ResourceDescriptor = {
   resourceKey: 'pedido',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/vendas/pedidos',
 };
 
 /** Operacoes de pedidos de venda no Sankhya ERP. Acesse via `sankhya.pedidos`. */

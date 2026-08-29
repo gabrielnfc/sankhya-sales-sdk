@@ -1,3 +1,5 @@
+import type { DegradedInfo } from './pagination-contracts.js';
+
 /** Parametros de paginacao para listagens. */
 export interface PaginationParams {
   /** Numero da pagina (base 0). */
@@ -27,6 +29,11 @@ export interface PaginatedResult<T> {
    * vem com `degraded: false`.
    */
   degraded?: boolean | undefined;
+  /**
+   * Diagnostico da degradacao, quando `degraded` e `true`. Aditivo e
+   * opcional — nao presente antes da 1.5.0.
+   */
+  degradedInfo?: DegradedInfo | undefined;
 }
 
 /**

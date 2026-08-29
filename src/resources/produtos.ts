@@ -20,6 +20,7 @@ const DESCRITOR_PRODUTOS: ResourceDescriptor = {
   resourceKey: 'produtos',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/produtos',
 };
 
 const DESCRITOR_COMPONENTES: ResourceDescriptor = {
@@ -28,6 +29,7 @@ const DESCRITOR_COMPONENTES: ResourceDescriptor = {
   resourceKey: null,
   contract: 'rest',
   expectPagination: false,
+  endpoint: '/produtos/{id}/componentes',
 };
 
 const DESCRITOR_ALTERNATIVOS: ResourceDescriptor = {
@@ -36,24 +38,28 @@ const DESCRITOR_ALTERNATIVOS: ResourceDescriptor = {
   resourceKey: null,
   contract: 'rest',
   expectPagination: false,
+  endpoint: '/produtos/{id}/alternativos',
 };
 
 const DESCRITOR_VOLUMES_PRODUTO: ResourceDescriptor = {
   resourceKey: 'volumesProduto',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/produtos/{id}/volumes',
 };
 
 const DESCRITOR_VOLUMES: ResourceDescriptor = {
   resourceKey: 'volumes',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/volumes-produtos',
 };
 
 const DESCRITOR_GRUPOS: ResourceDescriptor = {
   resourceKey: 'grupos',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/grupos-produto',
 };
 
 /** Operacoes de produtos no Sankhya ERP. Acesse via `sankhya.produtos`. */

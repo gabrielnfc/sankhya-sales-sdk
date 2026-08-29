@@ -13,18 +13,21 @@ const DESCRITOR_POR_TABELA: ResourceDescriptor = {
   resourceKey: 'produtos',
   contract: 'precos',
   expectPagination: false,
+  endpoint: '/precos/tabela/{id}',
 };
 
 const DESCRITOR_POR_PRODUTO: ResourceDescriptor = {
   resourceKey: 'produtos',
   contract: 'precos',
   expectPagination: false,
+  endpoint: '/precos/produto/{id}',
 };
 
 const DESCRITOR_POR_PRODUTO_E_TABELA: ResourceDescriptor = {
   resourceKey: 'produtos',
   contract: 'precos',
   expectPagination: false,
+  endpoint: '/precos/produto/{id}/tabela/{id}',
 };
 
 const DESCRITOR_CONTEXTUALIZADO: ResourceDescriptor = {
@@ -33,6 +36,7 @@ const DESCRITOR_CONTEXTUALIZADO: ResourceDescriptor = {
   resourceKey: null,
   contract: 'precos',
   expectPagination: false,
+  endpoint: '/precos/contextualizado',
 };
 
 /** Operacoes de precos e tabelas de preco no Sankhya ERP. Acesse via `sankhya.precos`. */

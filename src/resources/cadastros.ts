@@ -24,36 +24,42 @@ const DESCRITOR_TIPOS_OPERACAO: ResourceDescriptor = {
   resourceKey: 'data',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/tipos-operacao',
 };
 
 const DESCRITOR_NATUREZAS: ResourceDescriptor = {
   resourceKey: 'data',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/naturezas',
 };
 
 const DESCRITOR_PROJETOS: ResourceDescriptor = {
   resourceKey: 'data',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/projetos',
 };
 
 const DESCRITOR_CENTROS_RESULTADO: ResourceDescriptor = {
   resourceKey: 'data',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/centros-resultado',
 };
 
 const DESCRITOR_EMPRESAS: ResourceDescriptor = {
   resourceKey: 'empresas',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/empresas',
 };
 
 const DESCRITOR_USUARIOS: ResourceDescriptor = {
   resourceKey: 'usuarios',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/usuarios',
 };
 
 /**

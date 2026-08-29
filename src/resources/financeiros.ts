@@ -37,30 +37,35 @@ const DESCRITOR_TIPOS_PAGAMENTO: ResourceDescriptor = {
   resourceKey: 'data',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/financeiros/tipos-pagamento',
 };
 
 const DESCRITOR_RECEITAS: ResourceDescriptor = {
   resourceKey: 'financeiros',
   contract: 'financeiro',
   expectPagination: true,
+  endpoint: '/financeiros/receitas',
 };
 
 const DESCRITOR_DESPESAS: ResourceDescriptor = {
   resourceKey: 'financeiros',
   contract: 'financeiro',
   expectPagination: true,
+  endpoint: '/financeiros/despesas',
 };
 
 const DESCRITOR_MOEDAS: ResourceDescriptor = {
   resourceKey: 'data',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/financeiros/moedas',
 };
 
 const DESCRITOR_CONTAS_BANCARIAS: ResourceDescriptor = {
   resourceKey: 'data',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/financeiros/contas-bancaria',
 };
 
 /**

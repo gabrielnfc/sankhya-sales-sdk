@@ -53,6 +53,12 @@ export interface ResourceDescriptor {
   contract: PaginationContract;
   /** `true` se o endpoint devolve metadado de paginacao. */
   expectPagination: boolean;
+  /**
+   * Path do endpoint (ex.: `'/produtos'`, `'/financeiros/receitas'`), para o
+   * descritor poder se identificar num diagnostico de degradacao. Path
+   * dinamico usa a forma com placeholder literal (ex.: `'/produtos/{id}/volumes'`).
+   */
+  endpoint?: string | undefined;
 }
 
 /** Diagnostico de uma resposta degradada. */
@@ -68,4 +74,6 @@ export interface DegradedInfo {
   receivedKeys?: string[] | undefined;
   /** Pagina em que ocorreu, quando aplicavel. */
   page?: number | undefined;
+  /** Path do endpoint que gerou a resposta degradada, quando conhecido. */
+  endpoint?: string | undefined;
 }

@@ -1,14 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createPaginator } from '../../src/core/pagination.js';
 import type { PaginatedResult } from '../../src/types/common.js';
+import type { DegradedInfo } from '../../src/types/pagination-contracts.js';
 
 function pagina<T>(
   data: T[],
   hasMore: boolean,
   echo: number,
   degraded = false,
+  degradedInfo?: DegradedInfo,
 ): PaginatedResult<T> {
-  return { data, page: echo, hasMore, totalRecords: undefined, degraded };
+  return { data, page: echo, hasMore, totalRecords: undefined, degraded, degradedInfo };
 }
 
 describe('createPaginator', () => {
@@ -78,6 +80,29 @@ describe('createPaginator', () => {
 
     expect(onDegraded).toHaveBeenCalledTimes(2);
     expect(onDegraded.mock.calls[0]?.[0]).toMatchObject({ page: 0 });
+  });
+
+  it('onDegraded recebe endpoint e reason reais do degradedInfo, nao o texto generico', async () => {
+    const onDegraded = vi.fn();
+    const degradedInfo: DegradedInfo = {
+      reason: 'chave "produtos" ausente na resposta',
+      expectedKey: 'produtos',
+      receivedKeys: ['outraCoisa'],
+      endpoint: '/produtos',
+    };
+    const fetchFn = async (page: number) => pagina([{ id: page }], false, page, true, degradedInfo);
+
+    for await (const _ of createPaginator(fetchFn, 0, { onDegraded })) {
+      // consumir
+    }
+
+    expect(onDegraded).toHaveBeenCalledTimes(1);
+    expect(onDegraded.mock.calls[0]?.[0]).toMatchObject({
+      reason: 'chave "produtos" ausente na resposta',
+      endpoint: '/produtos',
+      page: 0,
+    });
+    expect(onDegraded.mock.calls[0]?.[0].reason).not.toBe('pagina degradada durante varredura');
   });
 
   it('avisa uma unica vez ao ultrapassar 100 paginas', async () => {

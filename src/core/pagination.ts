@@ -111,7 +111,12 @@ export function extractRestData<T>(
   return {
     data,
     degraded: true,
-    degradedInfo: { expectedKey: descriptor.resourceKey, receivedKeys, reason },
+    degradedInfo: {
+      expectedKey: descriptor.resourceKey,
+      receivedKeys,
+      reason,
+      endpoint: descriptor.endpoint,
+    },
   };
 }
 
@@ -172,12 +177,13 @@ export function normalizePagination<T>(
       hasMore: ehVerdadeiro(response.temMaisRegistros),
       totalRecords: paraNumero(response.numeroRegistros) ?? data.length,
       degraded,
+      degradedInfo,
     };
   }
 
   const pagination = response.pagination as Record<string, unknown> | undefined;
   if (!pagination) {
-    return { data, page: 0, hasMore: false, totalRecords: data.length, degraded };
+    return { data, page: 0, hasMore: false, totalRecords: data.length, degraded, degradedInfo };
   }
 
   return {
@@ -186,6 +192,7 @@ export function normalizePagination<T>(
     hasMore: ehVerdadeiro(pagination.hasMore),
     totalRecords: paraNumero(pagination.total),
     degraded,
+    degradedInfo,
   };
 }
 
@@ -262,7 +269,13 @@ export async function* createPaginator<T>(
     const result = await fetchFn(currentPage);
 
     if (result.degraded) {
-      options?.onDegraded?.({ reason: 'pagina degradada durante varredura', page: currentPage });
+      options?.onDegraded?.({
+        reason: result.degradedInfo?.reason ?? 'pagina degradada durante varredura',
+        expectedKey: result.degradedInfo?.expectedKey,
+        receivedKeys: result.degradedInfo?.receivedKeys,
+        endpoint: result.degradedInfo?.endpoint,
+        page: currentPage,
+      });
     }
 
     for (const item of result.data) {

@@ -21,6 +21,7 @@ const DESCRITOR_CLIENTES: ResourceDescriptor = {
   resourceKey: 'clientes',
   contract: 'rest',
   expectPagination: true,
+  endpoint: '/parceiros/clientes',
 };
 
 /** Mapeia `tipo` legado (`F`/`J`) para o canonico da API REST (`PF`/`PJ`). */
