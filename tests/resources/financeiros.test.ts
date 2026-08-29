@@ -388,5 +388,43 @@ describe('FinanceirosResource', () => {
       expect(items[0]).toEqual({ id: 1 });
       expect(items[1]).toEqual({ id: 2 });
     });
+
+    it('pede a pagina 1 primeiro, nao a 0 (contrato financeiro e 1-based)', async () => {
+      const http = createMockHttp();
+      const fin = new FinanceirosResource(http);
+      const paginasPedidas: string[] = [];
+
+      http.restGet.mockImplementation(async (_path: string, query?: Record<string, string>) => {
+        const page = query?.page ?? '0';
+        paginasPedidas.push(page);
+        return makeRestResponse('financeiros', [{ id: 1 }], false);
+      });
+
+      for await (const _item of fin.listarTodasReceitas()) {
+        // consumir
+      }
+
+      expect(paginasPedidas[0]).toBe('1');
+    });
+  });
+
+  describe('listarTodasDespesas()', () => {
+    it('pede a pagina 1 primeiro, nao a 0 (contrato financeiro e 1-based)', async () => {
+      const http = createMockHttp();
+      const fin = new FinanceirosResource(http);
+      const paginasPedidas: string[] = [];
+
+      http.restGet.mockImplementation(async (_path: string, query?: Record<string, string>) => {
+        const page = query?.page ?? '0';
+        paginasPedidas.push(page);
+        return makeRestResponse('financeiros', [{ id: 1 }], false);
+      });
+
+      for await (const _item of fin.listarTodasDespesas()) {
+        // consumir
+      }
+
+      expect(paginasPedidas[0]).toBe('1');
+    });
   });
 });

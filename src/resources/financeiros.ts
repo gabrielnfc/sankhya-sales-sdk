@@ -494,7 +494,12 @@ export class FinanceirosResource {
     },
   ): AsyncGenerator<Receita> {
     const { onDegraded, ...filtros } = filtro ?? {};
-    return createPaginator((page) => this.listarReceitas({ ...filtros, page }), 0, {
+    // startPage 1, nao 0: medido contra o sandbox em 29/08/2026 —
+    // /financeiros/receitas?page=0 e ?page=1 devolvem o MESMO conteudo
+    // (echo pagination.page=1 nos dois casos); ?page=2 ja diverge. Contrato
+    // 1-based de verdade. Comecar em 0 fazia a varredura emitir os 50
+    // primeiros registros duas vezes e gastar uma requisicao a mais.
+    return createPaginator((page) => this.listarReceitas({ ...filtros, page }), 1, {
       onDegraded,
       logger: this.http.getLogger(),
     });
@@ -531,7 +536,10 @@ export class FinanceirosResource {
     onDegraded?: ((info: DegradedInfo) => void) | undefined;
   }): AsyncGenerator<Despesa> {
     const { onDegraded } = params ?? {};
-    return createPaginator((page) => this.listarDespesas({ page }), 0, {
+    // startPage 1, nao 0: mesma medicao de listarTodasReceitas — o
+    // contrato financeiro e 1-based e as paginas 0/1 devolvem o mesmo
+    // conteudo (ver comentario em listarTodasReceitas acima).
+    return createPaginator((page) => this.listarDespesas({ page }), 1, {
       onDegraded,
       logger: this.http.getLogger(),
     });
