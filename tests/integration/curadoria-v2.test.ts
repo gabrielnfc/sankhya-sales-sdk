@@ -95,6 +95,20 @@ describe.skipIf(!has)('Curadoria v2 — Validação com novos formatos', () => {
       name: 'Empresas',
       descritor: { resourceKey: 'empresas', contract: 'rest', expectPagination: true },
     },
+    {
+      // Contrato financeiro e 1-based (medido). page=0 funciona e devolve a
+      // pagina 1, mas pedimos '1' explicitamente para nao depender disso.
+      path: '/financeiros/receitas',
+      name: 'Financeiros Receitas',
+      params: { page: '1' },
+      descritor: { resourceKey: 'financeiros', contract: 'financeiro', expectPagination: true },
+    },
+    {
+      path: '/financeiros/despesas',
+      name: 'Financeiros Despesas',
+      params: { page: '1' },
+      descritor: { resourceKey: 'financeiros', contract: 'financeiro', expectPagination: true },
+    },
   ];
 
   for (const { path, name, params, descritor } of restEndpoints) {
@@ -112,6 +126,11 @@ describe.skipIf(!has)('Curadoria v2 — Validação com novos formatos', () => {
       // Deve ter encontrado dados (array) — mesmo /projetos com 1 registro, que
       // chega como objeto e cai no fallback de primeiro array (=> []) nesta task.
       expect(Array.isArray(data)).toBe(true);
+
+      // A chave declarada no descritor precisa bater com a resposta real —
+      // sem isto, uma chave errada produz data: [] (que passa no
+      // Array.isArray acima) sem que o teste perceba o defeito.
+      expect(degraded).toBe(false);
 
       // normalizePagination deve funcionar
       const paginated = normalizePagination(data, rawResponse, descritor, degraded);
