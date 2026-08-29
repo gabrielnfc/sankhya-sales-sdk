@@ -52,7 +52,8 @@ describe('CadastrosResource', () => {
     it('calls restGet with /tipos-operacao and default page', async () => {
       const http = createMockHttp();
       const cad = new CadastrosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('tiposOperacao', [{ id: 1 }]));
+      // Chave real medida (spec §3.2 / Task 3): 'data', nao 'tiposOperacao'.
+      http.restGet.mockResolvedValue(makeRestResponse('data', [{ id: 1 }]));
 
       const result = await cad.listarTiposOperacao();
 
@@ -63,7 +64,7 @@ describe('CadastrosResource', () => {
     it('passes tipoMovimento param as string', async () => {
       const http = createMockHttp();
       const cad = new CadastrosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('tiposOperacao', []));
+      http.restGet.mockResolvedValue(makeRestResponse('data', []));
 
       await cad.listarTiposOperacao({ tipoMovimento: 3 });
 
@@ -94,7 +95,8 @@ describe('CadastrosResource', () => {
     it('calls restGet with /naturezas and default page', async () => {
       const http = createMockHttp();
       const cad = new CadastrosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('naturezas', [{ id: 1 }]));
+      // Chave real medida (spec §3.2 / Task 3): 'data', nao 'naturezas'.
+      http.restGet.mockResolvedValue(makeRestResponse('data', [{ id: 1 }]));
 
       const result = await cad.listarNaturezas();
 
@@ -121,7 +123,9 @@ describe('CadastrosResource', () => {
     it('calls restGet with /projetos and default page', async () => {
       const http = createMockHttp();
       const cad = new CadastrosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('projetos', [{ id: 1 }]));
+      // Chave real medida (spec §3.2 / Task 3): 'data' — a chave generica
+      // confirmada por medicao direta em /projetos (design §3.1).
+      http.restGet.mockResolvedValue(makeRestResponse('data', [{ id: 1 }]));
 
       const result = await cad.listarProjetos();
 
@@ -148,7 +152,8 @@ describe('CadastrosResource', () => {
     it('calls restGet with /centros-resultado and default page', async () => {
       const http = createMockHttp();
       const cad = new CadastrosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('centrosResultado', [{ id: 1 }]));
+      // Chave real medida (spec §3.2 / Task 3): 'data', nao 'centrosResultado'.
+      http.restGet.mockResolvedValue(makeRestResponse('data', [{ id: 1 }]));
 
       const result = await cad.listarCentrosResultado();
 

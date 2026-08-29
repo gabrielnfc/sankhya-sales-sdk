@@ -76,8 +76,12 @@ describe('ProdutosResource', () => {
 
   it('volumes() calls restGet with correct path for specific product', async () => {
     const http = createMockHttp({
+      // Chave real medida (medicoes-complementares §Lacuna 1/5): 'volumesProduto',
+      // nao 'volumes' — esse nome e o de listarVolumes()/'/volumes-produtos', um
+      // endpoint diferente. O endpoint tambem devolve pagination real (Task 8b).
       restGet: vi.fn().mockResolvedValue({
-        volumes: [{ codigoVolume: 'UN' }],
+        volumesProduto: [{ codigoVolume: 'UN' }],
+        pagination: { page: '0', total: '1', hasMore: 'false', offset: '0' },
       }),
     });
     const resource = new ProdutosResource(http);

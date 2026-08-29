@@ -32,7 +32,8 @@ describe('FinanceirosResource', () => {
     it('calls restGet with /financeiros/tipos-pagamento and default page', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('tiposPagamento', [{ id: 1 }]));
+      // Chave real medida (spec §3.2 / Task 3): 'data', nao 'tiposPagamento'.
+      http.restGet.mockResolvedValue(makeRestResponse('data', [{ id: 1 }]));
 
       const result = await fin.listarTiposPagamento();
 
@@ -43,7 +44,7 @@ describe('FinanceirosResource', () => {
     it('passes subTipoPagamento param', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('tiposPagamento', []));
+      http.restGet.mockResolvedValue(makeRestResponse('data', []));
 
       await fin.listarTiposPagamento({ subTipoPagamento: 5, page: 1 });
 
@@ -73,7 +74,8 @@ describe('FinanceirosResource', () => {
     it('calls restGet with /financeiros/receitas and default page', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('receitas', [{ id: 1 }]));
+      // Chave real medida (spec §3.2 / Task 3): 'financeiros', nao 'receitas'.
+      http.restGet.mockResolvedValue(makeRestResponse('financeiros', [{ id: 1 }]));
 
       const result = await fin.listarReceitas();
 
@@ -84,7 +86,7 @@ describe('FinanceirosResource', () => {
     it('passes all optional filter params', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('receitas', []));
+      http.restGet.mockResolvedValue(makeRestResponse('financeiros', []));
 
       await fin.listarReceitas({
         page: 2,
@@ -233,7 +235,8 @@ describe('FinanceirosResource', () => {
     it('calls restGet with /financeiros/despesas and default page', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('despesas', [{ id: 1 }]));
+      // Chave real medida (spec §3.2 / Task 3): 'financeiros', nao 'despesas'.
+      http.restGet.mockResolvedValue(makeRestResponse('financeiros', [{ id: 1 }]));
 
       const result = await fin.listarDespesas();
 
@@ -310,7 +313,8 @@ describe('FinanceirosResource', () => {
     it('calls restGet with /financeiros/moedas and default page', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('moedas', [{ id: 1 }]));
+      // Chave real medida (spec §3.2 / Task 3): 'data', nao 'moedas'.
+      http.restGet.mockResolvedValue(makeRestResponse('data', [{ id: 1 }]));
 
       const result = await fin.listarMoedas();
 
@@ -338,7 +342,9 @@ describe('FinanceirosResource', () => {
     it('calls restGet and returns array directly', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('contasBancarias', [{ id: 1 }, { id: 2 }]));
+      // Chave real medida (medicoes-complementares §Lacuna 1/5): 'data', nao
+      // 'contasBancarias' — o endpoint tambem devolve pagination real (Task 8b).
+      http.restGet.mockResolvedValue(makeRestResponse('data', [{ id: 1 }, { id: 2 }]));
 
       const result = await fin.listarContasBancarias();
 
@@ -368,9 +374,10 @@ describe('FinanceirosResource', () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
 
+      // Chave real medida (spec §3.2 / Task 3): 'financeiros', nao 'receitas'.
       http.restGet
-        .mockResolvedValueOnce(makeRestResponse('receitas', [{ id: 1 }], true))
-        .mockResolvedValueOnce(makeRestResponse('receitas', [{ id: 2 }], false));
+        .mockResolvedValueOnce(makeRestResponse('financeiros', [{ id: 1 }], true))
+        .mockResolvedValueOnce(makeRestResponse('financeiros', [{ id: 2 }], false));
 
       const items = [];
       for await (const item of fin.listarTodasReceitas()) {

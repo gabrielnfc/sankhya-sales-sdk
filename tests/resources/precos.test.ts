@@ -4,10 +4,14 @@ import { PrecosResource } from '../../src/resources/precos.js';
 
 function createMockHttp(overrides?: Partial<HttpClient>) {
   return {
+    // Chave real medida (spec §3.2 / Task 3): 'produtos', nao 'precos' — usada
+    // por porTabela/porProduto/porProdutoETabela (contrato 'precos').
     restGet: vi.fn().mockResolvedValue({
-      precos: [{ codigoProduto: 1, preco: 99.9 }],
+      produtos: [{ codigoProduto: 1, preco: 99.9 }],
       pagination: { page: '0', total: '1', hasMore: 'false', offset: '0' },
     }),
+    // contextualizado() usa resourceKey: null (endpoint nao mensuravel, ver §10
+    // do design) — mantem o fallback de primeiro array, chave irrelevante aqui.
     restPost: vi.fn().mockResolvedValue({
       precos: [{ codigoProduto: 1, preco: 88.5 }],
     }),
