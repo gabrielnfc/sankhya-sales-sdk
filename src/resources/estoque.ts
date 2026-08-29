@@ -47,7 +47,14 @@ export class EstoqueResource {
     const raw = await this.http.restGet<Record<string, unknown>>(
       `/estoque/produtos/${codigoProduto}`,
     );
-    const { data } = extractRestData<Estoque>(raw, DESCRITOR_POR_PRODUTO);
+    const { data, degraded, degradedInfo } = extractRestData<Estoque>(raw, DESCRITOR_POR_PRODUTO);
+    if (degraded) {
+      this.http
+        .getLogger()
+        .error(
+          `Resposta degradada em /estoque/produtos/${codigoProduto}: ${degradedInfo?.reason ?? 'formato inesperado'}`,
+        );
+    }
     return data;
   }
 
