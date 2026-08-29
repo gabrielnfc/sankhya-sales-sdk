@@ -54,10 +54,12 @@ describe('resultado unico via modifiedSince', () => {
     }
   }, 60_000);
 
-  it('devolve o registro unico em vez de lista vazia', async () => {
+  it('devolve o registro unico em vez de lista vazia', async (ctx) => {
     if (janelaDeUmRegistro === null) {
-      // Nunca aprovar por omissao: diga em voz alta que nao foi verificado.
+      // Nunca aprovar por omissao: skip() de verdade, para o runner reportar
+      // "skipped" (nao "passed") em qualquer resumo/CI/--reporter=json.
       console.warn('PULADO: sandbox nao tem janela com exatamente 1 alteracao');
+      ctx.skip();
       return;
     }
 
