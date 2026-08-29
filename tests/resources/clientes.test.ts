@@ -17,12 +17,12 @@ function createMockHttp(overrides?: Partial<HttpClient>) {
 }
 
 describe('ClientesResource', () => {
-  it('listar() calls restGet with /parceiros/clientes and default page 1', async () => {
+  it('listar() calls restGet with /parceiros/clientes and default page 0', async () => {
     const http = createMockHttp();
     const resource = new ClientesResource(http);
     const result = await resource.listar();
 
-    expect(http.restGet).toHaveBeenCalledWith('/parceiros/clientes', { page: '1' });
+    expect(http.restGet).toHaveBeenCalledWith('/parceiros/clientes', { page: '0' });
     expect(result.data).toHaveLength(1);
     expect(result.hasMore).toBe(false);
   });
@@ -161,7 +161,7 @@ describe('ClientesResource', () => {
     }
 
     expect(http.restGet).toHaveBeenCalledWith('/parceiros/clientes', {
-      page: '1',
+      page: '0',
       dataHoraAlteracao: '2024-06-01',
     });
   });

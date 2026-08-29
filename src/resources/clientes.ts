@@ -75,7 +75,7 @@ export class ClientesResource {
    * ```
    */
   async listar(params?: ListarClientesParams): Promise<PaginatedResult<Cliente>> {
-    const query: Record<string, string> = { page: String(params?.page ?? 1) };
+    const query: Record<string, string> = { page: String(params?.page ?? 0) };
     if (params?.dataHoraAlteracao) query.dataHoraAlteracao = params.dataHoraAlteracao;
 
     const raw = await this.http.restGet<Record<string, unknown>>('/parceiros/clientes', query);
@@ -196,6 +196,6 @@ export class ClientesResource {
    * ```
    */
   listarTodos(params?: Omit<ListarClientesParams, 'page'>): AsyncGenerator<Cliente> {
-    return createPaginator((page) => this.listar({ ...params, page }), 1);
+    return createPaginator((page) => this.listar({ ...params, page }));
   }
 }

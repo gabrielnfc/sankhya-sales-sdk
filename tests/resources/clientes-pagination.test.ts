@@ -43,7 +43,7 @@ function createPaginatedHttp() {
 }
 
 describe('ClientesResource — base de pagina', () => {
-  it.fails('listar() sem argumentos deve pedir a primeira pagina (0)', async () => {
+  it('listar() sem argumentos deve pedir a primeira pagina (0)', async () => {
     const { http } = createPaginatedHttp();
     const resource = new ClientesResource(http);
 
@@ -52,7 +52,7 @@ describe('ClientesResource — base de pagina', () => {
     expect(http.restGet).toHaveBeenCalledWith('/parceiros/clientes', { page: '0' });
   });
 
-  it.fails('listarTodos() deve emitir o primeiro item da pagina 0', async () => {
+  it('listarTodos() deve emitir o primeiro item da pagina 0', async () => {
     const { http, paginasPedidas } = createPaginatedHttp();
     const resource = new ClientesResource(http);
 
@@ -65,7 +65,7 @@ describe('ClientesResource — base de pagina', () => {
     expect(emitidos[0]).toBe('1000000000');
   });
 
-  it.fails('listarTodos() deve emitir todos os clientes das tres paginas', async () => {
+  it('listarTodos() deve emitir todos os clientes das tres paginas', async () => {
     const { http } = createPaginatedHttp();
     const resource = new ClientesResource(http);
 
