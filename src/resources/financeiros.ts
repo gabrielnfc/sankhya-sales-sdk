@@ -5,7 +5,7 @@ import {
   createPaginator,
   extractRestData,
   extractRestRecordOrThrow,
-  normalizeRestPagination,
+  normalizePagination,
 } from '../core/pagination.js';
 import { safeParseNumber } from '../core/parse-utils.js';
 import {
@@ -31,6 +31,42 @@ import type {
   RegistrarReceitaInput,
   TipoPagamento,
 } from '../types/financeiros.js';
+import type { DegradedInfo, ResourceDescriptor } from '../types/pagination-contracts.js';
+
+const DESCRITOR_TIPOS_PAGAMENTO: ResourceDescriptor = {
+  resourceKey: 'data',
+  contract: 'rest',
+  expectPagination: true,
+  endpoint: '/financeiros/tipos-pagamento',
+};
+
+const DESCRITOR_RECEITAS: ResourceDescriptor = {
+  resourceKey: 'financeiros',
+  contract: 'financeiro',
+  expectPagination: true,
+  endpoint: '/financeiros/receitas',
+};
+
+const DESCRITOR_DESPESAS: ResourceDescriptor = {
+  resourceKey: 'financeiros',
+  contract: 'financeiro',
+  expectPagination: true,
+  endpoint: '/financeiros/despesas',
+};
+
+const DESCRITOR_MOEDAS: ResourceDescriptor = {
+  resourceKey: 'data',
+  contract: 'rest',
+  expectPagination: true,
+  endpoint: '/financeiros/moedas',
+};
+
+const DESCRITOR_CONTAS_BANCARIAS: ResourceDescriptor = {
+  resourceKey: 'data',
+  contract: 'rest',
+  expectPagination: true,
+  endpoint: '/financeiros/contas-bancaria',
+};
 
 /**
  * Operacoes financeiras no Sankhya ERP (receitas, despesas, pagamentos).
@@ -101,8 +137,18 @@ export class FinanceirosResource {
       '/financeiros/tipos-pagamento',
       query,
     );
-    const { data, pagination } = extractRestData<TipoPagamento>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<TipoPagamento>(
+      raw,
+      DESCRITOR_TIPOS_PAGAMENTO,
+    );
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_TIPOS_PAGAMENTO,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -138,6 +184,9 @@ export class FinanceirosResource {
    *   codigoEmpresa: 1,
    * });
    * ```
+   * @remarks
+   * `totalRecords` deste endpoint E censo real (medido: 519004 receitas).
+   * E a excecao — nos demais endpoints o campo conta apenas a pagina.
    */
   async listarReceitas(filtro?: ReceitasFiltro): Promise<PaginatedResult<Receita>> {
     const query: Record<string, string> = { page: String(filtro?.page ?? 0) };
@@ -150,8 +199,15 @@ export class FinanceirosResource {
     if (filtro?.dataNegociacaoFinal) query.dataNegociacaoFinal = filtro.dataNegociacaoFinal;
 
     const raw = await this.http.restGet<Record<string, unknown>>('/financeiros/receitas', query);
-    const { data, pagination } = extractRestData<Receita>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Receita>(raw, DESCRITOR_RECEITAS);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_RECEITAS,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -240,12 +296,22 @@ export class FinanceirosResource {
    * @returns Resultado paginado com despesas.
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
+   * @remarks
+   * `totalRecords` deste endpoint E censo real (medido: 166417 despesas).
+   * E a excecao — nos demais endpoints o campo conta apenas a pagina.
    */
   async listarDespesas(params?: { page?: number }): Promise<PaginatedResult<Despesa>> {
     const query: Record<string, string> = { page: String(params?.page ?? 0) };
     const raw = await this.http.restGet<Record<string, unknown>>('/financeiros/despesas', query);
-    const { data, pagination } = extractRestData<Despesa>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Despesa>(raw, DESCRITOR_DESPESAS);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_DESPESAS,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -338,8 +404,15 @@ export class FinanceirosResource {
   async listarMoedas(params?: { page?: number }): Promise<PaginatedResult<Moeda>> {
     const query: Record<string, string> = { page: String(params?.page ?? 0) };
     const raw = await this.http.restGet<Record<string, unknown>>('/financeiros/moedas', query);
-    const { data, pagination } = extractRestData<Moeda>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Moeda>(raw, DESCRITOR_MOEDAS);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_MOEDAS,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -365,11 +438,36 @@ export class FinanceirosResource {
    * @returns Array de contas bancarias.
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
+   * @remarks
+   * Este endpoint devolve bloco `pagination` real, que versoes anteriores
+   * descartavam — o metodo entregava so a primeira pagina. Agora percorre
+   * todas as paginas internamente, entao pode fazer N requisicoes e falhar
+   * no meio de uma varredura longa.
    */
   async listarContasBancarias(): Promise<ContaBancaria[]> {
-    const raw = await this.http.restGet<Record<string, unknown>>('/financeiros/contas-bancaria');
-    const { data } = extractRestData<ContaBancaria>(raw);
-    return data;
+    const paginar = async (page: number) => {
+      const raw = await this.http.restGet<Record<string, unknown>>('/financeiros/contas-bancaria', {
+        page: String(page),
+      });
+      const { data, degraded, degradedInfo } = extractRestData<ContaBancaria>(
+        raw,
+        DESCRITOR_CONTAS_BANCARIAS,
+      );
+      return normalizePagination(
+        data,
+        raw,
+        DESCRITOR_CONTAS_BANCARIAS,
+        degraded,
+        this.http.getLogger(),
+        degradedInfo,
+      );
+    };
+
+    const todas: ContaBancaria[] = [];
+    for await (const conta of createPaginator(paginar, 0, { logger: this.http.getLogger() })) {
+      todas.push(conta);
+    }
+    return todas;
   }
 
   /**
@@ -400,8 +498,21 @@ export class FinanceirosResource {
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  listarTodasReceitas(filtro?: Omit<ReceitasFiltro, 'page'>): AsyncGenerator<Receita> {
-    return createPaginator((page) => this.listarReceitas({ ...filtro, page }));
+  listarTodasReceitas(
+    filtro?: Omit<ReceitasFiltro, 'page'> & {
+      onDegraded?: ((info: DegradedInfo) => void) | undefined;
+    },
+  ): AsyncGenerator<Receita> {
+    const { onDegraded, ...filtros } = filtro ?? {};
+    // startPage 1, nao 0: medido contra o sandbox em 29/08/2026 —
+    // /financeiros/receitas?page=0 e ?page=1 devolvem o MESMO conteudo
+    // (echo pagination.page=1 nos dois casos); ?page=2 ja diverge. Contrato
+    // 1-based de verdade. Comecar em 0 fazia a varredura emitir os 50
+    // primeiros registros duas vezes e gastar uma requisicao a mais.
+    return createPaginator((page) => this.listarReceitas({ ...filtros, page }), 1, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 
   /**
@@ -413,9 +524,15 @@ export class FinanceirosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   listarTodosTiposPagamento(
-    params?: Omit<{ page?: number; subTipoPagamento?: number }, 'page'>,
+    params?: Omit<{ page?: number; subTipoPagamento?: number }, 'page'> & {
+      onDegraded?: ((info: DegradedInfo) => void) | undefined;
+    },
   ): AsyncGenerator<TipoPagamento> {
-    return createPaginator((page) => this.listarTiposPagamento({ ...params, page }));
+    const { onDegraded, ...filtros } = params ?? {};
+    return createPaginator((page) => this.listarTiposPagamento({ ...filtros, page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 
   /**
@@ -425,8 +542,17 @@ export class FinanceirosResource {
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  listarTodasDespesas(): AsyncGenerator<Despesa> {
-    return createPaginator((page) => this.listarDespesas({ page }));
+  listarTodasDespesas(params?: {
+    onDegraded?: ((info: DegradedInfo) => void) | undefined;
+  }): AsyncGenerator<Despesa> {
+    const { onDegraded } = params ?? {};
+    // startPage 1, nao 0: mesma medicao de listarTodasReceitas — o
+    // contrato financeiro e 1-based e as paginas 0/1 devolvem o mesmo
+    // conteudo (ver comentario em listarTodasReceitas acima).
+    return createPaginator((page) => this.listarDespesas({ page }), 1, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 
   /**
@@ -436,7 +562,13 @@ export class FinanceirosResource {
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  listarTodasMoedas(): AsyncGenerator<Moeda> {
-    return createPaginator((page) => this.listarMoedas({ page }));
+  listarTodasMoedas(params?: {
+    onDegraded?: ((info: DegradedInfo) => void) | undefined;
+  }): AsyncGenerator<Moeda> {
+    const { onDegraded } = params ?? {};
+    return createPaginator((page) => this.listarMoedas({ page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 }

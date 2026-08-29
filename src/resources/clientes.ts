@@ -1,6 +1,6 @@
 import { SankhyaError } from '../core/errors.js';
 import type { HttpClient } from '../core/http.js';
-import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
+import { createPaginator, extractRestData, normalizePagination } from '../core/pagination.js';
 import { safeParseNumber } from '../core/parse-utils.js';
 import {
   validateAtualizarClienteInput,
@@ -15,6 +15,14 @@ import type {
   ListarClientesParams,
 } from '../types/clientes.js';
 import type { PaginatedResult } from '../types/common.js';
+import type { DegradedInfo, ResourceDescriptor } from '../types/pagination-contracts.js';
+
+const DESCRITOR_CLIENTES: ResourceDescriptor = {
+  resourceKey: 'clientes',
+  contract: 'rest',
+  expectPagination: true,
+  endpoint: '/parceiros/clientes',
+};
 
 /** Mapeia `tipo` legado (`F`/`J`) para o canonico da API REST (`PF`/`PJ`). */
 function normalizeTipoPessoa(tipo: string | undefined): string | undefined {
@@ -68,12 +76,19 @@ export class ClientesResource {
    * ```
    */
   async listar(params?: ListarClientesParams): Promise<PaginatedResult<Cliente>> {
-    const query: Record<string, string> = { page: String(params?.page ?? 1) };
+    const query: Record<string, string> = { page: String(params?.page ?? 0) };
     if (params?.dataHoraAlteracao) query.dataHoraAlteracao = params.dataHoraAlteracao;
 
     const raw = await this.http.restGet<Record<string, unknown>>('/parceiros/clientes', query);
-    const { data, pagination } = extractRestData<Cliente>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Cliente>(raw, DESCRITOR_CLIENTES);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_CLIENTES,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -181,7 +196,15 @@ export class ClientesResource {
    * }
    * ```
    */
-  listarTodos(params?: Omit<ListarClientesParams, 'page'>): AsyncGenerator<Cliente> {
-    return createPaginator((page) => this.listar({ ...params, page }), 1);
+  listarTodos(
+    params?: Omit<ListarClientesParams, 'page'> & {
+      onDegraded?: ((info: DegradedInfo) => void) | undefined;
+    },
+  ): AsyncGenerator<Cliente> {
+    const { onDegraded, ...filtros } = params ?? {};
+    return createPaginator((page) => this.listar({ ...filtros, page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 }

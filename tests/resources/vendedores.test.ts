@@ -11,6 +11,7 @@ function createMockHttp() {
     restPost: vi.fn(),
     restPut: vi.fn(),
     gatewayCall: vi.fn(),
+    getLogger: vi.fn(() => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })),
   } as unknown as HttpClient;
 }
 

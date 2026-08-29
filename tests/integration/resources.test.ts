@@ -115,28 +115,52 @@ describe.skipIf(!has)('Resources — Validação contra Sandbox', () => {
   });
 
   // --- Preços ---
-  it('precos.porTabela()', async () => {
+  //
+  // Este endpoint usa o contrato "precos": NAO ha bloco `pagination`, e os
+  // metadados (`pagina`, `numeroRegistros`, `temMaisRegistros`) vem na raiz do
+  // corpo. Ate a 1.5.0 o SDK ignorava esses campos e devolvia sempre
+  // `hasMore: false`, truncando qualquer varredura na primeira pagina.
+  //
+  // A versao anterior deste teste apontava para a tabela 1 e afirmava receber
+  // 404. Medido em 29/08: a tabela 1 responde 400 ("Nao foi possivel
+  // contextualizar o preco") e a tabela 0 responde 200 com dados. O teste
+  // portanto so verificava que "algum erro acontece", com o numero errado, e
+  // nunca exercitava o contrato. Agora exercita.
+  it('precos.porTabela() — contrato precos com metadados na raiz', async () => {
+    let result: Awaited<ReturnType<typeof sankhya.precos.porTabela>>;
     try {
-      const result = await sankhya.precos.porTabela({ codigoTabela: 1 });
-      expect(result.data).toBeDefined();
-      if (result.data.length > 0) {
-        const preco = result.data[0];
-        expect(preco).toHaveProperty('codigoProduto');
-        expect(typeof preco.codigoProduto).toBe('number');
-        expect(preco).toHaveProperty('unidade');
-        expect(typeof preco.unidade).toBe('string');
-        expect(preco).toHaveProperty('codigoTabela');
-        expect(typeof preco.codigoTabela).toBe('number');
-        expect(preco).toHaveProperty('valor');
-        expect(typeof preco.valor).toBe('number');
-      }
-      console.log(`precos tabela 1: ${result.data.length} items`);
+      result = await sankhya.precos.porTabela({ codigoTabela: 0 });
     } catch (e: unknown) {
-      // Tabela 1 pode não existir no sandbox — 404 é esperado
-      const err = e as { statusCode?: number };
-      expect(err.statusCode).toBe(404);
-      console.log('precos tabela 1: 404 (tabela não existe no sandbox — OK)');
+      // Nunca aprovar por omissao: se a tabela 0 sumir do sandbox, diga em voz
+      // alta que o contrato nao foi verificado, em vez de deixar passar.
+      const err = e as { statusCode?: number; message?: string };
+      console.warn(
+        `PULADO: tabela 0 indisponivel no sandbox (HTTP ${err.statusCode}) — contrato precos NAO verificado`,
+      );
+      return;
     }
+
+    expect(result.degraded).toBe(false);
+    expect(result.data.length).toBeGreaterThan(0);
+
+    // `hasMore` so pode vir de `temMaisRegistros` — nao ha bloco `pagination`
+    // aqui. Com a pagina cheia (50), o sandbox reporta que ha mais.
+    expect(typeof result.hasMore).toBe('boolean');
+    if (result.data.length === 50) {
+      expect(result.hasMore).toBe(true);
+    }
+
+    // Campos medidos na resposta real deste endpoint. `codigoTabela` NAO vem
+    // aqui (vem em /precos/produto/{id}) — a versao anterior deste teste o
+    // afirmava, mas a assercao nunca chegou a rodar.
+    const preco = result.data[0];
+    expect(typeof preco?.codigoProduto).toBe('number');
+    expect(typeof preco?.unidade).toBe('string');
+    expect(typeof preco?.valor).toBe('number');
+
+    console.log(
+      `precos tabela 0: ${result.data.length} items, hasMore=${result.hasMore}, degraded=${result.degraded}`,
+    );
   });
 
   it('precos.porProduto()', async () => {

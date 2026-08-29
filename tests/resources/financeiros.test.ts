@@ -8,11 +8,13 @@ function createMockHttp() {
     restPost: vi.fn(),
     restPut: vi.fn(),
     gatewayCall: vi.fn(),
+    getLogger: vi.fn(() => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })),
   } as unknown as HttpClient & {
     restGet: ReturnType<typeof vi.fn>;
     restPost: ReturnType<typeof vi.fn>;
     restPut: ReturnType<typeof vi.fn>;
     gatewayCall: ReturnType<typeof vi.fn>;
+    getLogger: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -30,7 +32,8 @@ describe('FinanceirosResource', () => {
     it('calls restGet with /financeiros/tipos-pagamento and default page', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('tiposPagamento', [{ id: 1 }]));
+      // Chave real medida (spec §3.2 / Task 3): 'data', nao 'tiposPagamento'.
+      http.restGet.mockResolvedValue(makeRestResponse('data', [{ id: 1 }]));
 
       const result = await fin.listarTiposPagamento();
 
@@ -41,7 +44,7 @@ describe('FinanceirosResource', () => {
     it('passes subTipoPagamento param', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('tiposPagamento', []));
+      http.restGet.mockResolvedValue(makeRestResponse('data', []));
 
       await fin.listarTiposPagamento({ subTipoPagamento: 5, page: 1 });
 
@@ -71,7 +74,8 @@ describe('FinanceirosResource', () => {
     it('calls restGet with /financeiros/receitas and default page', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('receitas', [{ id: 1 }]));
+      // Chave real medida (spec §3.2 / Task 3): 'financeiros', nao 'receitas'.
+      http.restGet.mockResolvedValue(makeRestResponse('financeiros', [{ id: 1 }]));
 
       const result = await fin.listarReceitas();
 
@@ -82,7 +86,7 @@ describe('FinanceirosResource', () => {
     it('passes all optional filter params', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('receitas', []));
+      http.restGet.mockResolvedValue(makeRestResponse('financeiros', []));
 
       await fin.listarReceitas({
         page: 2,
@@ -231,7 +235,8 @@ describe('FinanceirosResource', () => {
     it('calls restGet with /financeiros/despesas and default page', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('despesas', [{ id: 1 }]));
+      // Chave real medida (spec §3.2 / Task 3): 'financeiros', nao 'despesas'.
+      http.restGet.mockResolvedValue(makeRestResponse('financeiros', [{ id: 1 }]));
 
       const result = await fin.listarDespesas();
 
@@ -308,7 +313,8 @@ describe('FinanceirosResource', () => {
     it('calls restGet with /financeiros/moedas and default page', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('moedas', [{ id: 1 }]));
+      // Chave real medida (spec §3.2 / Task 3): 'data', nao 'moedas'.
+      http.restGet.mockResolvedValue(makeRestResponse('data', [{ id: 1 }]));
 
       const result = await fin.listarMoedas();
 
@@ -336,11 +342,13 @@ describe('FinanceirosResource', () => {
     it('calls restGet and returns array directly', async () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('contasBancarias', [{ id: 1 }, { id: 2 }]));
+      // Chave real medida (medicoes-complementares §Lacuna 1/5): 'data', nao
+      // 'contasBancarias' — o endpoint tambem devolve pagination real (Task 8b).
+      http.restGet.mockResolvedValue(makeRestResponse('data', [{ id: 1 }, { id: 2 }]));
 
       const result = await fin.listarContasBancarias();
 
-      expect(http.restGet).toHaveBeenCalledWith('/financeiros/contas-bancaria');
+      expect(http.restGet).toHaveBeenCalledWith('/financeiros/contas-bancaria', { page: '0' });
       expect(result).toHaveLength(2);
       expect(Array.isArray(result)).toBe(true);
     });
@@ -366,9 +374,10 @@ describe('FinanceirosResource', () => {
       const http = createMockHttp();
       const fin = new FinanceirosResource(http);
 
+      // Chave real medida (spec §3.2 / Task 3): 'financeiros', nao 'receitas'.
       http.restGet
-        .mockResolvedValueOnce(makeRestResponse('receitas', [{ id: 1 }], true))
-        .mockResolvedValueOnce(makeRestResponse('receitas', [{ id: 2 }], false));
+        .mockResolvedValueOnce(makeRestResponse('financeiros', [{ id: 1 }], true))
+        .mockResolvedValueOnce(makeRestResponse('financeiros', [{ id: 2 }], false));
 
       const items = [];
       for await (const item of fin.listarTodasReceitas()) {
@@ -378,6 +387,44 @@ describe('FinanceirosResource', () => {
       expect(items).toHaveLength(2);
       expect(items[0]).toEqual({ id: 1 });
       expect(items[1]).toEqual({ id: 2 });
+    });
+
+    it('pede a pagina 1 primeiro, nao a 0 (contrato financeiro e 1-based)', async () => {
+      const http = createMockHttp();
+      const fin = new FinanceirosResource(http);
+      const paginasPedidas: string[] = [];
+
+      http.restGet.mockImplementation(async (_path: string, query?: Record<string, string>) => {
+        const page = query?.page ?? '0';
+        paginasPedidas.push(page);
+        return makeRestResponse('financeiros', [{ id: 1 }], false);
+      });
+
+      for await (const _item of fin.listarTodasReceitas()) {
+        // consumir
+      }
+
+      expect(paginasPedidas[0]).toBe('1');
+    });
+  });
+
+  describe('listarTodasDespesas()', () => {
+    it('pede a pagina 1 primeiro, nao a 0 (contrato financeiro e 1-based)', async () => {
+      const http = createMockHttp();
+      const fin = new FinanceirosResource(http);
+      const paginasPedidas: string[] = [];
+
+      http.restGet.mockImplementation(async (_path: string, query?: Record<string, string>) => {
+        const page = query?.page ?? '0';
+        paginasPedidas.push(page);
+        return makeRestResponse('financeiros', [{ id: 1 }], false);
+      });
+
+      for await (const _item of fin.listarTodasDespesas()) {
+        // consumir
+      }
+
+      expect(paginasPedidas[0]).toBe('1');
     });
   });
 });

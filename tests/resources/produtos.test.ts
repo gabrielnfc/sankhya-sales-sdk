@@ -11,6 +11,7 @@ function createMockHttp(overrides?: Partial<HttpClient>) {
     restPost: vi.fn(),
     restPut: vi.fn(),
     gatewayCall: vi.fn(),
+    getLogger: vi.fn(() => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })),
     ...overrides,
   } as unknown as HttpClient;
 }
@@ -75,14 +76,18 @@ describe('ProdutosResource', () => {
 
   it('volumes() calls restGet with correct path for specific product', async () => {
     const http = createMockHttp({
+      // Chave real medida (medicoes-complementares §Lacuna 1/5): 'volumesProduto',
+      // nao 'volumes' — esse nome e o de listarVolumes()/'/volumes-produtos', um
+      // endpoint diferente. O endpoint tambem devolve pagination real (Task 8b).
       restGet: vi.fn().mockResolvedValue({
-        volumes: [{ codigoVolume: 'UN' }],
+        volumesProduto: [{ codigoVolume: 'UN' }],
+        pagination: { page: '0', total: '1', hasMore: 'false', offset: '0' },
       }),
     });
     const resource = new ProdutosResource(http);
     const result = await resource.volumes(5);
 
-    expect(http.restGet).toHaveBeenCalledWith('/produtos/5/volumes');
+    expect(http.restGet).toHaveBeenCalledWith('/produtos/5/volumes', { page: '0' });
     expect(result).toHaveLength(1);
   });
 

@@ -11,6 +11,13 @@ function unwrapDollarValue(raw: unknown): string {
   return String(raw);
 }
 
+/** Converte preservando o zero — `parseInt('0') || undefined` daria `undefined`. */
+function paraNumeroGateway(valor: string | undefined): number | undefined {
+  if (valor === undefined || valor.trim() === '') return undefined;
+  const n = Number.parseInt(valor, 10);
+  return Number.isNaN(n) ? undefined : n;
+}
+
 /**
  * Serializa dados para o formato Gateway do Sankhya: { CAMPO: valor } → { CAMPO: { "$": "valor" } }
  */
@@ -108,7 +115,7 @@ export function deserializeRows(responseBody: unknown, logger?: Logger): Deseria
   if (!rawEntities) {
     return {
       rows: [],
-      totalRecords: Number.parseInt(entities.total ?? '0', 10) || 0,
+      totalRecords: paraNumeroGateway(entities.total) ?? 0,
       hasMore: entities.hasMoreResult === 'true',
       page: Number.parseInt(entities.offsetPage ?? '0', 10) || 0,
     };
@@ -165,7 +172,7 @@ export function deserializeRows(responseBody: unknown, logger?: Logger): Deseria
 
   return {
     rows,
-    totalRecords: Number.parseInt(entities.total ?? '0', 10) || undefined,
+    totalRecords: paraNumeroGateway(entities.total),
     hasMore: entities.hasMoreResult === 'true',
     page: Number.parseInt(entities.offsetPage ?? '0', 10) || 0,
   };

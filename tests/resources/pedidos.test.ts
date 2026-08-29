@@ -9,11 +9,13 @@ function createMockHttp() {
     restPost: vi.fn(),
     restPut: vi.fn(),
     gatewayCall: vi.fn(),
+    getLogger: vi.fn(() => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })),
   } as unknown as HttpClient & {
     restGet: ReturnType<typeof vi.fn>;
     restPost: ReturnType<typeof vi.fn>;
     restPut: ReturnType<typeof vi.fn>;
     gatewayCall: ReturnType<typeof vi.fn>;
+    getLogger: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -31,7 +33,9 @@ describe('PedidosResource', () => {
     it('calls restGet with /vendas/pedidos and required params', async () => {
       const http = createMockHttp();
       const pedidos = new PedidosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('pedidos', [{ codigoNota: 1 }]));
+      // Chave real medida (medicoes-complementares §Lacuna 5): 'pedido', no
+      // singular — nao 'pedidos'.
+      http.restGet.mockResolvedValue(makeRestResponse('pedido', [{ codigoNota: 1 }]));
 
       const result = await pedidos.consultar({ codigoEmpresa: 1 });
 
@@ -46,7 +50,7 @@ describe('PedidosResource', () => {
     it('passes all optional params as strings', async () => {
       const http = createMockHttp();
       const pedidos = new PedidosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('pedidos', []));
+      http.restGet.mockResolvedValue(makeRestResponse('pedido', []));
 
       await pedidos.consultar({
         codigoEmpresa: 1,
@@ -87,7 +91,7 @@ describe('PedidosResource', () => {
     it('returns normalized pagination with hasMore', async () => {
       const http = createMockHttp();
       const pedidos = new PedidosResource(http);
-      http.restGet.mockResolvedValue(makeRestResponse('pedidos', [{ codigoNota: 1 }], true));
+      http.restGet.mockResolvedValue(makeRestResponse('pedido', [{ codigoNota: 1 }], true));
 
       const result = await pedidos.consultar({ codigoEmpresa: 1 });
 

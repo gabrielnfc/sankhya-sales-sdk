@@ -11,6 +11,7 @@ function createMockHttp(overrides?: Partial<HttpClient>) {
     restPost: vi.fn(),
     restPut: vi.fn(),
     gatewayCall: vi.fn(),
+    getLogger: vi.fn(() => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })),
     ...overrides,
   } as unknown as HttpClient;
 }
@@ -23,6 +24,21 @@ describe('EstoqueResource', () => {
 
     expect(http.restGet).toHaveBeenCalledWith('/estoque/produtos/42');
     expect(result).toHaveLength(1);
+  });
+
+  it('porProduto() loga error e devolve [] quando a chave "estoque" esta ausente', async () => {
+    const error = vi.fn();
+    const http = createMockHttp({
+      restGet: vi.fn().mockResolvedValue({ outraCoisa: [] }),
+      getLogger: vi.fn(() => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error })),
+    });
+    const resource = new EstoqueResource(http);
+
+    const result = await resource.porProduto(42);
+
+    expect(result).toEqual([]);
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(error.mock.calls[0]?.[0]).toContain('/estoque/produtos/42');
   });
 
   it('listar() calls restGet with /estoque/produtos and default page 0', async () => {

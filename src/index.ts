@@ -141,6 +141,10 @@ export type {
   GatewayDataRow,
   EntityField,
   ListFieldsOptions,
+  PaginationContract,
+  FinanceiroPagination,
+  PrecosPagination,
+  DegradedInfo,
 } from './types/index.js';
 
 // Enums (re-exported as values)

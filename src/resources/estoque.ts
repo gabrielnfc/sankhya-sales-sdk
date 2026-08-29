@@ -3,10 +3,32 @@ import {
   createPaginator,
   extractRestData,
   extractRestRecordOrThrow,
-  normalizeRestPagination,
+  normalizePagination,
 } from '../core/pagination.js';
 import type { PaginatedResult } from '../types/common.js';
 import type { Estoque, LocalEstoque } from '../types/estoque.js';
+import type { DegradedInfo, ResourceDescriptor } from '../types/pagination-contracts.js';
+
+const DESCRITOR_POR_PRODUTO: ResourceDescriptor = {
+  resourceKey: 'estoque',
+  contract: 'rest',
+  expectPagination: false,
+  endpoint: '/estoque/produtos/{id}',
+};
+
+const DESCRITOR_ESTOQUE: ResourceDescriptor = {
+  resourceKey: 'estoque',
+  contract: 'rest',
+  expectPagination: true,
+  endpoint: '/estoque/produtos',
+};
+
+const DESCRITOR_LOCAIS: ResourceDescriptor = {
+  resourceKey: 'locais',
+  contract: 'rest',
+  expectPagination: true,
+  endpoint: '/estoque/locais',
+};
 
 /** Operacoes de estoque no Sankhya ERP. Acesse via `sankhya.estoque`. */
 export class EstoqueResource {
@@ -28,7 +50,14 @@ export class EstoqueResource {
     const raw = await this.http.restGet<Record<string, unknown>>(
       `/estoque/produtos/${codigoProduto}`,
     );
-    const { data } = extractRestData<Estoque>(raw);
+    const { data, degraded, degradedInfo } = extractRestData<Estoque>(raw, DESCRITOR_POR_PRODUTO);
+    if (degraded) {
+      this.http
+        .getLogger()
+        .error(
+          `Resposta degradada em /estoque/produtos/${codigoProduto}: ${degradedInfo?.reason ?? 'formato inesperado'}`,
+        );
+    }
     return data;
   }
 
@@ -39,12 +68,23 @@ export class EstoqueResource {
    * @returns Resultado paginado com posicoes de estoque.
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
+   * @remarks
+   * `totalRecords` deste endpoint NAO e censo: conta produtos, enquanto o
+   * array conta linhas por local de estoque. Medido: a pagina 0 devolve
+   * 422 linhas com `total` 50. Nao use para verificar completude.
    */
   async listar(params?: { page?: number }): Promise<PaginatedResult<Estoque>> {
     const query: Record<string, string> = { page: String(params?.page ?? 0) };
     const raw = await this.http.restGet<Record<string, unknown>>('/estoque/produtos', query);
-    const { data, pagination } = extractRestData<Estoque>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Estoque>(raw, DESCRITOR_ESTOQUE);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_ESTOQUE,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -58,8 +98,15 @@ export class EstoqueResource {
   async listarLocais(params?: { page?: number }): Promise<PaginatedResult<LocalEstoque>> {
     const query: Record<string, string> = { page: String(params?.page ?? 0) };
     const raw = await this.http.restGet<Record<string, unknown>>('/estoque/locais', query);
-    const { data, pagination } = extractRestData<LocalEstoque>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<LocalEstoque>(raw, DESCRITOR_LOCAIS);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_LOCAIS,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -81,11 +128,18 @@ export class EstoqueResource {
   /**
    * Itera sobre todas as posicoes de estoque automaticamente.
    *
+   * @param params - Callback opcional de degradacao (sem filtros disponiveis).
    * @returns AsyncGenerator que emite posicoes individualmente.
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  listarTodos(): AsyncGenerator<Estoque> {
-    return createPaginator((page) => this.listar({ page }));
+  listarTodos(params?: {
+    onDegraded?: ((info: DegradedInfo) => void) | undefined;
+  }): AsyncGenerator<Estoque> {
+    const { onDegraded } = params ?? {};
+    return createPaginator((page) => this.listar({ page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 }

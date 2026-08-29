@@ -135,3 +135,11 @@ export type {
 } from './gateway.js';
 
 export type { EntityField, ListFieldsOptions } from './metadata.js';
+
+export type {
+  PaginationContract,
+  FinanceiroPagination,
+  PrecosPagination,
+  ResourceDescriptor,
+  DegradedInfo,
+} from './pagination-contracts.js';
