@@ -145,7 +145,7 @@ describe('contrato precos (/precos/tabela, /precos/produto)', () => {
 });
 
 describe('createPaginator — iteracao', () => {
-  it.fails('startPage 1 com echo de pagina ausente deve avancar, nao repetir', async () => {
+  it('startPage 1 com echo de pagina ausente deve avancar, nao repetir', async () => {
     const paginasVisitadas: number[] = [];
 
     // Servidor que nao ecoa `page` — normalizeRestPagination produz page: 0.

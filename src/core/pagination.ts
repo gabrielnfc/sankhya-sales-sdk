@@ -229,21 +229,67 @@ export function extractRestRecordOrThrow<T>(
 
 export type FetchPage<T> = (page: number) => Promise<PaginatedResult<T>>;
 
-export async function* createPaginator<T>(fetchFn: FetchPage<T>, startPage = 0): AsyncGenerator<T> {
+/** Numero de paginas a partir do qual uma varredura merece aviso. */
+const LIMITE_AVISO_PAGINAS = 100;
+
+/** Opcoes de comportamento do paginador. */
+export interface PaginatorOptions {
+  /** Chamado uma vez por pagina degradada. */
+  onDegraded?: ((info: DegradedInfo) => void) | undefined;
+  /** Logger para o aviso de varredura longa e para o estado impossivel. */
+  logger?: Logger | undefined;
+}
+
+/**
+ * Itera todas as paginas de um recurso, avancando por contador local
+ * (`currentPage++`) em vez do echo do servidor (`result.page`).
+ *
+ * O echo diverge de contrato para contrato — REST e base 0, financeiros e
+ * precos sao base 1 — e `parseInt(pagination.page) || 0` mascara ausencia
+ * de echo como zero. Dirigir a iteracao pelo echo podia travar sempre na
+ * mesma pagina; o contador local nao tem essa dependencia.
+ */
+export async function* createPaginator<T>(
+  fetchFn: FetchPage<T>,
+  startPage = 0,
+  options?: PaginatorOptions,
+): AsyncGenerator<T> {
   let currentPage = startPage;
-  let hasMore = true;
+  let paginasLidas = 0;
+  let avisou = false;
 
-  while (hasMore) {
+  while (true) {
     const result = await fetchFn(currentPage);
-    const pageData = result.data;
-    const nextPage = result.page + 1;
-    const continueIterating = result.hasMore && result.data.length > 0;
 
-    for (const item of pageData) {
+    if (result.degraded) {
+      options?.onDegraded?.({ reason: 'pagina degradada durante varredura', page: currentPage });
+    }
+
+    for (const item of result.data) {
       yield item;
     }
 
-    hasMore = continueIterating;
-    currentPage = nextPage;
+    paginasLidas++;
+    if (!avisou && paginasLidas > LIMITE_AVISO_PAGINAS) {
+      options?.logger?.warn(
+        `Varredura ultrapassou ${LIMITE_AVISO_PAGINAS} paginas — confirme se o filtro esta correto`,
+      );
+      avisou = true;
+    }
+
+    if (!result.hasMore) break;
+
+    // Pagina vazia com hasMore verdadeiro e estado impossivel: ou o
+    // servidor mentiu, ou o corpo veio degradado. A parada e preservada da
+    // 1.4.0 — sem ela isto seria laco infinito — mas agora sai sinal, em
+    // vez do silencio de antes. Na 2.0.0 este caso lanca.
+    if (result.data.length === 0) {
+      const motivo = 'pagina vazia com hasMore verdadeiro — varredura possivelmente incompleta';
+      options?.onDegraded?.({ reason: motivo, page: currentPage });
+      options?.logger?.error(motivo);
+      break;
+    }
+
+    currentPage++;
   }
 }
