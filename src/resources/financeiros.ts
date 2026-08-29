@@ -292,7 +292,7 @@ export class FinanceirosResource {
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    * @remarks
-   * `totalRecords` deste endpoint E censo real (medido: 519004 receitas).
+   * `totalRecords` deste endpoint E censo real (medido: 166417 despesas).
    * E a excecao — nos demais endpoints o campo conta apenas a pagina.
    */
   async listarDespesas(params?: { page?: number }): Promise<PaginatedResult<Despesa>> {
