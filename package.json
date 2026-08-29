@@ -43,6 +43,7 @@
     "test:smoke": "tsup && node tests/smoke/cjs.cjs && node tests/smoke/esm.mjs",
     "test:mutation": "npx stryker run",
     "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.tests.json",
     "docs": "typedoc",
     "dev": "tsup --watch",
     "prepublishOnly": "npm run build && npx publint"

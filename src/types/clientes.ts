@@ -132,6 +132,12 @@ export type AtualizarClienteInput = Partial<
 
 /** Filtros para listagem de clientes. */
 export interface ListarClientesParams extends PaginationParams {
-  /** Filtrar por data de alteracao (ISO). */
+  /**
+   * Data no formato `dd/MM/yyyy` ou `dd/MM/yyyy HH:mm:ss`.
+   *
+   * **Nao aceita ISO 8601** — a API responde `400 ORA-01861`. O filtro e
+   * inclusivo (`>=`). Uma janela sem alteracoes responde `404
+   * RESOURCE_NOT_FOUND`, nao lista vazia.
+   */
   dataHoraAlteracao?: string;
 }

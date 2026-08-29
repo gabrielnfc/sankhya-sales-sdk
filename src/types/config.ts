@@ -20,6 +20,15 @@ export interface SankhyaConfig {
   tokenCacheProvider?: TokenCacheProvider;
   /** Opcoes de logging do SDK. */
   logger?: LoggerOptions;
+  /**
+   * O que fazer quando uma resposta chega degradada.
+   *
+   * - `'flag'` (default na 1.5.0): marca `degraded` no resultado e emite
+   *   `logger.error`. Nao lanca.
+   *
+   * O default passa a `'throw'` na 2.0.0.
+   */
+  onDegradedResponse?: 'flag';
 }
 
 /**

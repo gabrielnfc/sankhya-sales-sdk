@@ -18,6 +18,15 @@ export interface PaginatedResult<T> {
   hasMore: boolean;
   /** Total de registros (quando disponivel na API). */
   totalRecords?: number | undefined;
+  /**
+   * `true` quando a resposta nao trouxe o formato declarado pelo endpoint
+   * e os dados podem estar incompletos.
+   *
+   * Opcional no tipo para nao quebrar quem constroi `PaginatedResult` em
+   * mocks; **sempre presente** no retorno do SDK. Lista vazia legitima
+   * vem com `degraded: false`.
+   */
+  degraded?: boolean | undefined;
 }
 
 /**
@@ -133,6 +142,12 @@ export interface CriteriaParameter {
 
 /** Parametros de filtro por data de modificacao. */
 export interface ModifiedSinceParams {
-  /** Data ISO para filtrar registros alterados desde. */
+  /**
+   * Data no formato `dd/MM/yyyy` ou `dd/MM/yyyy HH:mm:ss`.
+   *
+   * **Nao aceita ISO 8601** — a API responde `400 ORA-01861`. O filtro e
+   * inclusivo (`>=`). Uma janela sem alteracoes responde `404
+   * RESOURCE_NOT_FOUND`, nao lista vazia.
+   */
   modifiedSince?: string;
 }
