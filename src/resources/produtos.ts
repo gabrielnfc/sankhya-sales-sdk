@@ -3,9 +3,10 @@ import {
   createPaginator,
   extractRestData,
   extractRestRecordOrThrow,
-  normalizeRestPagination,
+  normalizePagination,
 } from '../core/pagination.js';
 import type { PaginatedResult } from '../types/common.js';
+import type { ResourceDescriptor } from '../types/pagination-contracts.js';
 import type {
   ComponenteProduto,
   GrupoProduto,
@@ -14,6 +15,46 @@ import type {
   ProdutoAlternativo,
   Volume,
 } from '../types/produtos.js';
+
+const DESCRITOR_PRODUTOS: ResourceDescriptor = {
+  resourceKey: 'produtos',
+  contract: 'rest',
+  expectPagination: true,
+};
+
+const DESCRITOR_COMPONENTES: ResourceDescriptor = {
+  // resourceKey null: endpoint nao mensuravel neste sandbox (ver §10 do design).
+  // Mantem o comportamento legado de primeiro array; sem deteccao de degradacao.
+  resourceKey: null,
+  contract: 'rest',
+  expectPagination: false,
+};
+
+const DESCRITOR_ALTERNATIVOS: ResourceDescriptor = {
+  // resourceKey null: endpoint nao mensuravel neste sandbox (ver §10 do design).
+  // Mantem o comportamento legado de primeiro array; sem deteccao de degradacao.
+  resourceKey: null,
+  contract: 'rest',
+  expectPagination: false,
+};
+
+const DESCRITOR_VOLUMES_PRODUTO: ResourceDescriptor = {
+  resourceKey: 'volumesProduto',
+  contract: 'rest',
+  expectPagination: true,
+};
+
+const DESCRITOR_VOLUMES: ResourceDescriptor = {
+  resourceKey: 'volumes',
+  contract: 'rest',
+  expectPagination: true,
+};
+
+const DESCRITOR_GRUPOS: ResourceDescriptor = {
+  resourceKey: 'grupos',
+  contract: 'rest',
+  expectPagination: true,
+};
 
 /** Operacoes de produtos no Sankhya ERP. Acesse via `sankhya.produtos`. */
 export class ProdutosResource {
@@ -36,8 +77,15 @@ export class ProdutosResource {
     if (params?.modifiedSince) query.modifiedSince = params.modifiedSince;
 
     const raw = await this.http.restGet<Record<string, unknown>>('/produtos', query);
-    const { data, pagination } = extractRestData<Produto>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Produto>(raw, DESCRITOR_PRODUTOS);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_PRODUTOS,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -69,7 +117,7 @@ export class ProdutosResource {
     const raw = await this.http.restGet<Record<string, unknown>>(
       `/produtos/${codigoProduto}/componentes`,
     );
-    const { data } = extractRestData<ComponenteProduto>(raw);
+    const { data } = extractRestData<ComponenteProduto>(raw, DESCRITOR_COMPONENTES);
     return data;
   }
 
@@ -85,7 +133,7 @@ export class ProdutosResource {
     const raw = await this.http.restGet<Record<string, unknown>>(
       `/produtos/${codigoProduto}/alternativos`,
     );
-    const { data } = extractRestData<ProdutoAlternativo>(raw);
+    const { data } = extractRestData<ProdutoAlternativo>(raw, DESCRITOR_ALTERNATIVOS);
     return data;
   }
 
@@ -101,7 +149,7 @@ export class ProdutosResource {
     const raw = await this.http.restGet<Record<string, unknown>>(
       `/produtos/${codigoProduto}/volumes`,
     );
-    const { data } = extractRestData<Volume>(raw);
+    const { data } = extractRestData<Volume>(raw, DESCRITOR_VOLUMES_PRODUTO);
     return data;
   }
 
@@ -116,8 +164,15 @@ export class ProdutosResource {
   async listarVolumes(params?: { page?: number }): Promise<PaginatedResult<Volume>> {
     const query: Record<string, string> = { page: String(params?.page ?? 0) };
     const raw = await this.http.restGet<Record<string, unknown>>('/volumes-produtos', query);
-    const { data, pagination } = extractRestData<Volume>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Volume>(raw, DESCRITOR_VOLUMES);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_VOLUMES,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -148,8 +203,15 @@ export class ProdutosResource {
     if (params?.modifiedSince) query.modifiedSince = params.modifiedSince;
 
     const raw = await this.http.restGet<Record<string, unknown>>('/grupos-produto', query);
-    const { data, pagination } = extractRestData<GrupoProduto>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<GrupoProduto>(raw, DESCRITOR_GRUPOS);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_GRUPOS,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**

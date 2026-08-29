@@ -5,7 +5,7 @@ import {
   createPaginator,
   extractRestData,
   extractRestRecordOrThrow,
-  normalizeRestPagination,
+  normalizePagination,
 } from '../core/pagination.js';
 import { safeParseNumber } from '../core/parse-utils.js';
 import {
@@ -31,6 +31,37 @@ import type {
   RegistrarReceitaInput,
   TipoPagamento,
 } from '../types/financeiros.js';
+import type { ResourceDescriptor } from '../types/pagination-contracts.js';
+
+const DESCRITOR_TIPOS_PAGAMENTO: ResourceDescriptor = {
+  resourceKey: 'data',
+  contract: 'rest',
+  expectPagination: true,
+};
+
+const DESCRITOR_RECEITAS: ResourceDescriptor = {
+  resourceKey: 'financeiros',
+  contract: 'financeiro',
+  expectPagination: true,
+};
+
+const DESCRITOR_DESPESAS: ResourceDescriptor = {
+  resourceKey: 'financeiros',
+  contract: 'financeiro',
+  expectPagination: true,
+};
+
+const DESCRITOR_MOEDAS: ResourceDescriptor = {
+  resourceKey: 'data',
+  contract: 'rest',
+  expectPagination: true,
+};
+
+const DESCRITOR_CONTAS_BANCARIAS: ResourceDescriptor = {
+  resourceKey: 'data',
+  contract: 'rest',
+  expectPagination: true,
+};
 
 /**
  * Operacoes financeiras no Sankhya ERP (receitas, despesas, pagamentos).
@@ -101,8 +132,18 @@ export class FinanceirosResource {
       '/financeiros/tipos-pagamento',
       query,
     );
-    const { data, pagination } = extractRestData<TipoPagamento>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<TipoPagamento>(
+      raw,
+      DESCRITOR_TIPOS_PAGAMENTO,
+    );
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_TIPOS_PAGAMENTO,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -150,8 +191,15 @@ export class FinanceirosResource {
     if (filtro?.dataNegociacaoFinal) query.dataNegociacaoFinal = filtro.dataNegociacaoFinal;
 
     const raw = await this.http.restGet<Record<string, unknown>>('/financeiros/receitas', query);
-    const { data, pagination } = extractRestData<Receita>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Receita>(raw, DESCRITOR_RECEITAS);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_RECEITAS,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -244,8 +292,15 @@ export class FinanceirosResource {
   async listarDespesas(params?: { page?: number }): Promise<PaginatedResult<Despesa>> {
     const query: Record<string, string> = { page: String(params?.page ?? 0) };
     const raw = await this.http.restGet<Record<string, unknown>>('/financeiros/despesas', query);
-    const { data, pagination } = extractRestData<Despesa>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Despesa>(raw, DESCRITOR_DESPESAS);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_DESPESAS,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -338,8 +393,15 @@ export class FinanceirosResource {
   async listarMoedas(params?: { page?: number }): Promise<PaginatedResult<Moeda>> {
     const query: Record<string, string> = { page: String(params?.page ?? 0) };
     const raw = await this.http.restGet<Record<string, unknown>>('/financeiros/moedas', query);
-    const { data, pagination } = extractRestData<Moeda>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Moeda>(raw, DESCRITOR_MOEDAS);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_MOEDAS,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -368,7 +430,7 @@ export class FinanceirosResource {
    */
   async listarContasBancarias(): Promise<ContaBancaria[]> {
     const raw = await this.http.restGet<Record<string, unknown>>('/financeiros/contas-bancaria');
-    const { data } = extractRestData<ContaBancaria>(raw);
+    const { data } = extractRestData<ContaBancaria>(raw, DESCRITOR_CONTAS_BANCARIAS);
     return data;
   }
 

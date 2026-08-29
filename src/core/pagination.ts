@@ -1,4 +1,6 @@
 import type { GatewayEntities, PaginatedResult, RestPagination } from '../types/common.js';
+import type { Logger } from '../types/config.js';
+import type { DegradedInfo, ResourceDescriptor } from '../types/pagination-contracts.js';
 import { SankhyaError } from './errors.js';
 
 /**
@@ -46,25 +48,60 @@ export function normalizeGatewayPagination<T>(
 }
 
 /**
- * Extrai o array de dados de uma resposta REST v1.
- * A chave do recurso varia por endpoint — esta função encontra o primeiro array.
+ * Extrai o array de dados de uma resposta REST v1, usando a chave declarada
+ * pelo descritor do endpoint quando ela existe.
+ *
+ * Nesta task a semantica de fallback (primeiro array do corpo) e preservada
+ * integralmente — inclusive quando a chave declarada existe mas nao bate.
+ * A Task 4 substitui isto pela tabela de decisao que classifica degradacao.
  */
-export function extractRestData<T>(response: Record<string, unknown>): {
-  data: T[];
-  pagination?: RestPagination | undefined;
-} {
-  const pagination = response.pagination as RestPagination | undefined;
-  let data: T[] = [];
-
-  for (const [key, value] of Object.entries(response)) {
-    if (key === 'pagination') continue;
-    if (Array.isArray(value)) {
-      data = value as T[];
-      break;
+export function extractRestData<T>(
+  response: Record<string, unknown>,
+  descriptor: ResourceDescriptor,
+): { data: T[]; degraded: boolean; degradedInfo?: DegradedInfo } {
+  if (descriptor.resourceKey !== null) {
+    const valor = response[descriptor.resourceKey];
+    if (Array.isArray(valor)) {
+      return { data: valor as T[], degraded: false };
     }
   }
+  // Comportamento antigo preservado nesta task, e permanente para
+  // resourceKey null: cai para o primeiro array.
+  // A Task 4 substitui isto pela tabela de decisao.
+  for (const [key, value] of Object.entries(response)) {
+    if (key === 'pagination') continue;
+    if (Array.isArray(value)) return { data: value as T[], degraded: false };
+  }
+  return { data: [], degraded: false };
+}
 
-  return { data, pagination };
+/**
+ * Normaliza uma resposta REST v1 ja extraida em `PaginatedResult`, aplicando
+ * o contrato de paginacao declarado pelo descritor do endpoint.
+ *
+ * Quando `degraded` e `true`, registra o diagnostico em `error` — nivel
+ * escolhido de proposito: o default do SDK e `warn`, mas uma degradacao
+ * silenciosa e exatamente a falha que este trabalho existe para expor, e
+ * precisa sobreviver a configuracoes que sobem o nivel minimo para `error`.
+ */
+export function normalizePagination<T>(
+  data: T[],
+  response: Record<string, unknown>,
+  descriptor: ResourceDescriptor,
+  degraded: boolean,
+  logger?: Logger,
+  degradedInfo?: DegradedInfo,
+): PaginatedResult<T> {
+  if (degraded && logger) {
+    logger.error(
+      `Resposta degradada: ${degradedInfo?.reason ?? 'formato inesperado'} ` +
+        `(chave esperada "${descriptor.resourceKey}", recebidas: ${degradedInfo?.receivedKeys?.join(', ') ?? 'nenhuma'})`,
+    );
+  }
+
+  const pagination = response.pagination as RestPagination | undefined;
+  const base = normalizeRestPagination(data, pagination);
+  return { ...base, degraded };
 }
 
 /**

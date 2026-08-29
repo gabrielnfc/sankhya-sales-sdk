@@ -11,6 +11,7 @@ function createMockHttp(overrides?: Partial<HttpClient>) {
     restPost: vi.fn().mockResolvedValue({ codigoCliente: 99 }),
     restPut: vi.fn().mockResolvedValue({ codigoCliente: 1 }),
     gatewayCall: vi.fn().mockResolvedValue({}),
+    getLogger: vi.fn(() => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })),
     ...overrides,
   } as unknown as HttpClient;
 }

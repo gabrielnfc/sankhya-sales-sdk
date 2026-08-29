@@ -3,10 +3,29 @@ import {
   createPaginator,
   extractRestData,
   extractRestRecordOrThrow,
-  normalizeRestPagination,
+  normalizePagination,
 } from '../core/pagination.js';
 import type { PaginatedResult } from '../types/common.js';
 import type { Estoque, LocalEstoque } from '../types/estoque.js';
+import type { ResourceDescriptor } from '../types/pagination-contracts.js';
+
+const DESCRITOR_POR_PRODUTO: ResourceDescriptor = {
+  resourceKey: 'estoque',
+  contract: 'rest',
+  expectPagination: false,
+};
+
+const DESCRITOR_ESTOQUE: ResourceDescriptor = {
+  resourceKey: 'estoque',
+  contract: 'rest',
+  expectPagination: true,
+};
+
+const DESCRITOR_LOCAIS: ResourceDescriptor = {
+  resourceKey: 'locais',
+  contract: 'rest',
+  expectPagination: true,
+};
 
 /** Operacoes de estoque no Sankhya ERP. Acesse via `sankhya.estoque`. */
 export class EstoqueResource {
@@ -28,7 +47,7 @@ export class EstoqueResource {
     const raw = await this.http.restGet<Record<string, unknown>>(
       `/estoque/produtos/${codigoProduto}`,
     );
-    const { data } = extractRestData<Estoque>(raw);
+    const { data } = extractRestData<Estoque>(raw, DESCRITOR_POR_PRODUTO);
     return data;
   }
 
@@ -43,8 +62,15 @@ export class EstoqueResource {
   async listar(params?: { page?: number }): Promise<PaginatedResult<Estoque>> {
     const query: Record<string, string> = { page: String(params?.page ?? 0) };
     const raw = await this.http.restGet<Record<string, unknown>>('/estoque/produtos', query);
-    const { data, pagination } = extractRestData<Estoque>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Estoque>(raw, DESCRITOR_ESTOQUE);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_ESTOQUE,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -58,8 +84,15 @@ export class EstoqueResource {
   async listarLocais(params?: { page?: number }): Promise<PaginatedResult<LocalEstoque>> {
     const query: Record<string, string> = { page: String(params?.page ?? 0) };
     const raw = await this.http.restGet<Record<string, unknown>>('/estoque/locais', query);
-    const { data, pagination } = extractRestData<LocalEstoque>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<LocalEstoque>(raw, DESCRITOR_LOCAIS);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_LOCAIS,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**

@@ -1,6 +1,6 @@
 import { SankhyaError } from '../core/errors.js';
 import type { HttpClient } from '../core/http.js';
-import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
+import { createPaginator, extractRestData, normalizePagination } from '../core/pagination.js';
 import { safeParseNumber } from '../core/parse-utils.js';
 import {
   validateAtualizarClienteInput,
@@ -15,6 +15,13 @@ import type {
   ListarClientesParams,
 } from '../types/clientes.js';
 import type { PaginatedResult } from '../types/common.js';
+import type { ResourceDescriptor } from '../types/pagination-contracts.js';
+
+const DESCRITOR_CLIENTES: ResourceDescriptor = {
+  resourceKey: 'clientes',
+  contract: 'rest',
+  expectPagination: true,
+};
 
 /** Mapeia `tipo` legado (`F`/`J`) para o canonico da API REST (`PF`/`PJ`). */
 function normalizeTipoPessoa(tipo: string | undefined): string | undefined {
@@ -72,8 +79,15 @@ export class ClientesResource {
     if (params?.dataHoraAlteracao) query.dataHoraAlteracao = params.dataHoraAlteracao;
 
     const raw = await this.http.restGet<Record<string, unknown>>('/parceiros/clientes', query);
-    const { data, pagination } = extractRestData<Cliente>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Cliente>(raw, DESCRITOR_CLIENTES);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_CLIENTES,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**

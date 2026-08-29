@@ -5,6 +5,7 @@ import {
   normalizeGatewayPagination,
   normalizeRestPagination,
 } from '../../src/core/pagination.js';
+import type { ResourceDescriptor } from '../../src/types/pagination-contracts.js';
 
 describe('normalizeRestPagination', () => {
   it('deve normalizar paginação REST com valores string', () => {
@@ -81,30 +82,41 @@ describe('normalizeGatewayPagination', () => {
 });
 
 describe('extractRestData', () => {
-  it('deve extrair array de dados e pagination', () => {
+  const descritorProdutos: ResourceDescriptor = {
+    resourceKey: 'produtos',
+    contract: 'rest',
+    expectPagination: true,
+  };
+  const descritorSemChave: ResourceDescriptor = {
+    resourceKey: null,
+    contract: 'rest',
+    expectPagination: true,
+  };
+
+  it('deve extrair array de dados usando a chave declarada', () => {
     const response = {
       produtos: [{ id: 1 }, { id: 2 }],
       pagination: { page: '0', offset: '0', total: '2', hasMore: 'false' },
     };
-    const { data, pagination } = extractRestData(response);
+    const { data, degraded } = extractRestData(response, descritorProdutos);
     expect(data).toEqual([{ id: 1 }, { id: 2 }]);
-    expect(pagination).toEqual({ page: '0', offset: '0', total: '2', hasMore: 'false' });
+    expect(degraded).toBe(false);
   });
 
   it('deve retornar array vazio quando não há dados', () => {
     const response = {
       pagination: { page: '0', offset: '0', total: '0', hasMore: 'false' },
     };
-    const { data } = extractRestData(response);
+    const { data } = extractRestData(response, descritorSemChave);
     expect(data).toEqual([]);
   });
 
-  it('deve encontrar o primeiro array independente da chave', () => {
+  it('deve encontrar o primeiro array quando resourceKey e null', () => {
     const response = {
       vendedores: [{ nome: 'João' }],
       pagination: { page: '0', offset: '0', total: '1', hasMore: 'false' },
     };
-    const { data } = extractRestData(response);
+    const { data } = extractRestData(response, descritorSemChave);
     expect(data).toEqual([{ nome: 'João' }]);
   });
 });

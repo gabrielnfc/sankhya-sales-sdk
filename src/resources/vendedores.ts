@@ -1,7 +1,14 @@
 import type { HttpClient } from '../core/http.js';
-import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
+import { createPaginator, extractRestData, normalizePagination } from '../core/pagination.js';
 import type { PaginatedResult } from '../types/common.js';
+import type { ResourceDescriptor } from '../types/pagination-contracts.js';
 import type { ListarVendedoresParams, Vendedor } from '../types/vendedores.js';
+
+const DESCRITOR_VENDEDORES: ResourceDescriptor = {
+  resourceKey: 'vendedores',
+  contract: 'rest',
+  expectPagination: true,
+};
 
 /** Operacoes de vendedores no Sankhya ERP. Acesse via `sankhya.vendedores`. */
 export class VendedoresResource {
@@ -24,8 +31,15 @@ export class VendedoresResource {
     if (params?.modifiedSince) query.modifiedSince = params.modifiedSince;
 
     const raw = await this.http.restGet<Record<string, unknown>>('/vendedores', query);
-    const { data, pagination } = extractRestData<Vendedor>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Vendedor>(raw, DESCRITOR_VENDEDORES);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_VENDEDORES,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**

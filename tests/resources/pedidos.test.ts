@@ -9,11 +9,13 @@ function createMockHttp() {
     restPost: vi.fn(),
     restPut: vi.fn(),
     gatewayCall: vi.fn(),
+    getLogger: vi.fn(() => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })),
   } as unknown as HttpClient & {
     restGet: ReturnType<typeof vi.fn>;
     restPost: ReturnType<typeof vi.fn>;
     restPut: ReturnType<typeof vi.fn>;
     gatewayCall: ReturnType<typeof vi.fn>;
+    getLogger: ReturnType<typeof vi.fn>;
   };
 }
 

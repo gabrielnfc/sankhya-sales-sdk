@@ -2,7 +2,7 @@ import { toSankhyaDateMaybe } from '../core/date.js';
 import { SankhyaError } from '../core/errors.js';
 import { serialize } from '../core/gateway-serializer.js';
 import type { HttpClient } from '../core/http.js';
-import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
+import { createPaginator, extractRestData, normalizePagination } from '../core/pagination.js';
 import { safeParseNumber } from '../core/parse-utils.js';
 import {
   validateCancelarPedidoInput,
@@ -12,6 +12,7 @@ import {
 } from '../core/validators.js';
 import type { PaginatedResult } from '../types/common.js';
 import type { RequestOptions } from '../types/config.js';
+import type { ResourceDescriptor } from '../types/pagination-contracts.js';
 import type {
   CancelarPedidoInput,
   ConfirmarPedidoInput,
@@ -27,6 +28,14 @@ import type {
   PedidoVenda,
   PedidoVendaInput,
 } from '../types/pedidos.js';
+
+// resourceKey 'pedido' no singular — medido (ver §3.2 do design). O plural
+// 'pedidos' quebra o metodo inteiro; nao "corrigir" por semelhanca ao path.
+const DESCRITOR_CONSULTAR: ResourceDescriptor = {
+  resourceKey: 'pedido',
+  contract: 'rest',
+  expectPagination: true,
+};
 
 /** Operacoes de pedidos de venda no Sankhya ERP. Acesse via `sankhya.pedidos`. */
 export class PedidosResource {
@@ -68,8 +77,15 @@ export class PedidosResource {
       query.codigoOrdemCarga = String(params.codigoOrdemCarga);
 
     const raw = await this.http.restGet<Record<string, unknown>>('/vendas/pedidos', query);
-    const { data, pagination } = extractRestData<PedidoVenda>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<PedidoVenda>(raw, DESCRITOR_CONSULTAR);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_CONSULTAR,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**

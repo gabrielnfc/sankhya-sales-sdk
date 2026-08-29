@@ -1,12 +1,39 @@
 import type { HttpClient } from '../core/http.js';
-import { createPaginator, extractRestData, normalizeRestPagination } from '../core/pagination.js';
+import { createPaginator, extractRestData, normalizePagination } from '../core/pagination.js';
 import type { PaginatedResult } from '../types/common.js';
+import type { ResourceDescriptor } from '../types/pagination-contracts.js';
 import type {
   Preco,
   PrecoContextualizadoInput,
   PrecosPorProdutoETabelaParams,
   PrecosPorTabelaParams,
 } from '../types/precos.js';
+
+const DESCRITOR_POR_TABELA: ResourceDescriptor = {
+  resourceKey: 'produtos',
+  contract: 'precos',
+  expectPagination: false,
+};
+
+const DESCRITOR_POR_PRODUTO: ResourceDescriptor = {
+  resourceKey: 'produtos',
+  contract: 'precos',
+  expectPagination: false,
+};
+
+const DESCRITOR_POR_PRODUTO_E_TABELA: ResourceDescriptor = {
+  resourceKey: 'produtos',
+  contract: 'precos',
+  expectPagination: false,
+};
+
+const DESCRITOR_CONTEXTUALIZADO: ResourceDescriptor = {
+  // resourceKey null: endpoint nao mensuravel neste sandbox (ver §10 do design).
+  // Mantem o comportamento legado de primeiro array; sem deteccao de degradacao.
+  resourceKey: null,
+  contract: 'precos',
+  expectPagination: false,
+};
 
 /** Operacoes de precos e tabelas de preco no Sankhya ERP. Acesse via `sankhya.precos`. */
 export class PrecosResource {
@@ -32,8 +59,15 @@ export class PrecosResource {
       `/precos/tabela/${params.codigoTabela}`,
       query,
     );
-    const { data, pagination } = extractRestData<Preco>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Preco>(raw, DESCRITOR_POR_TABELA);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_POR_TABELA,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -50,8 +84,15 @@ export class PrecosResource {
       `/precos/produto/${codigoProduto}`,
       { pagina: String(pagina) },
     );
-    const { data, pagination } = extractRestData<Preco>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Preco>(raw, DESCRITOR_POR_PRODUTO);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_POR_PRODUTO,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -67,8 +108,18 @@ export class PrecosResource {
       `/precos/produto/${params.codigoProduto}/tabela/${params.codigoTabela}`,
       { pagina: String(params.pagina ?? 1) },
     );
-    const { data, pagination } = extractRestData<Preco>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Preco>(
+      raw,
+      DESCRITOR_POR_PRODUTO_E_TABELA,
+    );
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_POR_PRODUTO_E_TABELA,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -104,7 +155,7 @@ export class PrecosResource {
    */
   async contextualizado(input: PrecoContextualizadoInput): Promise<Preco[]> {
     const raw = await this.http.restPost<Record<string, unknown>>('/precos/contextualizado', input);
-    const { data } = extractRestData<Preco>(raw);
+    const { data } = extractRestData<Preco>(raw, DESCRITOR_CONTEXTUALIZADO);
     return data;
   }
 }

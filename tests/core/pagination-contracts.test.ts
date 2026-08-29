@@ -17,8 +17,15 @@ import {
   normalizeRestPagination,
 } from '../../src/core/pagination.js';
 import type { RestPagination } from '../../src/types/common.js';
+import type { ResourceDescriptor } from '../../src/types/pagination-contracts.js';
 
 describe('contrato REST padrao', () => {
+  const descritorProdutos: ResourceDescriptor = {
+    resourceKey: 'produtos',
+    contract: 'rest',
+    expectPagination: true,
+  };
+
   // Medido: GET /v1/produtos?modifiedSince=14/08/2026 17:01:02
   // -> { "produtos": { ...objeto unico... }, "pagination": { "total": "1" } }
   it.fails('resultado unico chega como objeto e deve virar array de 1 elemento', () => {
@@ -31,7 +38,7 @@ describe('contrato REST padrao', () => {
       pagination: { page: '0', offset: '0', total: '1', hasMore: 'false' },
     };
 
-    const { data } = extractRestData<{ codigoProduto: number }>(resposta);
+    const { data } = extractRestData<{ codigoProduto: number }>(resposta, descritorProdutos);
 
     expect(data).toHaveLength(1);
     expect(data[0]?.codigoProduto).toBe(10104);
@@ -43,10 +50,10 @@ describe('contrato REST padrao', () => {
       pagination: { page: '0', offset: '0', total: '0', hasMore: 'false' },
     };
 
-    const { data, pagination } = extractRestData(resposta);
+    const { data } = extractRestData(resposta, descritorProdutos);
 
     expect(data).toEqual([]);
-    expect(pagination).toBeDefined();
+    expect(resposta.pagination).toBeDefined();
   });
 
   it.fails('total "0" deve normalizar para 0, nao para undefined', () => {
@@ -83,6 +90,12 @@ describe('contrato financeiro (/financeiros/receitas, /financeiros/despesas)', (
 });
 
 describe('contrato precos (/precos/tabela, /precos/produto)', () => {
+  const descritorPrecos: ResourceDescriptor = {
+    resourceKey: 'produtos',
+    contract: 'precos',
+    expectPagination: false,
+  };
+
   // Medido: GET /v1/precos/tabela/0?pagina=1
   // -> { codigo, pagina, numeroRegistros, temMaisRegistros, produtos: [...] }
   // Sem bloco `pagination`. Base 1.
@@ -97,8 +110,8 @@ describe('contrato precos (/precos/tabela, /precos/produto)', () => {
   };
 
   it.fails('temMaisRegistros true deve produzir hasMore true', () => {
-    const { data, pagination } = extractRestData<{ codigoProduto: number }>(respostaPrecos);
-    const resultado = normalizeRestPagination(data, pagination);
+    const { data } = extractRestData<{ codigoProduto: number }>(respostaPrecos, descritorPrecos);
+    const resultado = normalizeRestPagination(data, undefined);
 
     expect(resultado.data).toHaveLength(50);
     expect(resultado.hasMore).toBe(true);
@@ -109,8 +122,8 @@ describe('contrato precos (/precos/tabela, /precos/produto)', () => {
   // foi igual ao tamanho do array. O campo e redundante, e o criterio de
   // aceite que o exigia era vazio. Mantido como teste de regressao.
   it('totalRecords ja corresponde a numeroRegistros via data.length', () => {
-    const { data, pagination } = extractRestData(respostaPrecos);
-    const resultado = normalizeRestPagination(data, pagination);
+    const { data } = extractRestData(respostaPrecos, descritorPrecos);
+    const resultado = normalizeRestPagination(data, undefined);
 
     expect(resultado.totalRecords).toBe(respostaPrecos.numeroRegistros);
   });

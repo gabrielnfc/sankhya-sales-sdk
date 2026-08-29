@@ -4,7 +4,7 @@ import {
   createPaginator,
   extractRestData,
   extractRestRecordOrThrow,
-  normalizeRestPagination,
+  normalizePagination,
 } from '../core/pagination.js';
 import { safeParseNumber } from '../core/parse-utils.js';
 import type {
@@ -18,6 +18,43 @@ import type {
   Usuario,
 } from '../types/cadastros.js';
 import type { PaginatedResult } from '../types/common.js';
+import type { ResourceDescriptor } from '../types/pagination-contracts.js';
+
+const DESCRITOR_TIPOS_OPERACAO: ResourceDescriptor = {
+  resourceKey: 'data',
+  contract: 'rest',
+  expectPagination: true,
+};
+
+const DESCRITOR_NATUREZAS: ResourceDescriptor = {
+  resourceKey: 'data',
+  contract: 'rest',
+  expectPagination: true,
+};
+
+const DESCRITOR_PROJETOS: ResourceDescriptor = {
+  resourceKey: 'data',
+  contract: 'rest',
+  expectPagination: true,
+};
+
+const DESCRITOR_CENTROS_RESULTADO: ResourceDescriptor = {
+  resourceKey: 'data',
+  contract: 'rest',
+  expectPagination: true,
+};
+
+const DESCRITOR_EMPRESAS: ResourceDescriptor = {
+  resourceKey: 'empresas',
+  contract: 'rest',
+  expectPagination: true,
+};
+
+const DESCRITOR_USUARIOS: ResourceDescriptor = {
+  resourceKey: 'usuarios',
+  contract: 'rest',
+  expectPagination: true,
+};
 
 /**
  * Operacoes de cadastros gerais no Sankhya ERP
@@ -49,8 +86,18 @@ export class CadastrosResource {
     if (params?.tipoMovimento !== undefined) query.tipoMovimento = String(params.tipoMovimento);
 
     const raw = await this.http.restGet<Record<string, unknown>>('/tipos-operacao', query);
-    const { data, pagination } = extractRestData<TipoOperacao>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<TipoOperacao>(
+      raw,
+      DESCRITOR_TIPOS_OPERACAO,
+    );
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_TIPOS_OPERACAO,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -84,8 +131,15 @@ export class CadastrosResource {
   async listarNaturezas(params?: { page?: number }): Promise<PaginatedResult<Natureza>> {
     const query: Record<string, string> = { page: String(params?.page ?? 0) };
     const raw = await this.http.restGet<Record<string, unknown>>('/naturezas', query);
-    const { data, pagination } = extractRestData<Natureza>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Natureza>(raw, DESCRITOR_NATUREZAS);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_NATUREZAS,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -114,8 +168,15 @@ export class CadastrosResource {
   async listarProjetos(params?: { page?: number }): Promise<PaginatedResult<Projeto>> {
     const query: Record<string, string> = { page: String(params?.page ?? 0) };
     const raw = await this.http.restGet<Record<string, unknown>>('/projetos', query);
-    const { data, pagination } = extractRestData<Projeto>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Projeto>(raw, DESCRITOR_PROJETOS);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_PROJETOS,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -146,8 +207,18 @@ export class CadastrosResource {
   }): Promise<PaginatedResult<CentroResultado>> {
     const query: Record<string, string> = { page: String(params?.page ?? 0) };
     const raw = await this.http.restGet<Record<string, unknown>>('/centros-resultado', query);
-    const { data, pagination } = extractRestData<CentroResultado>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<CentroResultado>(
+      raw,
+      DESCRITOR_CENTROS_RESULTADO,
+    );
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_CENTROS_RESULTADO,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -181,8 +252,15 @@ export class CadastrosResource {
   async listarEmpresas(params?: { page?: number }): Promise<PaginatedResult<Empresa>> {
     const query: Record<string, string> = { page: String(params?.page ?? 0) };
     const raw = await this.http.restGet<Record<string, unknown>>('/empresas', query);
-    const { data, pagination } = extractRestData<Empresa>(raw);
-    return normalizeRestPagination(data, pagination);
+    const { data, degraded, degradedInfo } = extractRestData<Empresa>(raw, DESCRITOR_EMPRESAS);
+    return normalizePagination(
+      data,
+      raw,
+      DESCRITOR_EMPRESAS,
+      degraded,
+      this.http.getLogger(),
+      degradedInfo,
+    );
   }
 
   /**
@@ -209,7 +287,7 @@ export class CadastrosResource {
    */
   async listarUsuarios(): Promise<Usuario[]> {
     const raw = await this.http.restGet<Record<string, unknown>>('/usuarios');
-    const { data } = extractRestData<Usuario>(raw);
+    const { data } = extractRestData<Usuario>(raw, DESCRITOR_USUARIOS);
     return data;
   }
 
