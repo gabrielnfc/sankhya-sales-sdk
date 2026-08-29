@@ -250,11 +250,11 @@ Enumeração scriptada da superfície pública (não leitura):
 |---|---|---|
 | `Promise<PaginatedResult<T>>` | 20 | campo `degraded` no envelope |
 | `Promise<T[]>` | 11 | **nenhum** — sem envelope |
-| `AsyncGenerator<T>` | 14 | **nenhum** — emite item a item |
+| `AsyncGenerator<T>` | 15 | **nenhum** — emite item a item |
 
 Os 11 de array puro incluem `gateway.loadRecords`, `estoque.porProduto`, `produtos.componentes/alternativos/volumes`, `cadastros.listarUsuarios/listarModelosNota`, `financeiros.listarContasBancarias`, `precos.contextualizado`, `fiscal.calcularImpostos`, `metadata.listFields`.
 
-**Consequência para o runway.** Sem envelope, esses 25 métodos só teriam log na 1.5.0 e exceção na 2.0.0 — pulando o degrau de observação que é a razão de existir do faseamento. E o pior caso é justo o caminho que mais importa: as 14 varreduras.
+**Consequência para o runway.** Sem envelope, esses 26 métodos só teriam log na 1.5.0 e exceção na 2.0.0 — pulando o degrau de observação que é a razão de existir do faseamento. E o pior caso é justo o caminho que mais importa: as 15 varreduras.
 
 **Decisão:** os métodos de varredura aceitam um callback opcional:
 
