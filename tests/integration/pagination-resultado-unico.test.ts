@@ -16,13 +16,15 @@ import { SankhyaClient } from '../../src/index.js';
  * observado. Se nao conseguir isolar exatamente 1, pula com aviso explicito —
  * nunca aprova por omissao.
  */
-const client = new SankhyaClient({
-  baseUrl: process.env.SANKHYA_BASE_URL as string,
-  clientId: process.env.SANKHYA_CLIENT_ID as string,
-  clientSecret: process.env.SANKHYA_CLIENT_SECRET as string,
-  xToken: process.env.SANKHYA_X_TOKEN as string,
-  logger: { level: 'silent' },
-});
+const config = {
+  baseUrl: process.env.SANKHYA_BASE_URL ?? '',
+  clientId: process.env.SANKHYA_CLIENT_ID ?? '',
+  clientSecret: process.env.SANKHYA_CLIENT_SECRET ?? '',
+  xToken: process.env.SANKHYA_X_TOKEN ?? '',
+  logger: { level: 'silent' as const },
+};
+
+const has = config.baseUrl && config.clientId && config.clientSecret && config.xToken;
 
 /** Datas do Sankhya vem como `dd/MM/yyyy HH:mm:ss` — ordenar exige converter. */
 function chaveOrdenavel(data: string): string {
@@ -30,10 +32,12 @@ function chaveOrdenavel(data: string): string {
   return m ? `${m[3]}${m[2]}${m[1]}${m[4]}${m[5]}${m[6]}` : '';
 }
 
-describe('resultado unico via modifiedSince', () => {
+describe.skipIf(!has)('resultado unico via modifiedSince', () => {
+  let client: SankhyaClient;
   let janelaDeUmRegistro: string | null = null;
 
   beforeAll(async () => {
+    client = new SankhyaClient(config);
     // Estreita a janela ate isolar exatamente 1 registro.
     let corte: string | undefined;
     for (let tentativa = 0; tentativa < 5; tentativa++) {
