@@ -187,7 +187,7 @@ describe('createPaginator — iteracao', () => {
 });
 
 describe('deserializeRows — Gateway', () => {
-  it.fails('total "0" deve normalizar para 0, nao para undefined', () => {
+  it('total "0" deve normalizar para 0, nao para undefined', () => {
     const responseBody = {
       entities: {
         total: '0',
