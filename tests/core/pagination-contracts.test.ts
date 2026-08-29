@@ -50,10 +50,13 @@ describe('contrato REST padrao', () => {
       pagination: { page: '0', offset: '0', total: '0', hasMore: 'false' },
     };
 
-    const { data } = extractRestData(resposta, descritorProdutos);
+    const { data, degraded } = extractRestData(resposta, descritorProdutos);
 
     expect(data).toEqual([]);
-    expect(resposta.pagination).toBeDefined();
+    // Array vazio sob a chave declarada, com bloco pagination coerente
+    // (total "0"), e lista vazia legitima — nao deve ser tratada como
+    // degradacao (nem nesta task, nem depois que a Task 4 ativar a deteccao).
+    expect(degraded).toBe(false);
   });
 
   it.fails('total "0" deve normalizar para 0, nao para undefined', () => {

@@ -1,7 +1,8 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
 import { deserializeRows } from '../../src/core/gateway-serializer.js';
-import { extractRestData, normalizeRestPagination } from '../../src/core/pagination.js';
+import { extractRestData, normalizePagination } from '../../src/core/pagination.js';
+import type { ResourceDescriptor } from '../../src/types/pagination-contracts.js';
 import { getHttpClient } from '../helpers/get-http.js';
 
 const config = {
@@ -27,37 +28,93 @@ describe.skipIf(!has)('Curadoria v2 — Validação com novos formatos', () => {
   // REST v1 — Testar extractRestData + normalizeRestPagination
   // =====================================================
 
-  const restEndpoints = [
-    { path: '/produtos', name: 'Produtos' },
-    { path: '/grupos-produto', name: 'Grupos Produto' },
-    { path: '/parceiros/clientes', name: 'Clientes', params: { page: '1' } },
-    { path: '/vendedores', name: 'Vendedores' },
-    { path: '/estoque/locais', name: 'Locais Estoque' },
-    { path: '/financeiros/tipos-pagamento', name: 'Tipos Pagamento' },
-    { path: '/financeiros/moedas', name: 'Moedas' },
-    { path: '/tipos-operacao', name: 'Tipos Operação' },
-    { path: '/naturezas', name: 'Naturezas' },
-    { path: '/projetos', name: 'Projetos' },
-    { path: '/centros-resultado', name: 'Centros Resultado' },
-    { path: '/empresas', name: 'Empresas' },
+  const restEndpoints: {
+    path: string;
+    name: string;
+    params?: Record<string, string>;
+    descritor: ResourceDescriptor;
+  }[] = [
+    {
+      path: '/produtos',
+      name: 'Produtos',
+      descritor: { resourceKey: 'produtos', contract: 'rest', expectPagination: true },
+    },
+    {
+      path: '/grupos-produto',
+      name: 'Grupos Produto',
+      descritor: { resourceKey: 'grupos', contract: 'rest', expectPagination: true },
+    },
+    {
+      path: '/parceiros/clientes',
+      name: 'Clientes',
+      params: { page: '1' },
+      descritor: { resourceKey: 'clientes', contract: 'rest', expectPagination: true },
+    },
+    {
+      path: '/vendedores',
+      name: 'Vendedores',
+      descritor: { resourceKey: 'vendedores', contract: 'rest', expectPagination: true },
+    },
+    {
+      path: '/estoque/locais',
+      name: 'Locais Estoque',
+      descritor: { resourceKey: 'locais', contract: 'rest', expectPagination: true },
+    },
+    {
+      path: '/financeiros/tipos-pagamento',
+      name: 'Tipos Pagamento',
+      descritor: { resourceKey: 'data', contract: 'rest', expectPagination: true },
+    },
+    {
+      path: '/financeiros/moedas',
+      name: 'Moedas',
+      descritor: { resourceKey: 'data', contract: 'rest', expectPagination: true },
+    },
+    {
+      path: '/tipos-operacao',
+      name: 'Tipos Operação',
+      descritor: { resourceKey: 'data', contract: 'rest', expectPagination: true },
+    },
+    {
+      path: '/naturezas',
+      name: 'Naturezas',
+      descritor: { resourceKey: 'data', contract: 'rest', expectPagination: true },
+    },
+    {
+      path: '/projetos',
+      name: 'Projetos',
+      descritor: { resourceKey: 'data', contract: 'rest', expectPagination: true },
+    },
+    {
+      path: '/centros-resultado',
+      name: 'Centros Resultado',
+      descritor: { resourceKey: 'data', contract: 'rest', expectPagination: true },
+    },
+    {
+      path: '/empresas',
+      name: 'Empresas',
+      descritor: { resourceKey: 'empresas', contract: 'rest', expectPagination: true },
+    },
   ];
 
-  for (const { path, name, params } of restEndpoints) {
-    it(`REST: extractRestData + normalizeRestPagination — ${name}`, async () => {
+  for (const { path, name, params, descritor } of restEndpoints) {
+    it(`REST: extractRestData + normalizePagination — ${name}`, async () => {
       const http = getHttpClient(client);
       const rawResponse = await http.restGet<Record<string, unknown>>(
         path,
         params ?? { page: '0' },
       );
 
-      // extractRestData deve encontrar o array de dados e o pagination
-      const { data, pagination } = extractRestData(rawResponse);
+      // extractRestData deve encontrar o array de dados a partir da chave declarada
+      // (ou do fallback de primeiro array, nesta task, quando a chave nao bate)
+      const { data, degraded } = extractRestData(rawResponse, descritor);
 
-      // Deve ter encontrado dados (array)
+      // Deve ter encontrado dados (array) — mesmo /projetos com 1 registro, que
+      // chega como objeto e cai no fallback de primeiro array (=> []) nesta task.
       expect(Array.isArray(data)).toBe(true);
 
-      // normalizeRestPagination deve funcionar
-      const paginated = normalizeRestPagination(data, pagination);
+      // normalizePagination deve funcionar
+      const paginated = normalizePagination(data, rawResponse, descritor, degraded);
       expect(paginated.data).toBe(data);
       expect(typeof paginated.page).toBe('number');
       expect(typeof paginated.hasMore).toBe('boolean');
