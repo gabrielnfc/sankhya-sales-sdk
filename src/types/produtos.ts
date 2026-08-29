@@ -64,9 +64,25 @@ export interface Produto {
   ncm?: string;
   /** Codigo CEST. Sandbox pode retornar null. */
   cest?: string | null;
-  /** Data da ultima alteracao (ISO). */
+  /**
+   * Data da ultima alteracao.
+   *
+   * **Medido em 29/08/2026: a API NAO popula este campo em `/produtos`** —
+   * ela devolve `'dataAlteracao:'`, com dois-pontos no nome. Mantido no tipo
+   * por compatibilidade e para o caso de outros endpoints o usarem.
+   *
+   * Se voce le a data de alteracao para montar um cursor incremental, use
+   * `'dataAlteracao:'` — este aqui vem `undefined`.
+   */
   dataAlteracao?: string;
-  /** Campo retornado pelo sandbox com dois-pontos no nome. */
+  /**
+   * Data da ultima alteracao, no nome que a API realmente devolve — com
+   * dois-pontos no fim. Nao e erro de digitacao.
+   *
+   * Formato `dd/MM/yyyy HH:mm:ss` (ex.: `'14/08/2026 17:01:02'`), **nao ISO**.
+   * E o valor a passar de volta em `modifiedSince`, que exige o mesmo formato
+   * e filtra de forma inclusiva (`>=`).
+   */
   'dataAlteracao:'?: string;
   /** Homepage do produto. */
   homepage?: string;
