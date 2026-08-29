@@ -49,30 +49,70 @@ export function normalizeGatewayPagination<T>(
 
 /**
  * Extrai o array de dados de uma resposta REST v1, usando a chave declarada
- * pelo descritor do endpoint quando ela existe.
+ * pelo descritor do endpoint e a tabela de decisao completa (ver §D2 do
+ * design):
  *
- * Nesta task a semantica de fallback (primeiro array do corpo) e preservada
- * integralmente — inclusive quando a chave declarada existe mas nao bate.
- * A Task 4 substitui isto pela tabela de decisao que classifica degradacao.
+ * | Valor sob a chave         | Resultado                        |
+ * |----------------------------|----------------------------------|
+ * | array                      | `data` = o array                 |
+ * | objeto                     | `data` = `[objeto]`               |
+ * | chave ausente               | degradado                        |
+ * | `null` / `undefined`        | degradado                        |
+ * | string, numero, booleano    | degradado                        |
+ * | array vazio                 | `data` = `[]`, **nao** degradado |
+ *
+ * Alem disso, bloco `pagination` ausente num contrato que o declara
+ * (`expectPagination: true`) tambem e degradado.
+ *
+ * `resourceKey: null` mantem o comportamento legado de pegar o primeiro
+ * array do corpo e nunca marca degradacao — sao endpoints nao medidos
+ * neste sandbox, sem contrato conhecido contra o qual julgar a resposta.
  */
 export function extractRestData<T>(
   response: Record<string, unknown>,
   descriptor: ResourceDescriptor,
 ): { data: T[]; degraded: boolean; degradedInfo?: DegradedInfo } {
-  if (descriptor.resourceKey !== null) {
-    const valor = response[descriptor.resourceKey];
-    if (Array.isArray(valor)) {
-      return { data: valor as T[], degraded: false };
+  const receivedKeys = Object.keys(response);
+
+  if (descriptor.resourceKey === null) {
+    for (const [key, value] of Object.entries(response)) {
+      if (key === 'pagination') continue;
+      if (Array.isArray(value)) return { data: value as T[], degraded: false };
     }
+    return { data: [], degraded: false };
   }
-  // Comportamento antigo preservado nesta task, e permanente para
-  // resourceKey null: cai para o primeiro array.
-  // A Task 4 substitui isto pela tabela de decisao.
-  for (const [key, value] of Object.entries(response)) {
-    if (key === 'pagination') continue;
-    if (Array.isArray(value)) return { data: value as T[], degraded: false };
+
+  const valor = response[descriptor.resourceKey];
+
+  let data: T[];
+  let reason: string | null = null;
+
+  if (Array.isArray(valor)) {
+    data = valor as T[];
+  } else if (valor !== null && valor !== undefined && typeof valor === 'object') {
+    // A API devolve objeto quando exatamente 1 registro corresponde ao filtro.
+    data = [valor as T];
+  } else {
+    data = [];
+    reason =
+      valor === undefined
+        ? `chave "${descriptor.resourceKey}" ausente na resposta`
+        : `chave "${descriptor.resourceKey}" nao contem registros (${valor === null ? 'null' : typeof valor})`;
   }
-  return { data: [], degraded: false };
+
+  if (reason === null && descriptor.expectPagination && response.pagination === undefined) {
+    reason = 'bloco "pagination" ausente num endpoint que o declara';
+  }
+
+  if (reason === null) {
+    return { data, degraded: false };
+  }
+
+  return {
+    data,
+    degraded: true,
+    degradedInfo: { expectedKey: descriptor.resourceKey, receivedKeys, reason },
+  };
 }
 
 /**

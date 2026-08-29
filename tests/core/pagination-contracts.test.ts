@@ -28,7 +28,7 @@ describe('contrato REST padrao', () => {
 
   // Medido: GET /v1/produtos?modifiedSince=14/08/2026 17:01:02
   // -> { "produtos": { ...objeto unico... }, "pagination": { "total": "1" } }
-  it.fails('resultado unico chega como objeto e deve virar array de 1 elemento', () => {
+  it('resultado unico chega como objeto e deve virar array de 1 elemento', () => {
     const resposta = {
       produtos: {
         'dataAlteracao:': '14/08/2026 17:01:02',
