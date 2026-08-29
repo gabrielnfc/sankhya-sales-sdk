@@ -91,6 +91,8 @@ precos.todosPorTabela({codigoTabela:0}) → emitiu 50 itens e encerrou
 
 A página 0 nunca é visitada.
 
+**E não é só a varredura.** `clientes.ts:71` usa `page: String(params?.page ?? 1)` — o **default do próprio `listar()`** é a página 1. Quem chama `clientes.listar()` sem argumento acredita estar na primeira página e está na segunda. Enumeração dos defaults confirma que `clientes` é o único método REST com default 1; todos os outros usam 0, e `precos` usa 1 corretamente por ser 1-based.
+
 **Contraste importante:** `precos.todosPorTabela` também usa `startPage: 1` — e está **correto**, porque `/precos/tabela/{t}?pagina=0` devolve HTTP 400. O endpoint é genuinamente 1-based. Corrigir os dois por simetria teria introduzido um bug.
 
 ### 3.4 `modifiedSince` — formato e janela vazia
@@ -114,6 +116,10 @@ rota inexistente      → error.code = "NOT_FOUND"
 Ambos cabem folgados no corte de 500 chars do `sanitizeErrorBody`, então o match pode ser feito por campo JSON.
 
 `/vendas/pedidos` com `modifiedSince` **não é testável neste sandbox** (`400 — Necessario habilitar o parametro 'LOGTABOPER'`). Fica fora do mapeamento.
+
+**O filtro incremental não se chama `modifiedSince` em todo lugar.** Enumeração dos parâmetros de query — não leitura — mostrou que `clientes.listar` usa **`dataHoraAlteracao`**. Um grep por `modifiedSince` nunca o encontraria, e foi assim que ele ficou fora do escopo original. Medido: comportamento idêntico — formato BR obrigatório (ISO devolve `400 ORA-01861`) e janela vazia devolve `404 RESOURCE_NOT_FOUND` (`Nenhum registro da entidade Parceiro…`). Entra no escopo de D6.
+
+Superfície completa de filtro incremental, por enumeração: `modifiedSince` em `produtos.listar`, `produtos.listarGrupos`, `vendedores.listar` e `pedidos.consultar`; `dataHoraAlteracao` em `clientes.listar`.
 
 ### 3.5 `pagination.total` tem significados diferentes
 
@@ -280,7 +286,7 @@ A condição 3 precisa dessa forma operacional porque **o resource não sabe se 
 
 O resultado vazio sai com `degraded: false` — é vazio legítimo.
 
-Aplicado aos métodos com `modifiedSince` **medidos**: `produtos.listar`, `produtos.listarGrupos`, `vendedores.listar`. **Não** aplicado a `pedidos.consultar` (não testável no sandbox, §3.4).
+Aplicado aos métodos com filtro incremental **medido**: `produtos.listar`, `produtos.listarGrupos`, `vendedores.listar` (via `modifiedSince`) e `clientes.listar` (via `dataHoraAlteracao`). **Não** aplicado a `pedidos.consultar` (não testável no sandbox, §3.4).
 
 ### D7 — `PaginatedResult.page` permanece sendo o echo do servidor
 
@@ -308,7 +314,7 @@ Fatiado por **breaking-ness**, não por tema. Metade dos achados é perda de dad
 | Tipos próprios por contrato (`RestPagination` intocada) | D3 |
 | `onDegraded` opcional nas varreduras e nos métodos com objeto de params | D5.1 |
 | Contrato `precos` (`temMaisRegistros`) | §3.2 |
-| `startPage` de `clientes.listarTodos` → 0 | §3.3 |
+| `startPage` de `clientes.listarTodos` → 0 **e** default de `clientes.listar` → 0 | §3.3 |
 | Iteração por contador local | D4 |
 | Descritor de contrato nos call sites (interno) | D1 |
 | Flag `degraded` populada + `logger.error` — **sem lançar** | D5 |
@@ -350,6 +356,12 @@ Alargar `SankhyaErrorCode` quebra `switch` exaustivo — mais uma razão para o 
 ## 7. Critérios de aceite
 
 Cada item é um teste. Os de §3.1–§3.3 devem **falhar** contra a 1.4.0.
+
+**Os que podiam ser escritos hoje já foram** — `tests/core/pagination-contracts.test.ts` e `tests/resources/clientes-pagination.test.ts`, commitados antes da implementação. Usam `it.fails`, que executa o teste e exige que ele falhe: o bug fica verificado como presente, a suíte segue verde, e quando a correção entrar o `it.fails` passa a falhar, obrigando a virar `it`. Payloads copiados das medições, não inventados.
+
+Escrever esses testes já corrigiu o spec uma vez: um critério que eu tinha derivado (`numeroRegistros` alimentar `totalRecords` no contrato de preços) mostrou-se **vazio** — `normalizeRestPagination` já usa `data.length` quando não há bloco `pagination`, e `numeroRegistros` sempre igualou o tamanho do array nas medições. O critério não testava nada. Só a execução revelou.
+
+Os critérios que dependem de API inexistente (`DegradedResponseError`, `onDegraded`, descritor de contrato) não compilam contra a 1.4.0 e ficam para TDD dentro do plano, tarefa a tarefa.
 
 **1.5.0**
 
