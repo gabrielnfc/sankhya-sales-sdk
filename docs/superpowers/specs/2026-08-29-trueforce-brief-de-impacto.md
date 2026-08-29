@@ -52,7 +52,7 @@ Medido: `financeiros.listarTodasReceitas()` emite **50 itens de 519.004** e ence
 
 `/precos/*` é um **terceiro** contrato — não tem bloco `pagination` nenhum, usa `pagina`/`numeroRegistros`/`temMaisRegistros` no topo. `precos.todosPorTabela()` também para em 50.
 
-**Achado 4 (`total` não é censo):** confirmado, com explicação. Em `/estoque/produtos`, `total` e `offset` contam **produtos**, enquanto o array contém **linhas por local de estoque**. Página 0 devolve 422 linhas com `total:"50"`; página 1 devolve 147 linhas com `offset:50`.
+**Achado 4 (`total` não é censo):** confirmado. Em `/estoque/produtos`, página 0 devolve 422 linhas com `total:"50"` e `offset:0`; página 1 devolve 147 linhas com `offset:50`. A leitura mais coerente desses números é que `total`/`offset` contam **produtos** enquanto o array conta **linhas por local de estoque** — isso é interpretação nossa, não confirmação da API.
 
 **Consequência para a guarda de vocês:** a heurística "censo exato múltiplo de 50 congela o espelho" não mapeia para esse endpoint — o tamanho de página em linhas não é 50 e nem é constante. Vale revisar se ela dispara como esperado ali.
 

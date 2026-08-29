@@ -46,16 +46,18 @@ cadastros.listarProjetos()
   → data.length = 0, totalRecords = 1, hasMore = false
 ```
 
-O SDK informa literalmente "existe 1 registro, aqui estão 0". É sistêmico, não específico de endpoint — atinge qualquer listagem que filtre até um único resultado. Para sync incremental com janelas curtas, "exatamente 1 alteração" é o caso comum.
+O SDK informa literalmente "existe 1 registro, aqui estão 0". Para sync incremental com janelas curtas, "exatamente 1 alteração" é o caso comum, não o raro.
+
+**Escopo da medição:** confirmado em dois endpoints de contratos diferentes — `/produtos` (chave própria, filtrado por `modifiedSince`) e `/projetos` (chave genérica `data`, total=1 natural) — mais `/produtos/{id}`, que devolve objeto sob a mesma chave `produtos`. Que o comportamento valha para *todos* os endpoints é **inferência**, não medição. A correção (D2) é uniforme e não depende dessa generalização estar certa; a classificação por call site (§10) confirma caso a caso.
 
 ### 3.2 Quatro contratos de paginação, um só normalizador
 
-| Contrato | Endpoints | Forma | Base | Medido |
+| Contrato | Endpoints | Forma | Base | Como foi apurado |
 |---|---|---|---|---|
-| REST padrão | produtos, grupos-produto, vendedores, parceiros/clientes, estoque/*, tipos-operacao, naturezas, projetos, centros-resultado, empresas, usuarios, volumes-produtos, financeiros/{tipos-pagamento,moedas,contas-bancaria} | `pagination{page,offset,total,hasMore}` — todos string | 0 | sim |
-| Financeiros | financeiros/receitas, financeiros/despesas | `pagination{page,pageSize,total,totalPages,hasMore}` — número e boolean | 1 | sim |
-| Preços | precos/tabela/{t}, precos/produto/{p} | **sem bloco `pagination`**; `pagina`/`numeroRegistros`/`temMaisRegistros` no topo; param de página chamado `pagina` | 1 | sim |
-| Gateway | loadRecords | `entities{total,hasMoreResult,offsetPage}` — string | 0 | sim |
+| REST padrão | produtos, grupos-produto, vendedores, parceiros/clientes, estoque/*, tipos-operacao, naturezas, projetos, centros-resultado, empresas, usuarios, volumes-produtos, financeiros/{tipos-pagamento,moedas,contas-bancaria} | `pagination{page,offset,total,hasMore}` — todos string | 0 | **forma medida nos 16 endpoints**; **base medida em `/produtos` e `/parceiros/clientes`** (páginas 0/1/2 com dados distintos). Base dos demais: inferida |
+| Financeiros | financeiros/receitas, financeiros/despesas | `pagination{page,pageSize,total,totalPages,hasMore}` — número e boolean | 1 | forma e base medidas (`page=0` e `page=1` devolvem o mesmo conjunto; echo sempre `1`) |
+| Preços | precos/tabela/{t}, precos/produto/{p} | **sem bloco `pagination`**; `pagina`/`numeroRegistros`/`temMaisRegistros` no topo; param de página chamado `pagina` | 1 | forma e base medidas (`pagina=0` → HTTP 400) |
+| Gateway | loadRecords | `entities{total,hasMoreResult,offsetPage}` — string | 0 | **não medido** — apenas leitura de `gateway-serializer.ts`. Ver §10 |
 
 `normalizeRestPagination` compara `pagination.hasMore === 'true'`. Nos financeiros o campo é o booleano `true`, então a comparação dá `false`. Nos preços não existe bloco `pagination`, então o caminho `if (!pagination)` devolve `hasMore: false`.
 
@@ -110,8 +112,8 @@ Ambos cabem folgados no corte de 500 chars do `sanitizeErrorBody`, então o matc
 ### 3.5 `pagination.total` tem significados diferentes
 
 - Financeiros: censo real (519004 receitas, 166417 despesas).
-- Demais endpoints: tamanho da página (`"50"` fixo).
-- `/estoque/produtos`: página 0 devolve **422 linhas** com `total:"50"` e `offset:0`; página 1 devolve **147 linhas** com `offset:50`. `total` e `offset` contam **produtos**; o array conta **linhas por local de estoque**.
+- Demais endpoints: quantidade de registros **desta página**, limitada a 50 — `"50"` quando a página está cheia, o total real quando o conjunto inteiro cabe numa página (`locais` `"48"`, `volumes` `"26"`, `contas-bancaria` `"25"`, `moedas` `"8"`, `empresas` `"4"`). Nunca é censo quando `hasMore` é verdadeiro.
+- `/estoque/produtos`: página 0 devolve **422 linhas** com `total:"50"` e `offset:0`; página 1 devolve **147 linhas** com `offset:50`. `total` e `offset` contam **produtos**; o array conta **linhas por local de estoque**. Que a unidade seja "produtos" é a leitura mais coerente dos números medidos, não uma confirmação da API.
 
 `totalRecords` não serve para verificar completude de varredura, exceto nos financeiros.
 
@@ -169,7 +171,9 @@ Quando a chave declarada contém um objeto em vez de array, o SDK embrulha em ar
 
 Resolve §3.1 em todos os endpoints simultaneamente.
 
-### D3 — Reconhecer os quatro contratos
+### D3 — Reconhecer os três contratos REST
+
+O contrato Gateway não passa por `extractRestData` — é tratado em `deserializeRows`, e só muda no que §3.6 descreve. O descritor de D1 cobre os três contratos REST.
 
 Normalização por contrato declarado:
 
@@ -182,9 +186,14 @@ Normalização por contrato declarado:
 
 `createPaginator` deixa de derivar a próxima página do echo do servidor (`result.page + 1`) e passa a usar contador próprio a partir de `startPage`. O echo continua sendo reportado em `PaginatedResult.page`.
 
-**Por quê:** com quatro contratos e bases de página divergentes, o echo é entrada não confiável para controle de fluxo. Hoje `parseInt(pagination.page) || 0` mascara ausência como zero, o que — combinado com `startPage: 1` — pode fixar a iteração numa página só.
+**Por quê:** com contratos e bases de página divergentes, o echo é entrada não confiável para controle de fluxo. Hoje `parseInt(pagination.page) || 0` mascara ausência como zero, o que — combinado com `startPage: 1` — pode fixar a iteração numa página só.
 
 `startPage` correto por endpoint, medido: `/parceiros/clientes` = 0; `/precos/tabela` = 1.
+
+**Condição de parada.** Hoje o generator para com `hasMore && data.length > 0`. Remover a segunda condição junto com o echo abriria laço infinito quando o servidor mantém `hasMore` verdadeiro numa página vazia. Portanto:
+
+- **1.5.0:** página vazia com `hasMore` verdadeiro **para a iteração** (comportamento atual preservado) **e** marca `degraded: true` com `logger.error`. Sem laço infinito, sem mudança de fluxo.
+- **2.0.0:** o mesmo caso lança `DegradedResponseError`.
 
 ### D5 — Degradação: flag sempre, exceção como política
 
@@ -236,9 +245,17 @@ Fatiado por **breaking-ness**, não por tema. Metade dos achados é perda de dad
 | `total: "0"` normaliza para `0`, não `undefined` | §3.5 |
 | `deserializeRows` consistente entre seus dois retornos de `totalRecords` | §3.6 |
 | JSDoc de `modifiedSince` | §3.4 |
+| Página vazia com `hasMore` verdadeiro ⇒ para e marca `degraded` | D4 |
 | Documentação de `total` por endpoint | §3.5 |
 
-Todos fazem o SDK devolver **mais** dado correto onde hoje devolve menos. Nenhum altera assinatura pública nem fluxo de controle.
+Todos fazem o SDK devolver **mais** dado correto onde hoje devolve menos, ou anexar sinal onde hoje não há.
+
+Duas ressalvas de precisão, já que "sem breaking" é uma afirmação forte:
+
+- `PaginatedResult<T>` ganha o campo opcional `degraded`. É mudança de superfície pública, mas **aditiva** — nenhum consumidor existente deixa de compilar ou de funcionar.
+- `clientes.listarTodos()` passa a visitar a página 0, e as varreduras de financeiros e preços passam da primeira página. Consumidores recebem **mais itens** do que antes. É correção de perda de dados, não quebra de contrato — mas quem dimensionou batch por contagem observada deve saber. Vai nas notas de release.
+
+Nenhuma assinatura pública muda. Nenhuma exceção nova é lançada.
 
 ### 2.0.0 — breaking
 
@@ -270,6 +287,7 @@ Cada item é um teste. Os de §3.1–§3.3 devem **falhar** contra a 1.4.0.
 8. Corpo sem `pagination` num contrato que a declara ⇒ `degraded: true` e `logger.error`, sem lançar.
 9. Contrato `precos` sem bloco `pagination` ⇒ `degraded: false`.
 10. Integração: `produtos.listar({modifiedSince})` numa janela de exatamente 1 alteração ⇒ 1 item.
+10b. Página vazia com `hasMore` verdadeiro no meio da varredura ⇒ generator encerra (como hoje), `degraded: true`, `logger.error`, **sem laço infinito e sem lançar**.
 
 **2.0.0**
 
@@ -303,7 +321,23 @@ Sondas HTTP diretas e harness do SDK executados em 2026-08-29 contra o sandbox c
 
 Gotcha operacional: `.env` com CRLF quebra a autenticação com `401 invalid_client`; os scripts removem `\r` ao ler.
 
-## 10. Impacto em consumidores
+## 10. Lacunas conhecidas — a fechar no plano, antes de codificar
+
+Este documento distingue medido de inferido. O que ainda **não** foi medido:
+
+1. **Classificação dos call sites que não paginam.** Cerca de dez chamadas usam `extractRestData` descartando `pagination` de propósito: `produtos.componentes`, `produtos.alternativos`, `produtos.volumesDoProduto`, `estoque.porProduto`, `cadastros.listarUsuarios`, `financeiros.listarContasBancarias`, `precos.contextualizado`. Que esses endpoints legitimamente não tragam bloco `pagination` é **suposição** — nenhum foi sondado. D1 exige classificá-los; classificar errado gera falso-positivo de degradação num recurso inteiro. **Medir antes de escrever o descritor.**
+
+2. **Base de página dos endpoints REST não sondados.** Só `/produtos` e `/parceiros/clientes` tiveram a base confirmada. `startPage` de qualquer outro paginador só muda mediante medição — o caso de `precos` mostra que simetria não é evidência.
+
+3. **Contrato Gateway.** `deserializeRows` foi lido, não exercitado. As três saídas de §3.6 vêm do código; nenhuma foi observada contra o servidor. Antes das mudanças da 2.0.0, sondar `loadRecords` com resultado vazio e com resultado único (o colapso objeto/array de §3.1 tem análogo declarado em `entities.entity`, que o código já trata — confirmar que a resposta real bate).
+
+4. **`pedidos.consultar` + `modifiedSince`.** Bloqueado pelo sandbox (§3.4). Permanece não-objetivo até que exista medição.
+
+5. **Chave de resposta dos endpoints de sub-recurso.** As 18 chaves medidas cobrem os endpoints de lista. As de sub-recurso (`/produtos/{id}/componentes` e afins) não foram medidas.
+
+Nenhum item acima bloqueia o desenho — todos bloqueiam a **implementação** do trecho correspondente.
+
+## 11. Impacto em consumidores
 
 O consumidor conhecido (TrueForce) espelha catálogo, estoque, vendedores e TOPs com sync incremental via `modifiedSince`.
 
