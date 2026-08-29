@@ -5,8 +5,10 @@ Sondas HTTP diretas contra o sandbox configurado em `.env` do repositório, exec
 semanticamente uma leitura (POST no transporte, sem efeito colateral — mesmo padrão já
 usado pelo SDK em `gatewayCall(..., idempotent=true)`). Nenhuma escrita foi feita.
 
-Script: `/tmp/probe-lacunas.mjs` (fora do repo, não versionado — conteúdo reproduzido nas
-notas de cada seção abaixo). Saída bruta capturada em `/tmp/lacunas.txt` durante a execução.
+Script: salvo no diretório de scratchpad da sessão (fora do repo, não versionado —
+conteúdo reproduzido nas notas de cada seção abaixo, com uma correção de formato na
+Lacuna 3 documentada ali). Saída bruta capturada em arquivo `.txt` no mesmo diretório
+durante a execução.
 
 **Contexto operacional:** o sandbox é compartilhado com um worker de staging (app de força
 de vendas em desenvolvimento) que também faz apenas leitura. Por isso a sonda usa retry (até
@@ -134,7 +136,7 @@ nesta task.
 
 | Lacuna | Status | Nota |
 |---|---|---|
-| 1 — classificação dos call sites sem paginação | **Parcialmente fechada** | 5 de 7 call sites medidos (`volumes`, `estoque.porProduto`, `listarUsuarios`, `listarContasBancarias` — todos com resultado real, 2 deles revelando descarte de paginação real). `componentes` e `alternativos` ficam **NÃO MEDIDO** por ausência de dado no sandbox (9 produtos testados, todos 404). `contextualizado` fica **NÃO MEDIDO** por exigir POST com corpo de negociação, fora da sonda do brief. |
+| 1 — classificação dos call sites sem paginação | **Parcialmente fechada** | 4 de 7 call sites medidos (`volumes`, `estoque.porProduto`, `listarUsuarios`, `listarContasBancarias` — todos com resultado real, 3 deles revelando descarte de paginação real). `componentes` e `alternativos` ficam **NÃO MEDIDO** por ausência de dado no sandbox (9 produtos testados, todos 404). `contextualizado` fica **NÃO MEDIDO** por exigir POST com corpo de negociação, fora da sonda do brief. |
 | 2 — base de página REST | **Fechada para os 13 endpoints sondados** | 12 confirmam 0-based (7 fortes, 4 fracas por dataset pequeno); 1 (`financeiros/receitas`) reconfirma o contrato Financeiros já descrito em §3.2. Endpoints REST padrão fora desta lista (`projetos`, `financeiros/despesas`, base de `financeiros/contas-bancaria`) continuam sem medição direta. |
 | 3 — contrato Gateway | **Fechada** | Colapso objeto único e saída silenciosa "entity ausente" confirmados contra o servidor real; ambos já cobertos pelo código atual. |
 | 4 — `pedidos.consultar` + `modifiedSince` | **Continua aberta** | Bloqueada pelo sandbox (`LOGTABOPER`), decisão já tomada, nenhuma tentativa nova. |
