@@ -115,6 +115,26 @@ export function extractRestData<T>(
   };
 }
 
+/** A API usa `'true'` no contrato REST e `true` nos financeiros. */
+function ehVerdadeiro(valor: unknown): boolean {
+  return valor === true || valor === 'true';
+}
+
+/**
+ * Converte para numero preservando o zero.
+ *
+ * `Number.parseInt('0', 10) || undefined` devolveria `undefined` — era
+ * assim que lista legitimamente vazia perdia o total.
+ */
+function paraNumero(valor: unknown): number | undefined {
+  if (typeof valor === 'number') return Number.isFinite(valor) ? valor : undefined;
+  if (typeof valor === 'string' && valor.trim() !== '') {
+    const n = Number.parseInt(valor, 10);
+    return Number.isNaN(n) ? undefined : n;
+  }
+  return undefined;
+}
+
 /**
  * Normaliza uma resposta REST v1 ja extraida em `PaginatedResult`, aplicando
  * o contrato de paginacao declarado pelo descritor do endpoint.
@@ -123,6 +143,11 @@ export function extractRestData<T>(
  * escolhido de proposito: o default do SDK e `warn`, mas uma degradacao
  * silenciosa e exatamente a falha que este trabalho existe para expor, e
  * precisa sobreviver a configuracoes que sobem o nivel minimo para `error`.
+ *
+ * O contrato `financeiro` nao tem ramo proprio: seus campos ja chegam como
+ * numero/booleano nativos, e `paraNumero`/`ehVerdadeiro` aceitam esses tipos
+ * sem conversao — o mesmo caminho do contrato `rest` (que usa string) atende
+ * aos dois. So `precos` diverge de verdade, por nao ter bloco `pagination`.
  */
 export function normalizePagination<T>(
   data: T[],
@@ -139,9 +164,29 @@ export function normalizePagination<T>(
     );
   }
 
-  const pagination = response.pagination as RestPagination | undefined;
-  const base = normalizeRestPagination(data, pagination);
-  return { ...base, degraded };
+  if (descriptor.contract === 'precos') {
+    // Sem bloco `pagination`: os campos vem na raiz do corpo.
+    return {
+      data,
+      page: paraNumero(response.pagina) ?? 1,
+      hasMore: ehVerdadeiro(response.temMaisRegistros),
+      totalRecords: paraNumero(response.numeroRegistros) ?? data.length,
+      degraded,
+    };
+  }
+
+  const pagination = response.pagination as Record<string, unknown> | undefined;
+  if (!pagination) {
+    return { data, page: 0, hasMore: false, totalRecords: data.length, degraded };
+  }
+
+  return {
+    data,
+    page: paraNumero(pagination.page) ?? 0,
+    hasMore: ehVerdadeiro(pagination.hasMore),
+    totalRecords: paraNumero(pagination.total),
+    degraded,
+  };
 }
 
 /**

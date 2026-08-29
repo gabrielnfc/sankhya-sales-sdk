@@ -14,6 +14,7 @@ import { deserializeRows } from '../../src/core/gateway-serializer.js';
 import {
   createPaginator,
   extractRestData,
+  normalizePagination,
   normalizeRestPagination,
 } from '../../src/core/pagination.js';
 import type { RestPagination } from '../../src/types/common.js';
@@ -59,10 +60,10 @@ describe('contrato REST padrao', () => {
     expect(degraded).toBe(false);
   });
 
-  it.fails('total "0" deve normalizar para 0, nao para undefined', () => {
+  it('total "0" deve normalizar para 0, nao para undefined', () => {
     const pagination: RestPagination = { page: '0', offset: '0', total: '0', hasMore: 'false' };
 
-    const resultado = normalizeRestPagination([], pagination);
+    const resultado = normalizePagination([], { pagination }, descritorProdutos, false);
 
     expect(resultado.totalRecords).toBe(0);
   });
@@ -79,8 +80,19 @@ describe('contrato financeiro (/financeiros/receitas, /financeiros/despesas)', (
     hasMore: true,
   } as unknown as RestPagination;
 
-  it.fails('hasMore booleano true deve ser reconhecido como verdadeiro', () => {
-    const resultado = normalizeRestPagination([{ codigoFinanceiro: -866265 }], paginacaoFinanceiro);
+  const descritorFinanceiro: ResourceDescriptor = {
+    resourceKey: 'receitas',
+    contract: 'financeiro',
+    expectPagination: true,
+  };
+
+  it('hasMore booleano true deve ser reconhecido como verdadeiro', () => {
+    const resultado = normalizePagination(
+      [{ codigoFinanceiro: -866265 }],
+      { pagination: paginacaoFinanceiro },
+      descritorFinanceiro,
+      false,
+    );
 
     expect(resultado.hasMore).toBe(true);
   });
@@ -112,9 +124,9 @@ describe('contrato precos (/precos/tabela, /precos/produto)', () => {
     produtos: Array.from({ length: 50 }, (_, i) => ({ codigoProduto: i + 1, valor: 0 })),
   };
 
-  it.fails('temMaisRegistros true deve produzir hasMore true', () => {
+  it('temMaisRegistros true deve produzir hasMore true', () => {
     const { data } = extractRestData<{ codigoProduto: number }>(respostaPrecos, descritorPrecos);
-    const resultado = normalizeRestPagination(data, undefined);
+    const resultado = normalizePagination(data, respostaPrecos, descritorPrecos, false);
 
     expect(resultado.data).toHaveLength(50);
     expect(resultado.hasMore).toBe(true);
