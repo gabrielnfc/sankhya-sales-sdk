@@ -47,16 +47,23 @@ describe('createPaginator', () => {
   });
 
   it('pagina vazia com hasMore falso encerra em silencio — fim normal', async () => {
+    const visitadas: number[] = [];
     const onDegraded = vi.fn();
     const error = vi.fn();
     const logger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error };
-    const fetchFn = async (page: number) =>
-      page === 0 ? pagina([{ id: 0 }], false, page) : pagina<{ id: number }>([], false, page);
+    const fetchFn = async (page: number) => {
+      visitadas.push(page);
+      return page === 0 ? pagina([{ id: 0 }], true, page) : pagina<{ id: number }>([], false, page);
+    };
 
     for await (const _ of createPaginator(fetchFn, 0, { onDegraded, logger })) {
       // consumir
     }
 
+    // Prova que a varredura de fato chegou na pagina vazia final — sem
+    // isto o teste passaria mesmo se o laco parasse cedo demais, sem
+    // nunca exercitar o ramo "fim normal" que da nome ao teste.
+    expect(visitadas).toEqual([0, 1]);
     expect(onDegraded).not.toHaveBeenCalled();
     expect(error).not.toHaveBeenCalled();
   });
