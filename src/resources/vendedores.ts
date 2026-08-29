@@ -1,7 +1,7 @@
 import type { HttpClient } from '../core/http.js';
 import { createPaginator, extractRestData, normalizePagination } from '../core/pagination.js';
 import type { PaginatedResult } from '../types/common.js';
-import type { ResourceDescriptor } from '../types/pagination-contracts.js';
+import type { DegradedInfo, ResourceDescriptor } from '../types/pagination-contracts.js';
 import type { ListarVendedoresParams, Vendedor } from '../types/vendedores.js';
 
 const DESCRITOR_VENDEDORES: ResourceDescriptor = {
@@ -71,7 +71,15 @@ export class VendedoresResource {
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  listarTodos(params?: Omit<ListarVendedoresParams, 'page'>): AsyncGenerator<Vendedor> {
-    return createPaginator((page) => this.listar({ ...params, page }));
+  listarTodos(
+    params?: Omit<ListarVendedoresParams, 'page'> & {
+      onDegraded?: ((info: DegradedInfo) => void) | undefined;
+    },
+  ): AsyncGenerator<Vendedor> {
+    const { onDegraded, ...filtros } = params ?? {};
+    return createPaginator((page) => this.listar({ ...filtros, page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 }

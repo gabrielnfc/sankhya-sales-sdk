@@ -7,7 +7,7 @@ import {
 } from '../core/pagination.js';
 import type { PaginatedResult } from '../types/common.js';
 import type { Estoque, LocalEstoque } from '../types/estoque.js';
-import type { ResourceDescriptor } from '../types/pagination-contracts.js';
+import type { DegradedInfo, ResourceDescriptor } from '../types/pagination-contracts.js';
 
 const DESCRITOR_POR_PRODUTO: ResourceDescriptor = {
   resourceKey: 'estoque',
@@ -114,11 +114,18 @@ export class EstoqueResource {
   /**
    * Itera sobre todas as posicoes de estoque automaticamente.
    *
+   * @param params - Callback opcional de degradacao (sem filtros disponiveis).
    * @returns AsyncGenerator que emite posicoes individualmente.
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  listarTodos(): AsyncGenerator<Estoque> {
-    return createPaginator((page) => this.listar({ page }));
+  listarTodos(params?: {
+    onDegraded?: ((info: DegradedInfo) => void) | undefined;
+  }): AsyncGenerator<Estoque> {
+    const { onDegraded } = params ?? {};
+    return createPaginator((page) => this.listar({ page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 }

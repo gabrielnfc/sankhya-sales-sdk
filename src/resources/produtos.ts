@@ -6,7 +6,7 @@ import {
   normalizePagination,
 } from '../core/pagination.js';
 import type { PaginatedResult } from '../types/common.js';
-import type { ResourceDescriptor } from '../types/pagination-contracts.js';
+import type { DegradedInfo, ResourceDescriptor } from '../types/pagination-contracts.js';
 import type {
   ComponenteProduto,
   GrupoProduto,
@@ -259,7 +259,15 @@ export class ProdutosResource {
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  listarTodos(params?: Omit<ListarProdutosParams, 'page'>): AsyncGenerator<Produto> {
-    return createPaginator((page) => this.listar({ ...params, page }));
+  listarTodos(
+    params?: Omit<ListarProdutosParams, 'page'> & {
+      onDegraded?: ((info: DegradedInfo) => void) | undefined;
+    },
+  ): AsyncGenerator<Produto> {
+    const { onDegraded, ...filtros } = params ?? {};
+    return createPaginator((page) => this.listar({ ...filtros, page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 }

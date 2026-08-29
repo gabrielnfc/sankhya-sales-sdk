@@ -15,7 +15,7 @@ import type {
   ListarClientesParams,
 } from '../types/clientes.js';
 import type { PaginatedResult } from '../types/common.js';
-import type { ResourceDescriptor } from '../types/pagination-contracts.js';
+import type { DegradedInfo, ResourceDescriptor } from '../types/pagination-contracts.js';
 
 const DESCRITOR_CLIENTES: ResourceDescriptor = {
   resourceKey: 'clientes',
@@ -195,7 +195,15 @@ export class ClientesResource {
    * }
    * ```
    */
-  listarTodos(params?: Omit<ListarClientesParams, 'page'>): AsyncGenerator<Cliente> {
-    return createPaginator((page) => this.listar({ ...params, page }));
+  listarTodos(
+    params?: Omit<ListarClientesParams, 'page'> & {
+      onDegraded?: ((info: DegradedInfo) => void) | undefined;
+    },
+  ): AsyncGenerator<Cliente> {
+    const { onDegraded, ...filtros } = params ?? {};
+    return createPaginator((page) => this.listar({ ...filtros, page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 }

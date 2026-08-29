@@ -12,7 +12,7 @@ import {
 } from '../core/validators.js';
 import type { PaginatedResult } from '../types/common.js';
 import type { RequestOptions } from '../types/config.js';
-import type { ResourceDescriptor } from '../types/pagination-contracts.js';
+import type { DegradedInfo, ResourceDescriptor } from '../types/pagination-contracts.js';
 import type {
   CancelarPedidoInput,
   ConfirmarPedidoInput,
@@ -96,8 +96,16 @@ export class PedidosResource {
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  consultarTodos(params: Omit<ConsultarPedidosParams, 'page'>): AsyncGenerator<PedidoVenda> {
-    return createPaginator((page) => this.consultar({ ...params, page }));
+  consultarTodos(
+    params: Omit<ConsultarPedidosParams, 'page'> & {
+      onDegraded?: ((info: DegradedInfo) => void) | undefined;
+    },
+  ): AsyncGenerator<PedidoVenda> {
+    const { onDegraded, ...filtros } = params;
+    return createPaginator((page) => this.consultar({ ...filtros, page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 
   /**

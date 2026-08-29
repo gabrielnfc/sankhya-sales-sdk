@@ -31,7 +31,7 @@ import type {
   RegistrarReceitaInput,
   TipoPagamento,
 } from '../types/financeiros.js';
-import type { ResourceDescriptor } from '../types/pagination-contracts.js';
+import type { DegradedInfo, ResourceDescriptor } from '../types/pagination-contracts.js';
 
 const DESCRITOR_TIPOS_PAGAMENTO: ResourceDescriptor = {
   resourceKey: 'data',
@@ -482,8 +482,16 @@ export class FinanceirosResource {
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  listarTodasReceitas(filtro?: Omit<ReceitasFiltro, 'page'>): AsyncGenerator<Receita> {
-    return createPaginator((page) => this.listarReceitas({ ...filtro, page }));
+  listarTodasReceitas(
+    filtro?: Omit<ReceitasFiltro, 'page'> & {
+      onDegraded?: ((info: DegradedInfo) => void) | undefined;
+    },
+  ): AsyncGenerator<Receita> {
+    const { onDegraded, ...filtros } = filtro ?? {};
+    return createPaginator((page) => this.listarReceitas({ ...filtros, page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 
   /**
@@ -495,9 +503,15 @@ export class FinanceirosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   listarTodosTiposPagamento(
-    params?: Omit<{ page?: number; subTipoPagamento?: number }, 'page'>,
+    params?: Omit<{ page?: number; subTipoPagamento?: number }, 'page'> & {
+      onDegraded?: ((info: DegradedInfo) => void) | undefined;
+    },
   ): AsyncGenerator<TipoPagamento> {
-    return createPaginator((page) => this.listarTiposPagamento({ ...params, page }));
+    const { onDegraded, ...filtros } = params ?? {};
+    return createPaginator((page) => this.listarTiposPagamento({ ...filtros, page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 
   /**
@@ -507,8 +521,14 @@ export class FinanceirosResource {
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  listarTodasDespesas(): AsyncGenerator<Despesa> {
-    return createPaginator((page) => this.listarDespesas({ page }));
+  listarTodasDespesas(params?: {
+    onDegraded?: ((info: DegradedInfo) => void) | undefined;
+  }): AsyncGenerator<Despesa> {
+    const { onDegraded } = params ?? {};
+    return createPaginator((page) => this.listarDespesas({ page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 
   /**
@@ -518,7 +538,13 @@ export class FinanceirosResource {
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  listarTodasMoedas(): AsyncGenerator<Moeda> {
-    return createPaginator((page) => this.listarMoedas({ page }));
+  listarTodasMoedas(params?: {
+    onDegraded?: ((info: DegradedInfo) => void) | undefined;
+  }): AsyncGenerator<Moeda> {
+    const { onDegraded } = params ?? {};
+    return createPaginator((page) => this.listarMoedas({ page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 }

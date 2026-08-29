@@ -1,7 +1,7 @@
 import type { HttpClient } from '../core/http.js';
 import { createPaginator, extractRestData, normalizePagination } from '../core/pagination.js';
 import type { PaginatedResult } from '../types/common.js';
-import type { ResourceDescriptor } from '../types/pagination-contracts.js';
+import type { DegradedInfo, ResourceDescriptor } from '../types/pagination-contracts.js';
 import type {
   Preco,
   PrecoContextualizadoInput,
@@ -130,8 +130,16 @@ export class PrecosResource {
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    */
-  todosPorTabela(params: Omit<PrecosPorTabelaParams, 'pagina'>): AsyncGenerator<Preco> {
-    return createPaginator((page) => this.porTabela({ ...params, pagina: page }), 1);
+  todosPorTabela(
+    params: Omit<PrecosPorTabelaParams, 'pagina'> & {
+      onDegraded?: ((info: DegradedInfo) => void) | undefined;
+    },
+  ): AsyncGenerator<Preco> {
+    const { onDegraded, ...filtros } = params;
+    return createPaginator((page) => this.porTabela({ ...filtros, pagina: page }), 1, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 
   /**

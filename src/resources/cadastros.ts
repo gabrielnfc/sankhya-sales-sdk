@@ -18,7 +18,7 @@ import type {
   Usuario,
 } from '../types/cadastros.js';
 import type { PaginatedResult } from '../types/common.js';
-import type { ResourceDescriptor } from '../types/pagination-contracts.js';
+import type { DegradedInfo, ResourceDescriptor } from '../types/pagination-contracts.js';
 
 const DESCRITOR_TIPOS_OPERACAO: ResourceDescriptor = {
   resourceKey: 'data',
@@ -319,9 +319,15 @@ export class CadastrosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   listarTodosTiposOperacao(
-    params?: Omit<{ page?: number; tipoMovimento?: number }, 'page'>,
+    params?: Omit<{ page?: number; tipoMovimento?: number }, 'page'> & {
+      onDegraded?: ((info: DegradedInfo) => void) | undefined;
+    },
   ): AsyncGenerator<TipoOperacao> {
-    return createPaginator((page) => this.listarTiposOperacao({ ...params, page }));
+    const { onDegraded, ...filtros } = params ?? {};
+    return createPaginator((page) => this.listarTiposOperacao({ ...filtros, page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 
   /**
@@ -329,8 +335,14 @@ export class CadastrosResource {
    *
    * @returns AsyncGenerator que emite naturezas individualmente.
    */
-  listarTodasNaturezas(): AsyncGenerator<Natureza> {
-    return createPaginator((page) => this.listarNaturezas({ page }));
+  listarTodasNaturezas(params?: {
+    onDegraded?: ((info: DegradedInfo) => void) | undefined;
+  }): AsyncGenerator<Natureza> {
+    const { onDegraded } = params ?? {};
+    return createPaginator((page) => this.listarNaturezas({ page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 
   /**
@@ -338,8 +350,14 @@ export class CadastrosResource {
    *
    * @returns AsyncGenerator que emite projetos individualmente.
    */
-  listarTodosProjetos(): AsyncGenerator<Projeto> {
-    return createPaginator((page) => this.listarProjetos({ page }));
+  listarTodosProjetos(params?: {
+    onDegraded?: ((info: DegradedInfo) => void) | undefined;
+  }): AsyncGenerator<Projeto> {
+    const { onDegraded } = params ?? {};
+    return createPaginator((page) => this.listarProjetos({ page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 
   /**
@@ -347,8 +365,14 @@ export class CadastrosResource {
    *
    * @returns AsyncGenerator que emite centros de resultado.
    */
-  listarTodosCentrosResultado(): AsyncGenerator<CentroResultado> {
-    return createPaginator((page) => this.listarCentrosResultado({ page }));
+  listarTodosCentrosResultado(params?: {
+    onDegraded?: ((info: DegradedInfo) => void) | undefined;
+  }): AsyncGenerator<CentroResultado> {
+    const { onDegraded } = params ?? {};
+    return createPaginator((page) => this.listarCentrosResultado({ page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 
   /**
@@ -356,8 +380,14 @@ export class CadastrosResource {
    *
    * @returns AsyncGenerator que emite empresas individualmente.
    */
-  listarTodasEmpresas(): AsyncGenerator<Empresa> {
-    return createPaginator((page) => this.listarEmpresas({ page }));
+  listarTodasEmpresas(params?: {
+    onDegraded?: ((info: DegradedInfo) => void) | undefined;
+  }): AsyncGenerator<Empresa> {
+    const { onDegraded } = params ?? {};
+    return createPaginator((page) => this.listarEmpresas({ page }), 0, {
+      onDegraded,
+      logger: this.http.getLogger(),
+    });
   }
 
   // --- Gateway: Tipos de Negociacao ---
