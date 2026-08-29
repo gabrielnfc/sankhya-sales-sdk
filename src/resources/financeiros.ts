@@ -438,6 +438,11 @@ export class FinanceirosResource {
    * @returns Array de contas bancarias.
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
+   * @remarks
+   * Este endpoint devolve bloco `pagination` real, que versoes anteriores
+   * descartavam — o metodo entregava so a primeira pagina. Agora percorre
+   * todas as paginas internamente, entao pode fazer N requisicoes e falhar
+   * no meio de uma varredura longa.
    */
   async listarContasBancarias(): Promise<ContaBancaria[]> {
     const paginar = async (page: number) => {
