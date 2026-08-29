@@ -90,6 +90,22 @@ Isso é deliberado: vocês adotam a detecção em produção, medem quantas veze
 
 `DegradedResponseError` passa a ser lançado por padrão. `onDegradedResponse: 'flag'` mantém o comportamento da 1.5.0 para quem precisar de mais tempo.
 
+## 4b. Duas ressalvas que afetam vocês diretamente
+
+**A sonda de saúde de vocês fica só com log na 1.5.0.** A detecção de degradação precisa de um lugar no retorno para expor a flag. `gateway.loadRecords` devolve `Record<string,string>[]` puro — não tem envelope. Enumeramos a superfície: 20 métodos devolvem envelope e podem carregar `degraded`; 11 devolvem array puro e 14 são geradores — nenhum desses 25 tem onde carregá-la.
+
+Para os métodos de varredura (`listarTodos`, `listarTodasReceitas`, `consultarTodos`) vamos oferecer um callback opcional:
+
+```ts
+for await (const p of sankhya.produtos.listarTodos({ onDegraded: info => metrics.inc('sdk.degraded', info) })) { … }
+```
+
+Para `loadRecords`, na 1.5.0 o sinal é **apenas log estruturado**, capturável via `logger.custom`. Se a sonda de saúde de vocês depende de detectar degradação programaticamente, é o caminho a usar até a 2.0.0.
+
+**`gateway.loadRecord` passa a lançar em corpo degradado na 2.0.0.** Hoje devolve `null`, indistinguível de "não encontrado". Se o código de vocês trata `null` como "não existe" e age em cima disso, revisem junto com o item da seção 5.
+
+**Volume: a 1.5.0 destrava varreduras hoje truncadas.** Se vocês chamam `listarTodasReceitas()`, ela sai de 50 itens para 519.004 — 10.381 páginas. Um job que hoje termina em segundos passa a fazer dez mil requisições. É correção, mas planejem a capacidade antes de subir.
+
 ## 5. Item de risco na 2.0.0 — leiam antes de fazer upgrade
 
 Vocês pediram que o 404 de janela vazia virasse resultado vazio legítimo. Faz sentido e vai ser feito, com guardas: só quando a requisição carregava `modifiedSince`, só quando o corpo traz `error.code: "RESOURCE_NOT_FOUND"` (distinguível de rota inexistente, que devolve `NOT_FOUND`), e só na primeira página da varredura.

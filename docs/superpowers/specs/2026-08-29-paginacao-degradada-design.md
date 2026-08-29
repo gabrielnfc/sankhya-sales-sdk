@@ -21,12 +21,18 @@ O caso concreto que originou o trabalho: em 19/08/2026 o TrueForce zerou as flag
 
 ## 2. Método
 
-**Zero trust.** Nenhuma afirmação deste documento vem de leitura de código isolada ou de raciocínio por analogia. Cada uma foi medida de duas formas:
+**Zero trust.** Toda afirmação **comportamental sobre o SDK** foi medida de duas formas:
 
 1. **Sondas HTTP diretas** contra o sandbox (8 rodadas, somente leitura) — mediram o comportamento da API.
 2. **Harness rodando o SDK real** (`src/`, via tsx) contra o mesmo sandbox — mediu o comportamento do SDK. 8 afirmações, 8 confirmadas.
 
+Afirmações sobre **superfície de tipos** foram provadas com `tsc` sobre fixtures de consumidor (D3). Afirmações sobre **extensão da superfície** (quais métodos, quais call sites) foram provadas por enumeração scriptada, não por leitura.
+
+O que **não** teve essas garantias está isolado em §10, e §3.6 e §3.7 vêm apenas de leitura de código — estão marcados como tal.
+
 Uma conclusão intermediária foi **refutada** por esse método e descartada (ver §4). Os scripts de medição estão descritos em §9.
+
+**Lição de processo, registrada porque mudou o método:** as afirmações executadas saíram corretas; as derivadas apenas de raciocínio — tabelas-resumo, classificação de breaking, extensão da superfície — concentraram todos os erros pegos em revisão. Por isso os critérios de aceite de §7 são escritos como testes executáveis **antes** da implementação, e não como prosa.
 
 **Baseline no momento do desenho:** `npm test` = 404 testes verdes; `npm run typecheck` limpo.
 
@@ -171,16 +177,45 @@ Quando a chave declarada contém um objeto em vez de array, o SDK embrulha em ar
 
 Resolve §3.1 em todos os endpoints simultaneamente.
 
-### D3 — Reconhecer os três contratos REST
+**Tabela de decisão completa** para o valor sob a chave declarada — sem ela, o implementador escolhe por conta própria:
+
+| Valor sob a chave | Resultado |
+|---|---|
+| array | `data` = o array |
+| objeto | `data` = `[objeto]` |
+| chave ausente | degradado |
+| `null` / `undefined` | degradado |
+| string, número, booleano | degradado |
+| array vazio | `data` = `[]`, **não** degradado |
+
+### D3 — Um tipo por contrato; `RestPagination` não é alargada
 
 O contrato Gateway não passa por `extractRestData` — é tratado em `deserializeRows`, e só muda no que §3.6 descreve. O descritor de D1 cobre os três contratos REST.
 
+**Decisão: cada contrato medido ganha seu próprio tipo.** `RestPagination` permanece exatamente como está e passa a documentar apenas o contrato REST-padrão. Contratos novos:
+
+```ts
+interface FinanceiroPagination { page: number; pageSize: number; total: number; totalPages: number; hasMore: boolean }
+interface PrecosPagination    { pagina: number; numeroRegistros: number; temMaisRegistros: boolean }
+```
+
+**Por que não alargar `RestPagination`** — provado, não suposto. `RestPagination` é exportada em `src/index.ts:67`. Alargar `total: string` para `string | number` foi testado com `tsc --strict` sobre uma fixture de consumidor:
+
+```
+error TS2322: Type 'string | number' is not assignable to type 'string'.       (const total: string = p.total)
+error TS2345: Argument of type 'string | number' is not assignable to ...       (Number.parseInt(p.total, 10))
+```
+
+Quebra o consumidor **e** o código interno do SDK. Um tipo por contrato evita as duas quebras e ainda substitui um tipo frouxo cobrindo três formatos incompatíveis por três tipos exatos.
+
 Normalização por contrato declarado:
 
-- `hasMore`: aceita `true` e `'true'`.
-- `total`/`page`: aceita número e string.
-- Contrato `precos`: lê `temMaisRegistros`, `numeroRegistros` e `pagina` do topo do corpo.
+- Contrato `rest`: como hoje, comparando strings.
+- Contrato `financeiro`: `hasMore` booleano, `total`/`page` numéricos, base 1.
+- Contrato `precos`: lê `temMaisRegistros`, `numeroRegistros` e `pagina` do topo do corpo, base 1.
 - Ausência de bloco `pagination` só é sinal de degradação nos contratos que **declaram** tê-lo.
+
+`PaginatedResult` continua sendo o tipo único de saída — a divergência morre na normalização.
 
 ### D4 — Iteração por contador local
 
@@ -197,9 +232,33 @@ Normalização por contrato declarado:
 
 ### D5 — Degradação: flag sempre, exceção como política
 
-- `PaginatedResult<T>` ganha `degraded?: boolean`, **sempre populado**. Aditivo; não quebra tipo existente.
+- `PaginatedResult<T>` ganha `degraded?: boolean`. **Opcional no tipo, sempre presente no retorno do SDK.** A opcionalidade existe porque consumidores constroem `PaginatedResult` em mocks e testes; campo obrigatório quebraria essas construções. Quem lê o retorno do SDK pode contar que o campo está lá.
 - `DegradedResponseError extends SankhyaError`, `code: 'DEGRADED_RESPONSE'`, com `endpoint`, `expectedKey`, `receivedKeys` e `page` para diagnóstico.
-- Política via `SankhyaConfig.onDegradedResponse: 'throw' | 'flag'`.
+- Política via `SankhyaConfig.onDegradedResponse: 'throw' | 'flag'`. Global, não por chamada: a política é postura de segurança da aplicação, e um override por chamada seria o caminho natural para silenciar caso a caso — exatamente o que este trabalho existe para impedir.
+
+#### D5.1 — O canal do sinal depende da forma de retorno
+
+Enumeração scriptada da superfície pública (não leitura):
+
+| Forma de retorno | Qtd | Canal para `degraded` |
+|---|---|---|
+| `Promise<PaginatedResult<T>>` | 20 | campo `degraded` no envelope |
+| `Promise<T[]>` | 11 | **nenhum** — sem envelope |
+| `AsyncGenerator<T>` | 14 | **nenhum** — emite item a item |
+
+Os 11 de array puro incluem `gateway.loadRecords`, `estoque.porProduto`, `produtos.componentes/alternativos/volumes`, `cadastros.listarUsuarios/listarModelosNota`, `financeiros.listarContasBancarias`, `precos.contextualizado`, `fiscal.calcularImpostos`, `metadata.listFields`.
+
+**Consequência para o runway.** Sem envelope, esses 25 métodos só teriam log na 1.5.0 e exceção na 2.0.0 — pulando o degrau de observação que é a razão de existir do faseamento. E o pior caso é justo o caminho que mais importa: as 14 varreduras.
+
+**Decisão:** os métodos de varredura aceitam um callback opcional:
+
+```ts
+listarTodos({ onDegraded: (info: DegradedInfo) => void })
+```
+
+Aditivo, opt-in, e devolve canal programático para quem itera. Mesma opção nos métodos de array puro que aceitam objeto de parâmetros.
+
+Onde nem isso couber (métodos sem objeto de parâmetros, como `gateway.loadRecords`), o sinal na 1.5.0 é **apenas log estruturado** — capturável via `logger.custom`, que o SDK já suporta. Isso está declarado como limitação conhecida, não resolvido por omissão. `gateway.loadRecords` é a sonda de saúde do consumidor conhecido; a limitação vai no brief.
 
 **Por que lançar (na 2.0.0):** flag pura é segurança opt-in, e quem esquece de checar é exatamente quem se queimou. Erro não tratado mata o job; job morto não apaga espelho.
 
@@ -213,7 +272,9 @@ Mapear para resultado vazio legítimo **apenas** quando as três valem:
 
 1. a requisição carregava `modifiedSince`,
 2. o corpo traz `error.code === 'RESOURCE_NOT_FOUND'` (match por campo JSON, não substring),
-3. é a **primeira** página da varredura.
+3. `page === startPage` do endpoint (0 para `produtos`, `grupos-produto` e `vendedores`).
+
+A condição 3 precisa dessa forma operacional porque **o resource não sabe se está dentro de um paginador** — só conhece o parâmetro `page` que recebeu. Consequência declarada: uma chamada direta a `listar({ page: 5, modifiedSince })` que devolva 404 **continua lançando `ApiError`**. Isso é intencional: 404 numa página adiantada não é "nada mudou", é anomalia.
 
 **Por que a guarda:** converter 404 em "vazio" anda na direção perigosa — transforma erro em sucesso. Sem (1) e (2), uma base URL errada ou rota removida viraria "nada mudou", reintroduzindo a classe de bug que este trabalho existe para matar. Sem (3), um 404 no meio de uma varredura encerraria o generator em silêncio.
 
@@ -221,7 +282,15 @@ O resultado vazio sai com `degraded: false` — é vazio legítimo.
 
 Aplicado aos métodos com `modifiedSince` **medidos**: `produtos.listar`, `produtos.listarGrupos`, `vendedores.listar`. **Não** aplicado a `pedidos.consultar` (não testável no sandbox, §3.4).
 
-### D7 — Escopo de documentação
+### D7 — `PaginatedResult.page` permanece sendo o echo do servidor
+
+Consequência: o campo tem bases diferentes por recurso — 0-based no contrato REST, 1-based em financeiros e preços. Um consumidor que persista ou logue esse valor vê semânticas distintas dependendo do recurso.
+
+**Decisão: documentar, não normalizar.** Normalizar para 0-based mudaria silenciosamente um valor que consumidores podem estar persistindo, e a mudança seria invisível em tipo — a pior categoria de breaking. Se virar necessário, é item de 2.0.0 com nota própria, não efeito colateral desta correção.
+
+Registrado aqui porque a omissão anterior deixava a decisão para quem implementasse.
+
+### D8 — Escopo de documentação
 
 - JSDoc de `modifiedSince` corrigido para `dd/MM/yyyy [HH:mm:ss]`, com nota de inclusividade.
 - Semântica de `pagination.total` documentada por contrato, incluindo a divergência produtos-vs-linhas de `/estoque/produtos`.
@@ -236,7 +305,8 @@ Fatiado por **breaking-ness**, não por tema. Metade dos achados é perda de dad
 | Item | Achado |
 |---|---|
 | Normalização objeto→array | §3.1 |
-| `hasMore` aceita booleano; `total`/`page` aceitam número | §3.2 |
+| Tipos próprios por contrato (`RestPagination` intocada) | D3 |
+| `onDegraded` opcional nas varreduras e nos métodos com objeto de params | D5.1 |
 | Contrato `precos` (`temMaisRegistros`) | §3.2 |
 | `startPage` de `clientes.listarTodos` → 0 | §3.3 |
 | Iteração por contador local | D4 |
@@ -255,7 +325,13 @@ Duas ressalvas de precisão, já que "sem breaking" é uma afirmação forte:
 - `PaginatedResult<T>` ganha o campo opcional `degraded`. É mudança de superfície pública, mas **aditiva** — nenhum consumidor existente deixa de compilar ou de funcionar.
 - `clientes.listarTodos()` passa a visitar a página 0, e as varreduras de financeiros e preços passam da primeira página. Consumidores recebem **mais itens** do que antes. É correção de perda de dados, não quebra de contrato — mas quem dimensionou batch por contagem observada deve saber. Vai nas notas de release.
 
-Nenhuma assinatura pública muda. Nenhuma exceção nova é lançada.
+Nenhuma assinatura pública muda de forma incompatível. Nenhuma exceção nova é lançada. `RestPagination` não é tocada (D3).
+
+**Risco operacional da 1.5.0 — precisa de nota de release própria.**
+
+As varreduras hoje truncadas passam a percorrer o conjunto inteiro. `listarTodasReceitas()` sai de 50 itens para 519.004 — **10.381 páginas**. Um job que hoje termina em segundos passa a fazer dez mil requisições.
+
+É correção de perda de dados, não regressão. Mas para quem já roda esse código em produção é uma mudança de custo e duração que chega sem aviso. Mitigação: a nota de release destaca o item, e o paginador emite `logger.warn` ao ultrapassar 100 páginas numa varredura — visibilidade sem impor política.
 
 ### 2.0.0 — breaking
 
@@ -277,7 +353,8 @@ Cada item é um teste. Os de §3.1–§3.3 devem **falhar** contra a 1.4.0.
 
 **1.5.0**
 
-1. Resposta com chave declarada contendo objeto ⇒ `data` com 1 elemento, não `[]`.
+1. Um caso por linha da tabela de decisão de D2: array, objeto, chave ausente, `null`, escalar, array vazio.
+1b. `RestPagination` permanece byte-a-byte igual — teste de tipo com fixture de consumidor sob `tsc --strict`, verde antes e depois.
 2. `pagination.hasMore` booleano `true` ⇒ `hasMore: true`.
 3. `pagination` com `total`/`page` numéricos ⇒ normalizados sem perda.
 4. Corpo de contrato `precos` com `temMaisRegistros: true` ⇒ `hasMore: true`.
@@ -286,8 +363,10 @@ Cada item é um teste. Os de §3.1–§3.3 devem **falhar** contra a 1.4.0.
 7. `total: "0"` ⇒ `totalRecords: 0`, não `undefined` — em `normalizeRestPagination` e nos dois retornos de `deserializeRows`.
 8. Corpo sem `pagination` num contrato que a declara ⇒ `degraded: true` e `logger.error`, sem lançar.
 9. Contrato `precos` sem bloco `pagination` ⇒ `degraded: false`.
-10. Integração: `produtos.listar({modifiedSince})` numa janela de exatamente 1 alteração ⇒ 1 item.
+10. Integração: `produtos.listar({modifiedSince})` numa janela de exatamente 1 alteração ⇒ 1 item. **O timestamp é derivado em runtime** — busca a página 0, ordena `dataAlteracao:`, toma o máximo e reconsulta até isolar 1 registro. Nunca hardcoded: o dado do sandbox muda, e um valor fixo faz o teste validar outra coisa ou falhar sem motivo. Se a janela não render exatamente 1, o teste é pulado com mensagem explícita, nunca aprovado por omissão.
 10b. Página vazia com `hasMore` verdadeiro no meio da varredura ⇒ generator encerra (como hoje), `degraded: true`, `logger.error`, **sem laço infinito e sem lançar**.
+10c. `onDegraded` é chamado uma vez por página degradada durante uma varredura, com `endpoint` e `page` preenchidos.
+10d. Varredura que ultrapassa 100 páginas emite `logger.warn` uma única vez.
 
 **2.0.0**
 
@@ -308,7 +387,9 @@ Cada item é um teste. Os de §3.1–§3.3 devem **falhar** contra a 1.4.0.
 ## 8. Não-objetivos
 
 - Mapear 404 em `pedidos.consultar` — sem medição (§3.4).
-- Campo derivado para semântica de `total` — documentação apenas (D7).
+- Campo derivado para semântica de `total` — documentação apenas (D8).
+- Normalizar a base de `PaginatedResult.page` entre contratos (D7).
+- Override de `onDegradedResponse` por chamada (D5).
 - Refatorar `deserializeRows` além das saídas de degradação.
 - Alterar a superfície pública de resources além do campo `degraded`.
 
@@ -334,6 +415,8 @@ Este documento distingue medido de inferido. O que ainda **não** foi medido:
 4. **`pedidos.consultar` + `modifiedSince`.** Bloqueado pelo sandbox (§3.4). Permanece não-objetivo até que exista medição.
 
 5. **Chave de resposta dos endpoints de sub-recurso.** As 18 chaves medidas cobrem os endpoints de lista. As de sub-recurso (`/produtos/{id}/componentes` e afins) não foram medidas.
+
+6. **Deriva entre descritor e endpoint.** O contrato é propriedade do path, não da chamada. Descritores inline espalhados pelos métodos podem divergir sem que nada acuse. Mitigação barata na implementação: um `const` de descritores por módulo de resource, colocado junto do path — não literal solto em cada método.
 
 Nenhum item acima bloqueia o desenho — todos bloqueiam a **implementação** do trecho correspondente.
 
