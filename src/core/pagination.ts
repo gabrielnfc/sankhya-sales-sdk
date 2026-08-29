@@ -19,9 +19,9 @@ export function normalizeRestPagination<T>(
 
   return {
     data,
-    page: Number.parseInt(pagination.page, 10) || 0,
+    page: paraNumero(pagination.page) ?? 0,
     hasMore: pagination.hasMore === 'true',
-    totalRecords: Number.parseInt(pagination.total, 10) || undefined,
+    totalRecords: paraNumero(pagination.total),
   };
 }
 
@@ -41,9 +41,9 @@ export function normalizeGatewayPagination<T>(
 
   return {
     data,
-    page: Number.parseInt(entities.offsetPage ?? '0', 10) || 0,
+    page: paraNumero(entities.offsetPage) ?? 0,
     hasMore: entities.hasMoreResult === 'true',
-    totalRecords: Number.parseInt(entities.total ?? '0', 10) || undefined,
+    totalRecords: paraNumero(entities.total),
   };
 }
 

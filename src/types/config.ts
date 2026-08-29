@@ -27,6 +27,10 @@ export interface SankhyaConfig {
    *   `logger.error`. Nao lanca.
    *
    * O default passa a `'throw'` na 2.0.0.
+   *
+   * Este campo nao tem efeito na 1.5.0 — o SDK nao le seu valor em lugar
+   * nenhum, ja que so existe uma politica implementada (`'flag'`). Reservado
+   * para a 2.0.0, quando `'throw'` vira uma opcao real.
    */
   onDegradedResponse?: 'flag';
 }

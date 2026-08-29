@@ -81,7 +81,7 @@ describe('contrato financeiro (/financeiros/receitas, /financeiros/despesas)', (
   } as unknown as RestPagination;
 
   const descritorFinanceiro: ResourceDescriptor = {
-    resourceKey: 'receitas',
+    resourceKey: 'financeiros',
     contract: 'financeiro',
     expectPagination: true,
   };
