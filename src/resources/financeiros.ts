@@ -179,6 +179,9 @@ export class FinanceirosResource {
    *   codigoEmpresa: 1,
    * });
    * ```
+   * @remarks
+   * `totalRecords` deste endpoint E censo real (medido: 519004 receitas).
+   * E a excecao — nos demais endpoints o campo conta apenas a pagina.
    */
   async listarReceitas(filtro?: ReceitasFiltro): Promise<PaginatedResult<Receita>> {
     const query: Record<string, string> = { page: String(filtro?.page ?? 0) };
@@ -288,6 +291,9 @@ export class FinanceirosResource {
    * @returns Resultado paginado com despesas.
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
+   * @remarks
+   * `totalRecords` deste endpoint E censo real (medido: 519004 receitas).
+   * E a excecao — nos demais endpoints o campo conta apenas a pagina.
    */
   async listarDespesas(params?: { page?: number }): Promise<PaginatedResult<Despesa>> {
     const query: Record<string, string> = { page: String(params?.page ?? 0) };

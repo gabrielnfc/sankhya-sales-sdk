@@ -58,6 +58,10 @@ export class EstoqueResource {
    * @returns Resultado paginado com posicoes de estoque.
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
+   * @remarks
+   * `totalRecords` deste endpoint NAO e censo: conta produtos, enquanto o
+   * array conta linhas por local de estoque. Medido: a pagina 0 devolve
+   * 422 linhas com `total` 50. Nao use para verificar completude.
    */
   async listar(params?: { page?: number }): Promise<PaginatedResult<Estoque>> {
     const query: Record<string, string> = { page: String(params?.page ?? 0) };

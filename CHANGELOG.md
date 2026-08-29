@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-08-29
+
+### Corrigido
+
+- **Resultado único era descartado.** A API devolve objeto em vez de array quando exatamente 1 registro corresponde ao filtro; o SDK procurava um array e devolvia lista vazia, informando `totalRecords: 1`. Atingia qualquer listagem filtrada até um único resultado — em sync incremental, o caso comum.
+- **Varreduras dos endpoints financeiros paravam na primeira página.** `/financeiros/receitas` e `/despesas` usam `hasMore` booleano; a comparação era com a string `'true'`. `listarTodasReceitas()` entregava 50 de 519.004 registros.
+- **Varreduras de preços paravam na primeira página.** Os endpoints `/precos/*` não têm bloco `pagination` — trazem `temMaisRegistros` na raiz do corpo, que era ignorado.
+- **`clientes.listar()` e `clientes.listarTodos()` pulavam a primeira página.** O default era `page: 1` num endpoint 0-based.
+- **Iteração dirigida pelo echo do servidor.** `createPaginator` derivava a próxima página do campo `page` da resposta; agora usa contador local.
+- **`total: "0"` virava `undefined`** em `normalizeRestPagination` e em `deserializeRows`.
+- **`cadastros.listarUsuarios()`, `financeiros.listarContasBancarias()` e `produtos.volumes()` devolviam só a primeira página.** Os endpoints paginam de verdade e o bloco `pagination` era descartado. Medido: `/usuarios` responde 50 itens com `hasMore: true`. As assinaturas não mudaram — os métodos agora percorrem todas as páginas internamente.
+
+### Adicionado
+
+- `PaginatedResult.degraded` — `true` quando a resposta não trouxe o formato declarado pelo endpoint. Sempre presente no retorno do SDK. Lista vazia legítima vem com `false`.
+- `onDegraded` opcional nos métodos de varredura, para instrumentação.
+- `SankhyaConfig.onDegradedResponse` — hoje só `'flag'`. O default passa a `'throw'` na 2.0.0.
+- Tipos `FinanceiroPagination` e `PrecosPagination`, documentando os contratos divergentes.
+
+### Corrigido na documentação
+
+- `modifiedSince` e `dataHoraAlteracao` documentavam formato ISO. A API exige `dd/MM/yyyy [HH:mm:ss]`; ISO responde `400 ORA-01861`.
+- `totalRecords` documentado por endpoint: é censo nos financeiros e contagem de página nos demais.
+
+### ⚠️ Impacto operacional
+
+As varreduras antes truncadas passam a percorrer o conjunto inteiro. `listarTodasReceitas()` sai de 50 itens para 519.004 — **10.381 páginas**. Um job que hoje termina em segundos passará a fazer dez mil requisições. É correção de perda de dados, não regressão, mas planeje capacidade antes de subir. Varreduras acima de 100 páginas emitem `logger.warn`.
+
+Se seu código espelha dados via sync incremental, **faça um resync completo** após o upgrade: o bug do resultado único deixou registros desatualizados sem rastro em log.
+
 ## [1.4.0] - 2026-08-19
 
 ### Added
