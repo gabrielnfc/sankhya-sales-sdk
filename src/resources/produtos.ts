@@ -146,11 +146,30 @@ export class ProdutosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   async volumes(codigoProduto: number): Promise<Volume[]> {
-    const raw = await this.http.restGet<Record<string, unknown>>(
-      `/produtos/${codigoProduto}/volumes`,
-    );
-    const { data } = extractRestData<Volume>(raw, DESCRITOR_VOLUMES_PRODUTO);
-    return data;
+    const paginar = async (page: number) => {
+      const raw = await this.http.restGet<Record<string, unknown>>(
+        `/produtos/${codigoProduto}/volumes`,
+        { page: String(page) },
+      );
+      const { data, degraded, degradedInfo } = extractRestData<Volume>(
+        raw,
+        DESCRITOR_VOLUMES_PRODUTO,
+      );
+      return normalizePagination(
+        data,
+        raw,
+        DESCRITOR_VOLUMES_PRODUTO,
+        degraded,
+        this.http.getLogger(),
+        degradedInfo,
+      );
+    };
+
+    const todos: Volume[] = [];
+    for await (const volume of createPaginator(paginar, 0, { logger: this.http.getLogger() })) {
+      todos.push(volume);
+    }
+    return todos;
   }
 
   /**

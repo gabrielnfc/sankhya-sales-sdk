@@ -429,9 +429,29 @@ export class FinanceirosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   async listarContasBancarias(): Promise<ContaBancaria[]> {
-    const raw = await this.http.restGet<Record<string, unknown>>('/financeiros/contas-bancaria');
-    const { data } = extractRestData<ContaBancaria>(raw, DESCRITOR_CONTAS_BANCARIAS);
-    return data;
+    const paginar = async (page: number) => {
+      const raw = await this.http.restGet<Record<string, unknown>>('/financeiros/contas-bancaria', {
+        page: String(page),
+      });
+      const { data, degraded, degradedInfo } = extractRestData<ContaBancaria>(
+        raw,
+        DESCRITOR_CONTAS_BANCARIAS,
+      );
+      return normalizePagination(
+        data,
+        raw,
+        DESCRITOR_CONTAS_BANCARIAS,
+        degraded,
+        this.http.getLogger(),
+        degradedInfo,
+      );
+    };
+
+    const todas: ContaBancaria[] = [];
+    for await (const conta of createPaginator(paginar, 0, { logger: this.http.getLogger() })) {
+      todas.push(conta);
+    }
+    return todas;
   }
 
   /**

@@ -87,7 +87,7 @@ describe('ProdutosResource', () => {
     const resource = new ProdutosResource(http);
     const result = await resource.volumes(5);
 
-    expect(http.restGet).toHaveBeenCalledWith('/produtos/5/volumes');
+    expect(http.restGet).toHaveBeenCalledWith('/produtos/5/volumes', { page: '0' });
     expect(result).toHaveLength(1);
   });
 

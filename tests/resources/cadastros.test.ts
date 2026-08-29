@@ -215,11 +215,12 @@ describe('CadastrosResource', () => {
     it('calls restGet with /usuarios and returns array directly', async () => {
       const http = createMockHttp();
       const cad = new CadastrosResource(http);
+      // Endpoint devolve pagination real (Task 8b): percorre todas as paginas.
       http.restGet.mockResolvedValue(makeRestResponse('usuarios', [{ id: 1 }, { id: 2 }]));
 
       const result = await cad.listarUsuarios();
 
-      expect(http.restGet).toHaveBeenCalledWith('/usuarios');
+      expect(http.restGet).toHaveBeenCalledWith('/usuarios', { page: '0' });
       expect(result).toHaveLength(2);
       expect(Array.isArray(result)).toBe(true);
     });

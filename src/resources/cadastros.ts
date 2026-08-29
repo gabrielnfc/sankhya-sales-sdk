@@ -286,9 +286,26 @@ export class CadastrosResource {
    * @throws {AuthError} Se autenticacao falhar.
    */
   async listarUsuarios(): Promise<Usuario[]> {
-    const raw = await this.http.restGet<Record<string, unknown>>('/usuarios');
-    const { data } = extractRestData<Usuario>(raw, DESCRITOR_USUARIOS);
-    return data;
+    const paginar = async (page: number) => {
+      const raw = await this.http.restGet<Record<string, unknown>>('/usuarios', {
+        page: String(page),
+      });
+      const { data, degraded, degradedInfo } = extractRestData<Usuario>(raw, DESCRITOR_USUARIOS);
+      return normalizePagination(
+        data,
+        raw,
+        DESCRITOR_USUARIOS,
+        degraded,
+        this.http.getLogger(),
+        degradedInfo,
+      );
+    };
+
+    const todos: Usuario[] = [];
+    for await (const usuario of createPaginator(paginar, 0, { logger: this.http.getLogger() })) {
+      todos.push(usuario);
+    }
+    return todos;
   }
 
   // --- Iteradores ---

@@ -348,7 +348,7 @@ describe('FinanceirosResource', () => {
 
       const result = await fin.listarContasBancarias();
 
-      expect(http.restGet).toHaveBeenCalledWith('/financeiros/contas-bancaria');
+      expect(http.restGet).toHaveBeenCalledWith('/financeiros/contas-bancaria', { page: '0' });
       expect(result).toHaveLength(2);
       expect(Array.isArray(result)).toBe(true);
     });
