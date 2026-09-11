@@ -200,3 +200,14 @@ export type {
   FecharConferenciaInput,
   ReapontarOrigemInput,
 } from './types/conferencia.js';
+
+// Faturamento (D2.4) — bloco proprio ao fim para merge limpo
+export { FaturamentoResource } from './resources/faturamento.js';
+export type {
+  CabPendenteReadBackRow,
+  FaturarInput,
+  FaturarMotivo,
+  FaturarResult,
+  VarLinha,
+  VarReadBackRow,
+} from './types/faturamento.js';
