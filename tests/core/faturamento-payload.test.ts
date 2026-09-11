@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { SankhyaError } from '../../src/core/errors.js';
 import { buildFaturarWizardPayload } from '../../src/core/faturamento-payload.js';
+import type { FaturarPedidoInput } from '../../src/types/pedidos.js';
 
 describe('buildFaturarWizardPayload', () => {
   it('monta o payload wizard medido no sandbox (T0-11a, spike-raw/faturamento/ped.ts:fatBody)', () => {
@@ -33,5 +35,34 @@ describe('buildFaturarWizardPayload', () => {
         faturarTodosItens: false,
       }),
     ).toThrow(/faturamento parcial/i);
+  });
+
+  // O builder e a fonte unica que a D2.4 reusa: sem validacao propria,
+  // `String(undefined)` viraria a string `'undefined'` dentro de `nota[0].$`.
+  it('valida o input: codigoPedido ausente lanca VALIDATION_ERROR, nao vira "undefined"', () => {
+    const semPedido: Partial<FaturarPedidoInput> = { codigoTipoOperacao: 1101 };
+
+    let capturado: unknown;
+    try {
+      buildFaturarWizardPayload(semPedido as FaturarPedidoInput);
+    } catch (err) {
+      capturado = err;
+    }
+
+    expect(capturado).toBeInstanceOf(SankhyaError);
+    expect((capturado as SankhyaError).code).toBe('VALIDATION_ERROR');
+    expect((capturado as SankhyaError).message).toMatch(/codigoPedido/);
+  });
+
+  it('valida o input: serie vazia e recusada pelo builder', () => {
+    expect(() =>
+      buildFaturarWizardPayload({ codigoPedido: 1889309, codigoTipoOperacao: 1101, serie: '' }),
+    ).toThrow(/serie/i);
+  });
+
+  it('valida o input: codigoPedido fracionario e recusado (inteiro obrigatorio)', () => {
+    expect(() =>
+      buildFaturarWizardPayload({ codigoPedido: 1.5, codigoTipoOperacao: 1101 }),
+    ).toThrow(/inteiro/i);
   });
 });

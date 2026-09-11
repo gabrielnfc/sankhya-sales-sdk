@@ -702,6 +702,32 @@ describe('PedidosResource', () => {
         vi.resetModules();
       }
     });
+
+    it('codigoPedido fracionario lanca antes da rede (inteiro obrigatorio)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+
+      await expect(
+        pedidos.faturar({ codigoPedido: 1.5, codigoTipoOperacao: 1101 }),
+      ).rejects.toThrow(/inteiro/i);
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
+
+    // O 4o argumento de gatewayCall e o objeto de options recebido por
+    // `faturar` — repassado como veio, sem default nem reescrita.
+    it('repassa options como 4o argumento de gatewayCall', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({});
+      const options = { timeout: 5000, idempotencyKey: 'fat-99' };
+
+      await pedidos.faturar({ codigoPedido: 99, codigoTipoOperacao: 1101 }, options);
+
+      expect(http.gatewayCall.mock.calls[0][3]).toEqual({
+        timeout: 5000,
+        idempotencyKey: 'fat-99',
+      });
+    });
   });
 
   describe('incluirNotaGateway()', () => {

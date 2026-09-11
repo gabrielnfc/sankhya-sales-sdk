@@ -1,5 +1,6 @@
 import type { FaturarPedidoInput } from '../types/pedidos.js';
 import { SankhyaError } from './errors.js';
+import { validateFaturarPedidoInput } from './validators.js';
 
 /**
  * Defaults literais do wizard de faturamento, medidos no sandbox (M51/M49,
@@ -32,9 +33,15 @@ const PADROES_WIZARD = {
  *
  * @param input - Dados de faturamento (pedido, TOP, serie, local de destino).
  * @returns Corpo pronto para `gatewayCall('mgecom', 'SelecaoDocumentoSP.faturar', ...)`.
- * @throws {SankhyaError} Se `faturarTodosItens` for `false` (M82).
+ * @throws {SankhyaError} Se o input for invalido (`VALIDATION_ERROR`) ou se
+ * `faturarTodosItens` for `false` (M82).
  */
 export function buildFaturarWizardPayload(input: FaturarPedidoInput): Record<string, unknown> {
+  // O builder valida por conta propria: ele e a fonte unica do payload e e
+  // chamado direto (D2.4), nao so por `pedidos.faturar`. Sem isto,
+  // `String(undefined)` vira a string `'undefined'` dentro de `nota[0].$`.
+  validateFaturarPedidoInput(input, 'FaturarPedidoInput');
+
   if (input.faturarTodosItens === false) {
     throw new SankhyaError(
       'faturamento parcial nao e suportado pelo wizard de faturamento do Sankhya (M82): ' +
