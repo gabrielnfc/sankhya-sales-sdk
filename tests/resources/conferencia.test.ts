@@ -130,10 +130,27 @@ describe('ConferenciaResource', () => {
       expect(sql).toMatch(/^\s*SELECT\b/);
       expect(sql).not.toContain(';');
       expect(sql).toContain('AD_DTHRSEPARACAO');
+      // a tabela importa: o carimbo vive em TGFCAB, nao em TGFCON2
+      expect(sql).toMatch(/\bFROM\s+TGFCAB\b/);
       // coluna nua, como na leitura medida (spike-raw/conferencia/C1_RB_P_POS_CONF.json)
       expect(sql).not.toContain('TO_CHAR');
       // filtro pelo nunota recebido, e so por ele: sem WHERE o guard leria outra nota
       expect(sql).toMatch(/WHERE\s+NUNOTA\s*=\s*1889348\s*$/);
+    });
+
+    it('abrir lanca quando o result traz NUCONF 0 — zero nao e NUCONF, e celula presente', async () => {
+      const dbx = createMockDbx();
+      dbx.query
+        .mockResolvedValueOnce([{ AD_DTHRSEPARACAO: '06/09/2026 12:55:34' }])
+        .mockResolvedValueOnce([]);
+      const ds = createMockDs({ total: 1, result: [['0']] });
+      await expect(
+        new ConferenciaResource(ds, dbx).abrir({
+          nunota: 1889348,
+          codUsuConf: 69,
+          dataHora: '06/09/2026 12:55:34',
+        }),
+      ).rejects.toThrow(/NUCONF/);
     });
 
     it('abrir recusa NUNOTA nao-inteiro antes de qualquer leitura ou escrita', async () => {
