@@ -30,12 +30,30 @@ describe('DbExplorerResource', () => {
     'DELETE FROM TGFCAB',
     'SELECT 1 FROM DUAL; DROP TABLE TGFEST',
     'SELECT 1 FROM DUAL;',
+    'INSERT INTO t SELECT 1 FROM DUAL',
+    'WITH x AS (SELECT 1 FROM DUAL) SELECT * FROM x',
+    'DELETE FROM TGFCAB WHERE NUNOTA IN (SELECT NUNOTA FROM TGFITE)',
     '  delete from x',
     '',
   ])('recusa SQL que nao e SELECT puro: %s', async (sql) => {
     const http = createMockHttp();
     await expect(new DbExplorerResource(http).query(sql)).rejects.toThrow(/SELECT/i);
     expect(http.gatewayCall).not.toHaveBeenCalled(); // recusa ANTES da rede
+  });
+
+  // Consumidor JS (sem TS) pode passar algo que nao e string: recusa antes da
+  // rede. O array e o caso que importa — `regex.test(valor)` coage para string e
+  // `Array.prototype.includes` existe, entao sem a checagem de `typeof` ele
+  // atravessaria o guard inteiro e chegaria ao Sankhya.
+  it.each([
+    ['undefined', undefined],
+    ['array que imita SELECT', ['SELECT 1 FROM DUAL']],
+  ])('recusa sql nao-string (%s)', async (_label, sql) => {
+    const http = createMockHttp();
+    await expect(new DbExplorerResource(http).query(sql as unknown as string)).rejects.toThrow(
+      /SELECT/i,
+    );
+    expect(http.gatewayCall).not.toHaveBeenCalled();
   });
 
   it('casa rows com fieldsMetadata (resposta real do sandbox)', async () => {
@@ -79,16 +97,25 @@ describe('DbExplorerResource', () => {
 
   // Medido no spike legado (tools/sankhya-spike/lib.ts:80): CODLOCAL veio `number`,
   // nao string. A celula e convertida explicitamente; null/undefined viram ''.
-  it('converte celula nao-string para string e null/undefined para vazio', async () => {
+  it('converte celula nao-string para string; so null/undefined viram vazio', async () => {
     const http = createMockHttp();
     http.gatewayCall.mockResolvedValue({
-      fieldsMetadata: [{ name: 'CODLOCAL' }, { name: 'DESCRICAO' }, { name: 'DTALTER' }],
-      rows: [[1010, null, undefined]],
+      fieldsMetadata: [
+        { name: 'CODLOCAL' },
+        { name: 'QTDNEG' },
+        { name: 'ATIVO' },
+        { name: 'DESCRICAO' },
+        { name: 'DTALTER' },
+      ],
+      // 0 e false sao valores reais do ERP (quantidade, flag) — nao podem virar ''.
+      rows: [[1010, 0, false, null, undefined]],
     });
     const rows = await new DbExplorerResource(http).query(
-      'SELECT CODLOCAL, DESCRICAO, DTALTER FROM TGFLOC',
+      'SELECT CODLOCAL, QTDNEG, ATIVO, DESCRICAO, DTALTER FROM TGFLOC',
     );
-    expect(rows).toEqual([{ CODLOCAL: '1010', DESCRICAO: '', DTALTER: '' }]);
+    expect(rows).toEqual([
+      { CODLOCAL: '1010', QTDNEG: '0', ATIVO: 'false', DESCRICAO: '', DTALTER: '' },
+    ]);
   });
 
   // I11: linha com numero de colunas diferente do metadata nao vira objeto

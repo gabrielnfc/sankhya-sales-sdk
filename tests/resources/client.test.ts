@@ -3,6 +3,7 @@ import { SankhyaClient } from '../../src/client.js';
 import { HttpClient } from '../../src/core/http.js';
 import { CadastrosResource } from '../../src/resources/cadastros.js';
 import { ClientesResource } from '../../src/resources/clientes.js';
+import { DbExplorerResource } from '../../src/resources/db-explorer.js';
 import { EstoqueResource } from '../../src/resources/estoque.js';
 import { FinanceirosResource } from '../../src/resources/financeiros.js';
 import { FiscalResource } from '../../src/resources/fiscal.js';
@@ -165,6 +166,12 @@ describe('SankhyaClient', () => {
     it('client.gateway returns GatewayResource instance', () => {
       const client = new SankhyaClient(validConfig);
       expect(client.gateway).toBeInstanceOf(GatewayResource);
+    });
+
+    it('client.dbExplorer returns DbExplorerResource instance (lazy, mesma instancia)', () => {
+      const client = new SankhyaClient(validConfig);
+      expect(client.dbExplorer).toBeInstanceOf(DbExplorerResource);
+      expect(client.dbExplorer).toBe(client.dbExplorer);
     });
   });
 

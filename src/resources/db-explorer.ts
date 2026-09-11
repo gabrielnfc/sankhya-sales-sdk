@@ -4,10 +4,23 @@ import type { RequestOptions } from '../types/config.js';
 import type { DbExplorerRawResponse, DbExplorerRow } from '../types/db-explorer.js';
 
 /**
- * SELECT puro: inicio `SELECT` (espacos a esquerda ok, caixa livre) e nenhum
- * `;` em lugar algum — mesma semantica de `tools/sankhya-spike/lib.ts`
- * (`isReadOnlySql`). O `;` e recusado porque o DbExplorer aceita mais de um
- * comando por chamada: `SELECT 1 FROM DUAL; DROP TABLE X` passaria no prefixo.
+ * SELECT puro: a consulta **comeca** com `SELECT` (espacos a esquerda ok, caixa
+ * livre) e nao tem `;` em lugar algum — mesma semantica de
+ * `tools/sankhya-spike/lib.ts` (`isReadOnlySql`).
+ *
+ * A ancora `^` e o invariante: sem ela `INSERT INTO t SELECT 1 FROM DUAL` ou
+ * `DELETE … WHERE id IN (SELECT …)` passariam. O `;` e recusado porque o
+ * DbExplorer aceita mais de um comando por chamada (`SELECT 1 FROM DUAL; DROP
+ * TABLE X`).
+ *
+ * Limites declarados (G9 — guard sintatico por regex, nao parser de SQL):
+ * - **recusa** o que comeca com outra palavra, inclusive CTE (`WITH x AS (…)
+ *   SELECT …`) e comentario antes do `SELECT` — falso negativo aceito (I9);
+ * - **nao impede** `SELECT … FOR UPDATE` nem `SELECT f_com_side_effect()`, que
+ *   escrevem apesar de serem `SELECT`. `DbExplorerSP.executeQuery` esta na
+ *   allowlist de idempotentes (`src/core/http.ts:8-10`) e e **retentado ate 3x**
+ *   (`src/core/retry.ts:61-66`): um SQL com efeito seria reexecutado. Nao use
+ *   `query()` para isso — a responsabilidade e do chamador.
  */
 const PURE_SELECT = /^\s*SELECT\b/i;
 
@@ -36,8 +49,12 @@ export class DbExplorerResource {
   /**
    * Executa um `SELECT` e devolve as linhas como dicionarios chave-valor.
    *
-   * Toda celula e convertida para string (`null`/`undefined` viram `''`): o
-   * DbExplorer nao garante string — `CODLOCAL` chega como `number`.
+   * Toda celula e convertida para string: o DbExplorer nao garante string —
+   * `CODLOCAL` chega como `number`. Apenas `null`/`undefined` viram `''`; `0` e
+   * `false` viram `'0'` e `'false'`, porque sao valores reais do ERP.
+   *
+   * Colunas homonimas colapsam: `SELECT A.CODPROD, B.CODPROD` devolve uma unica
+   * chave `CODPROD` (a ultima vence), sem erro — use alias no SQL.
    *
    * @param sql - `SELECT` puro, sem `;`. Interpolacao e responsabilidade do chamador.
    * @param options - Opcoes de requisicao (timeout, `signal`).
