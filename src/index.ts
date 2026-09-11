@@ -187,3 +187,13 @@ export type {
   DatasetSaveRawResponse,
   DatasetSaveResult,
 } from './types/dataset.js';
+
+// Notas (D2.3) — bloco proprio ao fim para merge limpo
+export { NotasResource } from './resources/notas.js';
+export type {
+  CancelamentoReadBackRow,
+  CancelarNotaInput,
+  CancelarNotaRawResponse,
+  CancelarNotaResult,
+  ConfirmarNotaResult,
+} from './types/notas.js';
