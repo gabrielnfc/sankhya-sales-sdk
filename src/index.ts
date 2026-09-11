@@ -33,6 +33,10 @@ export {
 } from './core/errors.js';
 export type { SankhyaErrorCode } from './core/errors.js';
 
+// Classificacao de falha (3 camadas)
+export { classifyFailure } from './core/failure-classification.js';
+export type { SankhyaFailureKind } from './core/failure-classification.js';
+
 // Validators
 export {
   validatePedidoVendaInput,

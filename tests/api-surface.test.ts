@@ -15,6 +15,13 @@ describe('api-surface', () => {
       expect(sdk.TimeoutError).toBeDefined();
     });
 
+    it('exports classifyFailure (o tipo e travado em tests/types)', () => {
+      expect(sdk.classifyFailure).toBeDefined();
+      expect(sdk.classifyFailure(new Error('boom'))).toBe('TIMEOUT');
+      // O tipo `SankhyaFailureKind` nao existe em runtime: quem o trava e
+      // `tests/types/failure-classification-superficie.ts`, via `npm run typecheck:tests`.
+    });
+
     it('exports type guard functions', () => {
       expect(sdk.isSankhyaError).toBeDefined();
       expect(sdk.isAuthError).toBeDefined();
