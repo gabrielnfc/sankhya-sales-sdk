@@ -123,10 +123,17 @@ export class GatewayResource {
   }
 
   /**
-   * Salva (cria ou atualiza) um registro via Gateway.
+   * Envia um registro para `CRUDServiceProvider.saveRecord`.
    *
-   * @param params - Entidade, campos e dados a salvar.
-   * @returns Registro salvo como dicionario chave-valor.
+   * O SDK monta `dataSet.dataRow.localFields` com `params.data` e acrescenta
+   * `dataSet.dataRow.key` quando `params.primaryKey` vem preenchida. Qual efeito
+   * (insercao ou atualizacao) cada forma produz no ERP e premissa nao medida ate
+   * a lane de integracao. `primaryKey: {}` e recusada: a escolha e do chamador.
+   *
+   * @param params - Entidade, campos, dados e (opcional) chave primaria.
+   * @returns Registro devolvido pelo Gateway como dicionario chave-valor.
+   * @throws {SankhyaError} `VALIDATION_ERROR` se `primaryKey` vier vazia ou se
+   * algum nome de campo de `data`/`primaryKey` for invalido.
    * @throws {GatewayError} Em erro de negocio Sankhya.
    * @throws {AuthError} Se autenticacao falhar.
    * @example
@@ -143,8 +150,15 @@ export class GatewayResource {
     assertFieldNames(params.primaryKey ?? {}, 'primaryKey');
     assertFieldNames(params.data, 'data');
 
+    if (params.primaryKey && Object.keys(params.primaryKey).length === 0) {
+      throw new SankhyaError(
+        'SaveRecordParams.primaryKey vazia: omita o campo para inserir ou informe a chave do registro.',
+        'VALIDATION_ERROR',
+      );
+    }
+
     const dataRow: Record<string, unknown> = { localFields: serialize(params.data) };
-    if (params.primaryKey && Object.keys(params.primaryKey).length > 0) {
+    if (params.primaryKey) {
       dataRow.key = serialize(params.primaryKey);
     }
 

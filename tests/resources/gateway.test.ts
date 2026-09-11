@@ -300,6 +300,41 @@ describe('GatewayResource', () => {
       };
       expect(body.dataSet.dataRow).not.toHaveProperty('key');
     });
+
+    // MINOR-3 do review: a validacao de nome de campo vale para `data`, nao so
+    // para a primaryKey de loadRecord. Sem ela, o nome sujo chega ao Gateway.
+    it('rejeita nome de campo invalido em data, sem chamar o Gateway', async () => {
+      const http = createMockHttp();
+      const gw = new GatewayResource(http);
+
+      await expect(
+        gw.saveRecord({
+          entity: 'Parceiro',
+          fields: 'CODPARC,NOMEPARC',
+          data: { 'NOME PARC': 'X' },
+        }),
+      ).rejects.toThrow(/Nome de campo invalido na data/);
+
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
+
+    // MINOR-4 do review (I11): ambiguidade nao vira estado terminal em silencio.
+    // `primaryKey: {}` seria insercao muda; o SDK falha alto e pede a decisao.
+    it('recusa primaryKey vazia em vez de decidir insercao em silencio', async () => {
+      const http = createMockHttp();
+      const gw = new GatewayResource(http);
+
+      await expect(
+        gw.saveRecord({
+          entity: 'Parceiro',
+          fields: 'CODPARC,NOMEPARC',
+          primaryKey: {},
+          data: { NOMEPARC: 'X' },
+        }),
+      ).rejects.toThrow(/primaryKey vazia/);
+
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
   });
 
   describe('call()', () => {

@@ -31,9 +31,12 @@ export interface SaveRecordParams {
   /** Dados a salvar como pares campo-valor. */
   data: Record<string, string>;
   /**
-   * Chave primaria do registro a atualizar, como pares campo-valor.
+   * Chave primaria do registro, como pares campo-valor.
    *
-   * Ausente ou vazia, o Gateway trata a chamada como insercao.
+   * Presente, o SDK envia `dataSet.dataRow.key`; ausente, omite a chave.
+   * O efeito disso no ERP (insercao vs. atualizacao) e premissa ainda nao
+   * medida contra o sandbox — vale a partir da lane de integracao.
+   * Um objeto vazio e recusado com `VALIDATION_ERROR`: omita para inserir.
    */
   primaryKey?: Record<string, string>;
 }
