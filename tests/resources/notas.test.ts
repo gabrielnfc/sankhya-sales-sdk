@@ -59,6 +59,60 @@ describe('NotasResource', () => {
       await expect(new NotasResource(http, dbx).confirmar(1)).rejects.toThrow(/Data de Validade/);
     });
 
+    it('confirmar aceita a mensagem ACENTUADA medida no sandbox (A nota <n> ja foi confirmada.)', async () => {
+      const http = createMockHttp();
+      const dbx = createMockDbx();
+      // Texto literal medido: spike-raw/faturamento/attempts.ndjson, n=4
+      // (label S3_CONFIRMAR_1101_2_IDENTICO) — vem COM acento.
+      http.gatewayCall.mockRejectedValue(
+        new GatewayError('A nota 1889308 já foi confirmada.', 'CACSP.confirmarNota'),
+      );
+      await expect(new NotasResource(http, dbx).confirmar(1889308)).resolves.toEqual({
+        confirmada: true,
+        jaEstavaConfirmada: true,
+      });
+    });
+
+    // O ramo de idempotencia (M80) e o unico lugar do SDK onde um ERRO vira
+    // SUCESSO. Cada caso abaixo e uma forma que NAO pode entrar nele.
+    it.each([
+      [
+        'outra acao no mesmo formato ("ja foi cancelada")',
+        new GatewayError('A nota 1889277 ja foi cancelada.', 'CACSP.confirmarNota'),
+      ],
+      [
+        'negativa da MESMA acao ("nao foi confirmada")',
+        new GatewayError('A nota 1 nao foi confirmada.', 'CACSP.confirmarNota'),
+      ],
+      [
+        'mensagem certa em erro que NAO e GatewayError (instanceof)',
+        new TimeoutError('A nota 1889309 ja foi confirmada.'),
+      ],
+      [
+        'mensagem certa vinda de OUTRO serviceName',
+        new GatewayError('A nota 1889309 ja foi confirmada.', 'CACSP.incluirNota'),
+      ],
+      [
+        'a frase embutida em uma recusa maior (regex ancorada)',
+        new GatewayError(
+          'Erro ao gravar: A nota 1 ja foi confirmada. Verifique o estoque.',
+          'CACSP.confirmarNota',
+        ),
+      ],
+    ])('confirmar NAO trata como sucesso: %s', async (_caso, erro) => {
+      const http = createMockHttp();
+      const dbx = createMockDbx();
+      http.gatewayCall.mockRejectedValue(erro);
+      await expect(new NotasResource(http, dbx).confirmar(1889309)).rejects.toBe(erro);
+    });
+
+    it('confirmar recusa nunota nao-inteiro ANTES da rede', async () => {
+      const http = createMockHttp();
+      const dbx = createMockDbx();
+      await expect(new NotasResource(http, dbx).confirmar(1.5)).rejects.toThrow(/inteiro/i);
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
+
     it('confirmar usa mgecom/CACSP.confirmarNota e devolve jaEstavaConfirmada false no caminho feliz', async () => {
       const http = createMockHttp();
       const dbx = createMockDbx();
@@ -96,6 +150,17 @@ describe('NotasResource', () => {
         'CACSP.excluirNotas',
         { notas: { nota: [{ NUNOTA: '1889304' }, { NUNOTA: '1889305' }] } },
         undefined,
+      );
+    });
+
+    it('excluir com TIMEOUT avisa que a exclusao pode ter sido executada e re-lanca o erro original', async () => {
+      const http = createMockHttp();
+      const dbx = createMockDbx();
+      const erro = new TimeoutError('Request timeout apos 30000ms');
+      http.gatewayCall.mockRejectedValue(erro);
+      await expect(new NotasResource(http, dbx).excluir([1889304])).rejects.toBe(erro);
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringMatching(/TIMEOUT[\s\S]*pode ter sido executada/),
       );
     });
 
@@ -219,6 +284,56 @@ describe('NotasResource', () => {
         confirmadoPorReadBack: true,
         statusNfe: null, // STATUSNFE vazio nao e status: e ausencia (null), nunca ''
       });
+    });
+
+    it('cancelar com TIMEOUT no gateway AINDA faz o read-back e deriva o estado dele (I11)', async () => {
+      const http = createMockHttp();
+      http.gatewayCall.mockRejectedValue(new TimeoutError('Request timeout apos 30000ms'));
+      const dbx = createMockDbx([{ NUNOTA: '1889277', STATUSNFE: 'C' }]);
+      const out = await new NotasResource(http, dbx).cancelar({
+        nunota: 1889277,
+        justificativa: 'x',
+      });
+      expect(dbx.query).toHaveBeenCalled();
+      expect(out).toEqual({
+        totalNotasCanceladas: 0,
+        gerouRecebimento: false,
+        confirmadoPorReadBack: true,
+        statusNfe: 'C',
+        avisoRespostaGateway: expect.stringMatching(/estado derivado do read-back/),
+      });
+    });
+
+    it('cancelar com TIMEOUT e read-back SEM linha lanca dizendo que o comando JA FOI ENVIADO', async () => {
+      const http = createMockHttp();
+      http.gatewayCall.mockRejectedValue(new TimeoutError('Request timeout apos 30000ms'));
+      const dbx = createMockDbx([]);
+      await expect(
+        new NotasResource(http, dbx).cancelar({ nunota: 1889277, justificativa: 'x' }),
+      ).rejects.toThrow(/JA FOI ENVIADO/i);
+      expect(dbx.query).toHaveBeenCalled();
+    });
+
+    it('cancelar com erro de NEGOCIO propaga cru e NAO consulta o read-back', async () => {
+      const http = createMockHttp();
+      const erro = new GatewayError('Nota nao pode ser cancelada.', 'CACSP.cancelarNota');
+      http.gatewayCall.mockRejectedValue(erro);
+      const dbx = createMockDbx([]);
+      await expect(
+        new NotasResource(http, dbx).cancelar({ nunota: 1889277, justificativa: 'x' }),
+      ).rejects.toBe(erro);
+      expect(dbx.query).not.toHaveBeenCalled();
+    });
+
+    it('cancelar devolve statusNfe null quando a coluna nem vem na linha do read-back', async () => {
+      const http = createMockHttp();
+      http.gatewayCall.mockResolvedValue({
+        resultadoCancelamento: { totalNotasCanceladas: '1', gerouRecebimento: 'false' },
+      });
+      const dbx = createMockDbx([{ NUNOTA: '1889277' }]);
+      await expect(
+        new NotasResource(http, dbx).cancelar({ nunota: 1889277, justificativa: 'x' }),
+      ).resolves.toMatchObject({ confirmadoPorReadBack: true, statusNfe: null });
     });
 
     it('cancelar recusa nunota nao-inteiro ANTES da rede e do read-back', async () => {

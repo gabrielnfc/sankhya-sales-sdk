@@ -15,19 +15,39 @@ import type { DbExplorerResource } from './db-explorer.js';
 /**
  * A **unica** mensagem de `CACSP.confirmarNota` que e sucesso equivalente (M80).
  *
- * Texto medido no sandbox: `A nota 1889309 ja foi confirmada.`. A regex tolera
- * `ja`/`já` (o Gateway nao garante o acento) e caixa livre, mas exige a forma
- * inteira — `nota <numero> ja foi confirmada`. Deliberadamente estreita: uma
- * regex larga (`/ja foi/`) engoliria recusa de negocio como sucesso, que e o
- * bug silencioso que R11/I3 proibem. Falso negativo aqui custa um erro a mais
- * para o chamador; falso positivo custa uma nota nao confirmada tratada como
+ * Texto medido no sandbox, literal e **acentuado**:
+ * `A nota 1889308 já foi confirmada.`
+ * (`spike-raw/faturamento/attempts.ndjson`, `n: 4`, label
+ * `S3_CONFIRMAR_1101_2_IDENTICO`, `service: CACSP.confirmarNota`).
+ *
+ * **Ancorada nas duas pontas** (`^…$`) de proposito. Uma regex larga como
+ * `/ja foi/` ou `/nota \d+ ja foi confirmada/` sem ancora aceitaria
+ * `A nota 1 ja foi cancelada.` ou `Erro ao gravar: A nota 1 ja foi confirmada.
+ * Verifique o estoque.` — um erro virando sucesso, que e o bug silencioso que
+ * R11/I3 proibem. Tolera apenas o que o Gateway nao garante: o acento em
+ * `ja`/`já`, o ponto final e a caixa. Falso negativo aqui custa um erro a mais
+ * para o chamador; falso positivo custa uma nota NAO confirmada tratada como
  * confirmada (I9).
  */
-const JA_CONFIRMADA = /\bnota\s+\d+\s+j[aá]\s+foi\s+confirmada/i;
+const JA_CONFIRMADA = /^A nota \d+ j[aá] foi confirmada\.?$/i;
 
-/** `true` so para o erro de idempotencia de `confirmarNota` (M80). */
+/** O unico servico cuja mensagem de idempotencia este ramo reconhece. */
+const SERVICO_CONFIRMAR = 'CACSP.confirmarNota';
+
+/**
+ * `true` so para o erro de idempotencia de `confirmarNota` (M80).
+ *
+ * Tres condicoes, todas necessarias: o erro e um `GatewayError` (HTTP 200 com
+ * recusa no corpo — um `TimeoutError` com o mesmo texto e desfecho
+ * desconhecido, nao sucesso), veio **deste** servico, e a mensagem casa a forma
+ * inteira medida.
+ */
 function isJaConfirmada(err: unknown): boolean {
-  return err instanceof GatewayError && JA_CONFIRMADA.test(err.message);
+  return (
+    err instanceof GatewayError &&
+    err.serviceName === SERVICO_CONFIRMAR &&
+    JA_CONFIRMADA.test(err.message.trim())
+  );
 }
 
 /**
@@ -114,7 +134,7 @@ export class NotasResource {
     try {
       await this.http.gatewayCall<unknown>(
         'mgecom',
-        'CACSP.confirmarNota',
+        SERVICO_CONFIRMAR,
         { nota: { NUNOTA: { $: String(nunota) } } },
         options,
         // Sem `idempotent`: CACSP.confirmarNota e ESCRITA (src/core/http.ts:8-10).
@@ -149,6 +169,10 @@ export class NotasResource {
    *
    * @param nunotas - NUNOTAs a excluir (ao menos um, todos inteiros positivos).
    * @param options - Opcoes de requisicao (timeout, `signal`).
+   * Falha de camada `TIMEOUT` e re-lancada **como veio**, mas acompanhada de um
+   * `warn` dizendo que a exclusao pode ter sido executada no servidor: aqui a
+   * prova seria a AUSENCIA da nota, e ausencia de dado nao e dado ausente (I4).
+   *
    * @returns Nada: o servico responde corpo vazio (`{}`) em caso de sucesso.
    * @throws {SankhyaError} `VALIDATION_ERROR` se a lista vier vazia ou se algum
    * NUNOTA nao for inteiro positivo — nesse caso nenhuma chamada e feita.
@@ -170,13 +194,32 @@ export class NotasResource {
       assertNunotaInteiro(nunota, `notas.excluir: nunotas[${index}]`);
     }
 
-    await this.http.gatewayCall<unknown>(
-      'mgecom',
-      'CACSP.excluirNotas',
-      { notas: { nota: nunotas.map((nunota) => ({ NUNOTA: String(nunota) })) } },
-      options,
-      // Sem `idempotent`: CACSP.excluirNotas e ESCRITA (src/core/http.ts:8-10).
-    );
+    try {
+      await this.http.gatewayCall<unknown>(
+        'mgecom',
+        'CACSP.excluirNotas',
+        { notas: { nota: nunotas.map((nunota) => ({ NUNOTA: String(nunota) })) } },
+        options,
+        // Sem `idempotent`: CACSP.excluirNotas e ESCRITA (src/core/http.ts:8-10).
+      );
+    } catch (err) {
+      // Classificacao em 3 camadas (D2.0). `TIMEOUT` e desfecho DESCONHECIDO: o
+      // servidor pode ter excluido (I11/R8) — e nao ha read-back barato aqui,
+      // porque a prova seria a AUSENCIA da nota, e ausencia de dado nao e dado
+      // ausente (I4). Por isso o aviso e explicito e o erro vai cru para quem
+      // chamou (o proprio `classifyFailure` e exportado em `src/index.ts`).
+      const camada = classifyFailure(err);
+      this.http
+        .getLogger()
+        .warn(
+          `notas.excluir: NUNOTAs ${nunotas.join(', ')} falharam — camada ${camada}.${
+            camada === 'TIMEOUT'
+              ? ' A exclusao pode ter sido executada no servidor: confira em TGFCAB antes de repetir.'
+              : ''
+          } Erro re-lancado sem alteracao.`,
+        );
+      throw err;
+    }
   }
 
   /**
@@ -187,11 +230,17 @@ export class NotasResource {
    * cancelamento e **exclusao** (M73/M95), nao `TGFCAN`.
    *
    * O read-back roda **sempre**, inclusive quando o Gateway diz
-   * `totalNotasCanceladas: 0`: o numero do Gateway e informativo, e
-   * `confirmadoPorReadBack` e a unica prova (I3). Se o read-back nao puder
-   * rodar, este metodo **lanca** em vez de devolver um resultado sem prova
-   * (fail-closed declarado, G9) — o comando de cancelamento **ja foi enviado**
-   * nesse ponto, e a mensagem diz isso (I11).
+   * `totalNotasCanceladas: 0` e inclusive quando o Gateway **nao responde**:
+   * falha de camada `TIMEOUT` nao e propagada crua, porque o cancelamento pode
+   * ter sido executado no servidor (I11/R8) — nesse caso o resultado vem do
+   * banco e traz `avisoRespostaGateway`. Falha de camada `NEGOCIO` ou
+   * `AUTH_FAIL` propaga cru: o comando nao foi aceito, nao ha o que consultar.
+   *
+   * O numero do Gateway e informativo; `confirmadoPorReadBack` e a unica prova
+   * (I3). Se o read-back nao puder rodar — ou se ele rodar, nao achar linha e a
+   * resposta do gateway tambem estiver ausente — este metodo **lanca** em vez de
+   * devolver um resultado sem prova (fail-closed declarado, G9): o comando **ja
+   * foi enviado** nesse ponto, e a mensagem diz isso.
    *
    * @param input - `nunota` (inteiro positivo) e `justificativa` nao vazia.
    * @param options - Opcoes de requisicao (timeout, `signal`).
@@ -199,8 +248,9 @@ export class NotasResource {
    * @throws {SankhyaError} `VALIDATION_ERROR` se `nunota` nao for inteiro
    * positivo ou `justificativa` for vazia (antes da rede);
    * `CANCELAR_NOTA_READ_BACK_INDISPONIVEL` se o read-back falhar **apos** o
-   * comando ter sido enviado; `PARSE_ERROR` se `totalNotasCanceladas` vier com
-   * valor nao numerico.
+   * comando ter sido enviado; `CANCELAR_NOTA_DESFECHO_INDETERMINADO` se a
+   * resposta do gateway faltar **e** o read-back nao achar linha; `PARSE_ERROR`
+   * se `totalNotasCanceladas` vier com valor nao numerico.
    * @throws {GatewayError} Em erro de negocio Sankhya.
    * @throws {AuthError} Se autenticacao falhar.
    * @example
@@ -218,24 +268,52 @@ export class NotasResource {
       );
     }
 
-    const raw = await this.http.gatewayCall<CancelarNotaRawResponse>(
-      'mgecom',
-      'CACSP.cancelarNota',
-      {
-        notasCanceladas: {
-          justificativa: input.justificativa,
-          notaCancelada: [{ NUNOTA: String(input.nunota) }],
+    let raw: CancelarNotaRawResponse | undefined;
+    let respostaIndisponivel = false;
+
+    try {
+      raw = await this.http.gatewayCall<CancelarNotaRawResponse>(
+        'mgecom',
+        'CACSP.cancelarNota',
+        {
+          notasCanceladas: {
+            justificativa: input.justificativa,
+            notaCancelada: [{ NUNOTA: String(input.nunota) }],
+          },
         },
-      },
-      options,
-      // Sem `idempotent`: CACSP.cancelarNota e ESCRITA (src/core/http.ts:8-10).
-    );
+        options,
+        // Sem `idempotent`: CACSP.cancelarNota e ESCRITA (src/core/http.ts:8-10).
+      );
+    } catch (err) {
+      const camada = classifyFailure(err);
+      // `NEGOCIO`/`AUTH_FAIL`: o comando nao foi aceito — propaga cru e NAO
+      // gasta uma consulta. `TIMEOUT`: desfecho desconhecido, o cancelamento
+      // pode ter acontecido — a decisao e do read-back, nunca da suposicao
+      // (I11/R8). E a mesma regra que a D2.4 aplica ao faturar.
+      if (camada !== 'TIMEOUT') throw err;
+      this.http
+        .getLogger()
+        .warn(
+          `notas.cancelar: NUNOTA ${input.nunota} sem resposta do gateway — camada ${camada}. O comando pode ter sido executado: decidindo por read-back em TGFCAN.`,
+        );
+      respostaIndisponivel = true;
+    }
 
     // Aninhado de proposito: `totalNotasCanceladas` NAO existe na raiz da
     // resposta (fixture C5_CANCELARNOTA_1101_V7.json). Ler da raiz devolveria
     // `undefined` => 0 para sempre, mascarando cancelamento bem-sucedido.
     const resultado = raw?.resultadoCancelamento;
     const linha = await this.lerReadBackCancelamento(input.nunota, options);
+
+    if (respostaIndisponivel && linha === undefined) {
+      // Nada provado e desfecho ambiguo: o comando JA FOI ENVIADO e TGFCAN nao
+      // mostra linha. Devolver `confirmadoPorReadBack: false` aqui leria como
+      // "nao cancelou", quando o correto e "nao sei" — fail-closed (G9).
+      throw new SankhyaError(
+        `notas.cancelar: o comando CACSP.cancelarNota da NUNOTA ${input.nunota} JA FOI ENVIADO, a resposta do gateway nao chegou e o read-back nao achou linha em TGFCAN — o efeito e indeterminado. Consulte TGFCAN antes de repetir a chamada. Nenhum sucesso nem fracasso foi presumido.`,
+        'CANCELAR_NOTA_DESFECHO_INDETERMINADO',
+      );
+    }
 
     return {
       totalNotasCanceladas: safeParseNumber(
@@ -245,6 +323,12 @@ export class NotasResource {
       gerouRecebimento: toBoolean(resultado?.gerouRecebimento),
       confirmadoPorReadBack: linha !== undefined,
       statusNfe: linha === undefined || !linha.STATUSNFE ? null : linha.STATUSNFE,
+      ...(respostaIndisponivel
+        ? {
+            avisoRespostaGateway:
+              'Resposta do gateway indisponivel (camada TIMEOUT); estado derivado do read-back em TGFCAN. totalNotasCanceladas e gerouRecebimento sao 0/false por ausencia de resposta, nao por medicao.',
+          }
+        : {}),
     };
   }
 
