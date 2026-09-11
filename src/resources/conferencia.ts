@@ -5,7 +5,6 @@ import type {
   ApontarNaNotaInput,
   BiparInput,
   CarimbarSeparacaoInput,
-  CarimboReadRow,
   ConferenciaDaNota,
   FecharConferenciaInput,
   ReapontarOrigemInput,
@@ -65,6 +64,21 @@ function assertTextoPreenchido(valor: unknown, where: string): void {
 }
 
 /**
+ * Parse estrito de um NUCONF vindo do ERP: inteiro positivo, ou `null`.
+ *
+ * Unico lugar onde um NUCONF vira numero — tanto o gerado pelo `save` quanto o
+ * lido por `listarPorNota`. `Number()` direto devolveria `NaN` para `''`,
+ * `'X'` ou celula ausente, e `NaN` num campo publico tipado `nuconf: number`
+ * vaza para a mensagem do guard de duplicata e para `bipar`/`fechar`, que
+ * escreveriam no registro errado (I11). Quem chama decide a mensagem e o codigo.
+ */
+function parseNuconf(celula: string | undefined): number | null {
+  if (celula === undefined || celula.trim() === '') return null;
+  const numero = Number(celula);
+  return Number.isInteger(numero) && numero > 0 ? numero : null;
+}
+
+/**
  * Le o NUCONF gerado do `result` do `save`, **ou lanca**.
  *
  * `NUCONF` e auto-gerado (`TIPONUMERACAO='A'`) e so volta no `result` — a
@@ -75,15 +89,14 @@ function assertTextoPreenchido(valor: unknown, where: string): void {
  * @throws {SankhyaError} `CONFERENCIA_NUCONF_AUSENTE`.
  */
 function lerNuconfGerado(result: readonly (readonly string[])[]): number {
-  const celula = result[0]?.[0];
-  const numero = celula === undefined || celula.trim() === '' ? Number.NaN : Number(celula);
-  if (!Number.isInteger(numero) || numero <= 0) {
+  const nuconf = parseNuconf(result[0]?.[0]);
+  if (nuconf === null) {
     throw new SankhyaError(
       'conferencia.abrir: o save nao devolveu um NUCONF utilizavel em result[0][0]. A conferencia pode ter sido criada no ERP — confira por listarPorNota antes de repetir. Nenhum NUCONF foi inventado.',
       'CONFERENCIA_NUCONF_AUSENTE',
     );
   }
-  return numero;
+  return nuconf;
 }
 
 /**
@@ -449,7 +462,16 @@ export class ConferenciaResource {
       `SELECT TO_CHAR(K.NUCONF) NUCONF, K.STATUS FROM TGFCON2 K WHERE K.NUNOTAORIG = ${nunota} ORDER BY K.NUCONF`,
     );
 
-    return rows.map((row) => ({ nuconf: Number(row.NUCONF), status: row.STATUS }));
+    return rows.map((row) => {
+      const nuconf = parseNuconf(row.NUCONF);
+      if (nuconf === null) {
+        throw new SankhyaError(
+          `conferencia.listarPorNota: TGFCON2 devolveu um NUCONF nao utilizavel para a nota ${nunota}. Nenhuma lista parcial foi devolvida — um NaN aqui viraria filtro de escrita em bipar/fechar e mensagem sem sentido no guard de duplicata.`,
+          'CONFERENCIA_NUCONF_INVALIDO',
+        );
+      }
+      return { nuconf, status: row.STATUS };
+    });
   }
 
   /**
@@ -459,11 +481,17 @@ export class ConferenciaResource {
    * carimbo — nao deriva "nota inexistente" de leitura vazia (I4), so recusa
    * abrir sem a prova do carimbo (fail-closed, G9).
    *
+   * A coluna e lida **nua**, na forma medida (`spike-raw/conferencia/
+   * C1_RB_P_POS_CONF.json`: `SELECT … AD_DTHRSEPARACAO … FROM TGFCAB WHERE
+   * NUNOTA IN (…)` devolveu `'06092026 12:55:34'`). Nenhum `TO_CHAR` com mascara
+   * aqui: o guard so precisa de "nao nulo", e a TO_CHAR-abilidade desta coluna
+   * nunca foi medida — formato nao e assunto deste guard.
+   *
    * @throws {SankhyaError} `CONFERENCIA_SEM_CARIMBO`, citando `carimbarSeparacao`.
    */
   private async assertCarimbada(nunota: number): Promise<void> {
-    const rows = await this.dbExplorer.query<CarimboReadRow>(
-      `SELECT TO_CHAR(C.AD_DTHRSEPARACAO,'DD/MM/YYYY HH24:MI:SS') AD_DTHRSEPARACAO, TO_CHAR(C.NUNOTA) NUNOTA FROM TGFCAB C WHERE C.NUNOTA = ${nunota}`,
+    const rows = await this.dbExplorer.query<{ AD_DTHRSEPARACAO: string }>(
+      `SELECT AD_DTHRSEPARACAO FROM TGFCAB WHERE NUNOTA = ${nunota}`,
     );
 
     const carimbo = rows[0]?.AD_DTHRSEPARACAO ?? '';

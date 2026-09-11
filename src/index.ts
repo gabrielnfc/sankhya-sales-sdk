@@ -196,7 +196,6 @@ export type {
   ApontarNaNotaInput,
   BiparInput,
   CarimbarSeparacaoInput,
-  CarimboReadRow,
   ConferenciaDaNota,
   FecharConferenciaInput,
   ReapontarOrigemInput,

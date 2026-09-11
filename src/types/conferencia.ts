@@ -81,6 +81,3 @@ export interface AbrirConferenciaResult {
   /** NUCONF gerado pelo ERP (`TIPONUMERACAO='A'`), lido do `result` do save. */
   readonly nuconf: number;
 }
-
-/** Linha do guard de carimbo (`TGFCAB.AD_DTHRSEPARACAO`). */
-export type CarimboReadRow = Record<string, string>;

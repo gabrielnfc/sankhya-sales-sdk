@@ -115,6 +115,27 @@ describe('ConferenciaResource', () => {
       ).rejects.toThrow(/NUCONF/);
     });
 
+    it('abrir le o carimbo por SELECT puro em AD_DTHRSEPARACAO, filtrado pelo nunota recebido', async () => {
+      const dbx = createMockDbx();
+      dbx.query
+        .mockResolvedValueOnce([{ AD_DTHRSEPARACAO: '06/09/2026 12:55:34' }])
+        .mockResolvedValueOnce([]);
+      const ds = createMockDs({ total: 1, result: [['281956']] });
+      await new ConferenciaResource(ds, dbx).abrir({
+        nunota: 1889348,
+        codUsuConf: 69,
+        dataHora: '06/09/2026 12:55:34',
+      });
+      const sql = String(dbx.query.mock.calls[0][0]);
+      expect(sql).toMatch(/^\s*SELECT\b/);
+      expect(sql).not.toContain(';');
+      expect(sql).toContain('AD_DTHRSEPARACAO');
+      // coluna nua, como na leitura medida (spike-raw/conferencia/C1_RB_P_POS_CONF.json)
+      expect(sql).not.toContain('TO_CHAR');
+      // filtro pelo nunota recebido, e so por ele: sem WHERE o guard leria outra nota
+      expect(sql).toMatch(/WHERE\s+NUNOTA\s*=\s*1889348\s*$/);
+    });
+
     it('abrir recusa NUNOTA nao-inteiro antes de qualquer leitura ou escrita', async () => {
       const dbx = createMockDbx();
       const ds = createMockDs();
@@ -160,6 +181,21 @@ describe('ConferenciaResource', () => {
           },
         ],
       });
+    });
+
+    it('bipar aceita controle vazio — produto sem controle de lote nao tem lote a informar', async () => {
+      const ds = createMockDs({ total: 1, result: [[]] });
+      const dbx = createMockDbx();
+      await new ConferenciaResource(ds, dbx).bipar({
+        nuconf: 281956,
+        seqConf: 1,
+        codProd: 10077,
+        codVol: 'UN',
+        qtdConf: 1,
+        codBarra: '7891234567890',
+        controle: '',
+      });
+      expect(ds.save.mock.calls[0][0].records[0].values['6']).toBe('');
     });
 
     it('bipar recusa qtdConf <= 0 antes da rede', async () => {
@@ -230,6 +266,14 @@ describe('ConferenciaResource', () => {
       expect(sql).toMatch(/^SELECT\b/);
       expect(sql).not.toContain(';');
       expect(sql).toContain('1889338');
+    });
+
+    it('listarPorNota lanca quando o NUCONF lido nao e numerico — nunca devolve NaN', async () => {
+      const ds = createMockDs();
+      const dbx = createMockDbx([{ NUCONF: 'X', STATUS: 'A' }]);
+      await expect(new ConferenciaResource(ds, dbx).listarPorNota(1889338)).rejects.toThrow(
+        /NUCONF/,
+      );
     });
 
     it('listarPorNota recusa nunota nao-inteiro antes da rede', async () => {
