@@ -87,6 +87,23 @@ describe('DbExplorerResource', () => {
     await expect(new DbExplorerResource(http).query('SELECT X FROM DUAL')).resolves.toEqual([]);
   });
 
+  // Contrato declarado em src/types/db-explorer.ts: fieldsMetadata e opcional
+  // (fronteira externa). Ausente COM rows, cada linha desalinha de 0 colunas e
+  // lanca — nunca TypeError nem objeto parcial. Resposta vazia continua [].
+  it('lanca mismatch quando fieldsMetadata vem ausente com rows', async () => {
+    const http = createMockHttp();
+    http.gatewayCall.mockResolvedValue({ rows: [['1']] });
+    await expect(new DbExplorerResource(http).query('SELECT X FROM DUAL')).rejects.toThrow(
+      /DB_EXPLORER_ROW_MISMATCH|colunas/i,
+    );
+  });
+
+  it('devolve [] quando a resposta vem sem fieldsMetadata e sem rows', async () => {
+    const http = createMockHttp();
+    http.gatewayCall.mockResolvedValue({});
+    await expect(new DbExplorerResource(http).query('SELECT X FROM DUAL')).resolves.toEqual([]);
+  });
+
   it('aceita SELECT com espacos a esquerda e caixa mista', async () => {
     const http = createMockHttp();
     http.gatewayCall.mockResolvedValue({ fieldsMetadata: [{ name: 'X' }], rows: [['1']] });
