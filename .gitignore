@@ -1,6 +1,10 @@
 node_modules/
 dist/
+# Segredos: ignora todo .env e variantes (.env.local, .env.backup-*, .env.prod).
+# `.env.example` e a unica excecao — nao tem valor real, so o formato.
 .env
+.env.*
+!.env.example
 *.tsbuildinfo
 coverage/
 .DS_Store

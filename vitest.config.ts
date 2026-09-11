@@ -1,5 +1,5 @@
-import { defineConfig } from 'vitest/config';
 import { readFileSync } from 'node:fs';
+import { defineConfig } from 'vitest/config';
 
 function loadEnv() {
   try {
@@ -18,7 +18,16 @@ function loadEnv() {
       ) {
         value = value.slice(1, -1);
       }
-      env[trimmed.slice(0, eqIndex)] = value;
+      const key = trimmed.slice(0, eqIndex);
+      // Chave duplicada no .env sombreia silenciosamente a primeira ocorrencia.
+      // Ja causou um near-miss real: um bloco de PROD com as mesmas chaves do
+      // bloco de SANDBOX fazia `npm run test:integration` (que inclui suites de
+      // escrita) apontar para producao. Falha alto em vez de escolher sozinho.
+      if (key in env) {
+        const dica = 'Prefixos distintos por ambiente: SANKHYA_* sandbox, SANKHYA_PROD_* producao.';
+        throw new Error(`.env: chave duplicada "${key}". ${dica}`);
+      }
+      env[key] = value;
     }
     return env;
   } catch {

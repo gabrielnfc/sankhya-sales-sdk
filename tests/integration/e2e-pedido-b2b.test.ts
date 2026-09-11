@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
 import { ApiError, GatewayError, TimeoutError } from '../../src/core/errors.js';
+import { assertSandbox } from './_write-guard.js';
 
 function formatDate(date: Date): string {
   const dd = String(date.getDate()).padStart(2, '0');
@@ -26,6 +27,9 @@ const config = {
 };
 
 const has = config.baseUrl && config.clientId && config.clientSecret && config.xToken;
+
+// Esta suite ESCREVE no ERP. Sandbox ou nada.
+assertSandbox(config.baseUrl);
 
 // ---- E2E B2B Order Flow ----
 describe.skipIf(!has)(
