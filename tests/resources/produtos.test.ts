@@ -293,7 +293,12 @@ describe('ProdutosResource', () => {
 
     // `[]` aqui significaria "sem cadastro" (REQ-CNT-5) — varredura truncada
     // nao pode se disfarcar disso. I11/G1.
-    await expect(produtos.volumesProduto(13609)).rejects.toThrow(/incompleta/i);
+    // Prende mensagem **e** `code`: a mensagem sozinha nao distingue truncamento
+    // de erro de validacao (M9 do re-review sobrevivia sem o `code`).
+    await expect(produtos.volumesProduto(13609)).rejects.toMatchObject({
+      code: 'INCOMPLETE_READ',
+      message: expect.stringMatching(/incompleta/i),
+    });
     expect(http.gatewayCall).toHaveBeenCalledTimes(1);
     expect(mockLogger.error).toHaveBeenCalledTimes(1);
   });
