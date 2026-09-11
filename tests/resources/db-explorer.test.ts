@@ -65,13 +65,13 @@ describe('DbExplorerResource', () => {
         ['1889310', 'L', 'N'],
       ],
     });
-    const rows = await new DbExplorerResource(http).query(
-      'SELECT NUNOTA, STATUSNOTA, PENDENTE FROM TGFCAB WHERE NUNOTA IN (1889309,1889310)',
-    );
+    const sql = 'SELECT NUNOTA, STATUSNOTA, PENDENTE FROM TGFCAB WHERE NUNOTA IN (1889309,1889310)';
+    const rows = await new DbExplorerResource(http).query(sql);
+    // Payload preso no literal: o SDK nao reescreve o SQL do chamador.
     expect(http.gatewayCall).toHaveBeenCalledWith(
       'mge',
       'DbExplorerSP.executeQuery',
-      { sql: expect.any(String) },
+      { sql },
       undefined,
       true,
     );
@@ -93,6 +93,8 @@ describe('DbExplorerResource', () => {
     await expect(new DbExplorerResource(http).query('\n  select X from DUAL')).resolves.toEqual([
       { X: '1' },
     ]);
+    // Nem trim: o SQL chega ao Gateway exatamente como o chamador escreveu.
+    expect(http.gatewayCall.mock.calls[0][2]).toEqual({ sql: '\n  select X from DUAL' });
   });
 
   // Medido no spike legado (tools/sankhya-spike/lib.ts:80): CODLOCAL veio `number`,
