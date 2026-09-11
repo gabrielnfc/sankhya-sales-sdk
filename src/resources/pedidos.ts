@@ -438,6 +438,12 @@ export class PedidosResource {
     // Formato aceito pelo 4midware (M34/M46): `NUNOTA: {}` (objeto vazio, NAO
     // `{ $: '' }`) no cabecalho e em CADA item; `itens.INFORMARPRECO` e a
     // STRING 'True'/'False', fora do serializador. Nao "simplificar".
+    // Item COMPLETO, na forma medida (`spike-raw/faturamento/S2_INCLUIR_P1.json`
+    // -> `nota.itens.item[0]`, e `ped.ts:6`, 06/09): 8 chaves. `VLRTOT` e
+    // `PERCDESC` nao sao decorativos — a lane da D4 mediu duas vezes que, sem o
+    // percentual, `CACSP.incluirNota` recusa com `O campo 'Perc. desconto' deve
+    // ser informado.` (CORE_E03235); e o campo e do ITEM, nao do cabecalho: a
+    // recusa sobreviveu a `PERCDESC` no cabecalho.
     const itens = input.itens.map((item) => ({
       NUNOTA: {},
       ...serialize({
@@ -446,6 +452,8 @@ export class PedidosResource {
         VLRUNIT: item.valorUnitario,
         CODVOL: item.unidade,
         ...(item.codigoLocalOrigem ? { CODLOCALORIG: item.codigoLocalOrigem } : {}),
+        VLRTOT: item.valorTotal ?? item.valorUnitario * item.quantidade,
+        PERCDESC: item.percentualDesconto ?? 0,
       }),
     }));
 

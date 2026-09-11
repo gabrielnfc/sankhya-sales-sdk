@@ -427,6 +427,21 @@ export interface ItemNotaGatewayInput {
   unidade: string;
   /** Codigo do local de origem (CODLOCALORIG). */
   codigoLocalOrigem?: number;
+  /**
+   * Percentual de desconto do item (`PERCDESC`). Default **0**.
+   *
+   * Nao e opcional para o ERP: sem ele `CACSP.incluirNota` recusa com
+   * `O campo 'Perc. desconto' deve ser informado.` (CORE_E03235) — medido na
+   * lane da D4 em 2026-09-11, duas vezes. Por isso o SDK manda 0 quando o
+   * chamador nao informa, em vez de omitir a chave.
+   */
+  percentualDesconto?: number;
+  /**
+   * Valor total do item (`VLRTOT`). Default: `valorUnitario x quantidade`,
+   * multiplicado como veio — sem arredondamento inventado. Informe este campo
+   * quando o total precisar de outro arredondamento que nao o produto direto.
+   */
+  valorTotal?: number;
 }
 
 /** Dados para inclusao de nota via Gateway (CACSP.incluirNota). */

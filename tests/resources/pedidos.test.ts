@@ -917,6 +917,88 @@ describe('PedidosResource', () => {
       expect(r.codigoPedido).toBe(1889304);
     });
 
+    // D1.2b — item COMPLETO, como medido. Fonte:
+    // `spike-raw/faturamento/S2_INCLUIR_P1.json` (`nota.itens.item[0]`) e
+    // `ped.ts:6`: 8 chaves, com `VLRTOT` e `PERCDESC`. A lane da D4 mediu 2x que
+    // sem o percentual o ERP recusa — `O campo 'Perc. desconto' deve ser
+    // informado.` (CORE_E03235) — e que o campo NAO e do cabecalho: a recusa
+    // sobreviveu a `PERCDESC` no cabecalho (spike 4).
+    it('monta o item com as 8 chaves medidas, incluindo VLRTOT e PERCDESC (D1.2b)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ pk: { NUNOTA: { $: '1889304' } } });
+
+      await pedidos.incluirNotaGateway({
+        codigoCliente: 312984,
+        dataNegociacao: '06/09/2026 12:00:00',
+        codigoTipoOperacao: 1001,
+        codigoTipoNegociacao: 200,
+        codigoVendedor: 50,
+        codigoEmpresa: 2,
+        tipoMovimento: 'P',
+        statusNota: 'A',
+        numeroPedidoExterno: 'SDK-T-1200',
+        itens: [
+          {
+            codigoProduto: 10077,
+            quantidade: 3,
+            valorUnitario: 10,
+            unidade: 'UN',
+            codigoLocalOrigem: 30301,
+          },
+        ],
+      });
+
+      const body = http.gatewayCall.mock.calls[0][2] as {
+        nota: { itens: { item: Record<string, unknown>[] } };
+      };
+      // Corpo INTEIRO do item: chave a mais ou a menos reprova.
+      expect(body.nota.itens.item[0]).toEqual({
+        NUNOTA: {},
+        CODPROD: { $: '10077' },
+        CODLOCALORIG: { $: '30301' },
+        QTDNEG: { $: '3' },
+        CODVOL: { $: 'UN' },
+        VLRUNIT: { $: '10' },
+        VLRTOT: { $: '30' },
+        PERCDESC: { $: '0' },
+      });
+    });
+
+    it('percentualDesconto e valorTotal do input vencem os defaults', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ pk: { NUNOTA: { $: '1' } } });
+
+      await pedidos.incluirNotaGateway({
+        codigoCliente: 1,
+        dataNegociacao: '06/09/2026',
+        codigoTipoOperacao: 1001,
+        codigoTipoNegociacao: 200,
+        codigoVendedor: 50,
+        codigoEmpresa: 2,
+        tipoMovimento: 'P',
+        itens: [
+          {
+            codigoProduto: 10077,
+            quantidade: 2,
+            valorUnitario: 10,
+            unidade: 'UN',
+            percentualDesconto: 15,
+            valorTotal: 17,
+          },
+        ],
+      });
+
+      const item = (
+        http.gatewayCall.mock.calls[0][2] as {
+          nota: { itens: { item: Record<string, unknown>[] } };
+        }
+      ).nota.itens.item[0];
+      expect(item.PERCDESC).toEqual({ $: '15' });
+      expect(item.VLRTOT).toEqual({ $: '17' });
+    });
+
     it('camposExtras entram no cabecalho sem serem reinterpretados', async () => {
       const http = createMockHttp();
       const pedidos = new PedidosResource(http);
