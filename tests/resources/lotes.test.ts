@@ -52,7 +52,10 @@ describe('LotesResource', () => {
         }),
       } as unknown as NotasResource;
 
-      await new LotesResource(ds, notas).entrada1813({ ...ENTRADA_OK, itens: [...ENTRADA_OK.itens] });
+      await new LotesResource(ds, notas).entrada1813({
+        ...ENTRADA_OK,
+        itens: [...ENTRADA_OK.itens],
+      });
 
       expect(ordem).toEqual(['CabecalhoNota', 'ItemNota', 'Estoque', 'confirmar']);
     });

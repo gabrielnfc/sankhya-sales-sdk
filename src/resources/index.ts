@@ -13,3 +13,4 @@ export { DbExplorerResource } from './db-explorer.js';
 export { DatasetResource, datasetRecord } from './dataset.js';
 export { NotasResource } from './notas.js';
 export { ConferenciaResource } from './conferencia.js';
+export { LotesResource } from './lotes.js';

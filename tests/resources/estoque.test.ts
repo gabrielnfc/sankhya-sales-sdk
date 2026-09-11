@@ -123,7 +123,9 @@ describe('EstoqueResource', () => {
       },
     ]);
 
-    await expect(new EstoqueResource(http, { dbExplorer: dbx }).porLote({ codProd: 10077 })).resolves.toEqual([
+    await expect(
+      new EstoqueResource(http, { dbExplorer: dbx }).porLote({ codProd: 10077 }),
+    ).resolves.toEqual([
       {
         codEmp: 2,
         codLocal: 30301,
