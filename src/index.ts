@@ -171,3 +171,7 @@ export {
   TipoFinanceiro,
   TipoMovimento,
 } from './types/index.js';
+
+// DbExplorer (D2.1) — bloco proprio ao fim para merge limpo
+export { DbExplorerResource } from './resources/db-explorer.js';
+export type { DbExplorerRawResponse, DbExplorerRow } from './types/db-explorer.js';

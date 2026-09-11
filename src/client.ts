@@ -5,6 +5,7 @@ import { createLogger } from './core/logger.js';
 import {
   CadastrosResource,
   ClientesResource,
+  DbExplorerResource,
   EstoqueResource,
   FinanceirosResource,
   FiscalResource,
@@ -57,6 +58,7 @@ export class SankhyaClient {
   private _fiscal?: FiscalResource;
   private _gateway?: GatewayResource;
   private _metadata?: MetadataResource;
+  private _dbExplorer?: DbExplorerResource;
 
   /**
    * Cria uma instancia do SDK Sankhya.
@@ -161,6 +163,12 @@ export class SankhyaClient {
   get metadata(): MetadataResource {
     this._metadata ??= new MetadataResource(this.http);
     return this._metadata;
+  }
+
+  /** Consulta SQL somente-leitura (SELECT puro) via DbExplorer. */
+  get dbExplorer(): DbExplorerResource {
+    this._dbExplorer ??= new DbExplorerResource(this.http);
+    return this._dbExplorer;
   }
 
   /**
