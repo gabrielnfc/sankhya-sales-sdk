@@ -1,5 +1,6 @@
 import { toSankhyaDateMaybe } from '../core/date.js';
 import { SankhyaError } from '../core/errors.js';
+import { buildFaturarWizardPayload } from '../core/faturamento-payload.js';
 import { serialize } from '../core/gateway-serializer.js';
 import type { HttpClient } from '../core/http.js';
 import { createPaginator, extractRestData, normalizePagination } from '../core/pagination.js';
@@ -386,10 +387,14 @@ export class PedidosResource {
   }
 
   /**
-   * Fatura um pedido de venda via Gateway.
+   * Fatura um pedido de venda via Gateway (`SelecaoDocumentoSP.faturar`).
    *
-   * @param input - Dados de faturamento (pedido, tipo operacao, data).
+   * O corpo vem inteiro de {@link buildFaturarWizardPayload} — fonte unica do
+   * payload do wizard medido no sandbox (M51/M49). Nao montar o corpo aqui.
+   *
+   * @param input - Dados de faturamento (pedido, tipo operacao, serie, data).
    * @param options - Opcoes de requisicao.
+   * @throws {SankhyaError} Se `faturarTodosItens` for `false` (M82, sem rede).
    * @throws {GatewayError} Em erro de negocio Sankhya.
    * @throws {AuthError} Se autenticacao falhar.
    */
@@ -398,17 +403,7 @@ export class PedidosResource {
     await this.http.gatewayCall(
       'mgecom',
       'SelecaoDocumentoSP.faturar',
-      {
-        notas: {
-          codTipOper: input.codigoTipoOperacao,
-          dtFatur: input.dataFaturamento,
-          tipoFaturamento: input.tipoFaturamento ?? 'FaturamentoNormal',
-          faturarTodosItens: input.faturarTodosItens !== false,
-          nota: {
-            NUNOTA: { $: String(input.codigoPedido) },
-          },
-        },
-      },
+      buildFaturarWizardPayload(input),
       options,
     );
   }

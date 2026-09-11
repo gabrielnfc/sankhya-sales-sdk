@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GatewayError } from '../../src/core/errors.js';
 import type { HttpClient } from '../../src/core/http.js';
 import { PedidosResource } from '../../src/resources/pedidos.js';
+import type { FaturarPedidoInput } from '../../src/types/pedidos.js';
 
 function createMockHttp() {
   return {
@@ -598,7 +599,10 @@ describe('PedidosResource', () => {
   });
 
   describe('faturar()', () => {
-    it('calls gatewayCall with defaults for tipoFaturamento and faturarTodosItens', async () => {
+    // D1.3: estes dois testes asseravam o payload QUEBRADO (M51) — `dtFatur`,
+    // `nota` como objeto, `faturarTodosItens` booleano e faturamento parcial
+    // aceito. Eles travavam o bug; foram corrigidos contra o payload medido.
+    it('manda o payload wizard medido (M51), nao o shape antigo', async () => {
       const http = createMockHttp();
       const pedidos = new PedidosResource(http);
       http.gatewayCall.mockResolvedValue({});
@@ -606,7 +610,7 @@ describe('PedidosResource', () => {
       await pedidos.faturar({
         codigoPedido: 99,
         codigoTipoOperacao: 1,
-        dataFaturamento: '2024-06-01',
+        dataFaturamento: '01/06/2024',
       });
 
       expect(http.gatewayCall).toHaveBeenCalledTimes(1);
@@ -615,16 +619,27 @@ describe('PedidosResource', () => {
       expect(service).toBe('SelecaoDocumentoSP.faturar');
       expect(requestBody).toEqual({
         notas: {
-          codTipOper: 1,
-          dtFatur: '2024-06-01',
+          codTipOper: '1',
+          dtFaturamento: '01/06/2024',
+          serie: '1',
           tipoFaturamento: 'FaturamentoNormal',
-          faturarTodosItens: true,
-          nota: { NUNOTA: { $: '99' } },
+          dataValidada: 'true',
+          notasComMoeda: {},
+          nota: [{ $: '99' }],
+          codLocalDestino: '',
+          faturarTodosItens: 'true',
+          umaNotaParaCada: 'false',
+          ehWizardFaturamento: 'true',
+          dtFixaVenc: '',
+          ehPedidoWeb: 'false',
+          nfeDevolucaoViaRecusa: 'false',
+          serieNFDevolucao: '',
+          ehJejum: 'false',
         },
       });
     });
 
-    it('uses custom tipoFaturamento and faturarTodosItens when provided', async () => {
+    it('repassa tipoFaturamento, serie, local de destino e umaNotaParaCada', async () => {
       const http = createMockHttp();
       const pedidos = new PedidosResource(http);
       http.gatewayCall.mockResolvedValue({});
@@ -632,15 +647,127 @@ describe('PedidosResource', () => {
       await pedidos.faturar({
         codigoPedido: 99,
         codigoTipoOperacao: 2,
-        dataFaturamento: '2024-06-01',
         tipoFaturamento: 'FaturamentoDireto' as never,
-        faturarTodosItens: false,
+        serie: '9',
+        codigoLocalDestino: '30301',
+        umaNotaParaCada: true,
       });
 
       const body = http.gatewayCall.mock.calls[0][2] as Record<string, unknown>;
       const notas = body.notas as Record<string, unknown>;
       expect(notas.tipoFaturamento).toBe('FaturamentoDireto');
-      expect(notas.faturarTodosItens).toBe(false);
+      expect(notas.serie).toBe('9');
+      expect(notas.codLocalDestino).toBe('30301');
+      expect(notas.umaNotaParaCada).toBe('true');
+      expect(notas.dtFaturamento).toBe('');
+    });
+
+    it('faturarTodosItens:false lanca antes de qualquer rede (M82)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+
+      await expect(
+        pedidos.faturar({
+          codigoPedido: 99,
+          codigoTipoOperacao: 1101,
+          faturarTodosItens: false,
+        }),
+      ).rejects.toThrow(/faturamento parcial/i);
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
+
+    // Fonte unica (D1.3): o corpo vem de buildFaturarWizardPayload, nao de um
+    // literal dentro de `faturar` — a D2.4 reusa o mesmo builder. Montar o
+    // payload inline aqui derruba este teste.
+    it('delega a montagem do payload a buildFaturarWizardPayload', async () => {
+      const marcador = { notas: { marcadorDoBuilder: 'sim' } };
+      const builder = vi.fn(() => marcador);
+      vi.resetModules();
+      vi.doMock('../../src/core/faturamento-payload.js', () => ({
+        buildFaturarWizardPayload: builder,
+      }));
+      try {
+        const { PedidosResource: PedidosRecarregado } = await import(
+          '../../src/resources/pedidos.js'
+        );
+        const http = createMockHttp();
+        http.gatewayCall.mockResolvedValue({});
+        const input = { codigoPedido: 7, codigoTipoOperacao: 1101 };
+
+        await new PedidosRecarregado(http).faturar(input);
+
+        expect(builder).toHaveBeenCalledWith(input);
+        expect(http.gatewayCall.mock.calls[0][2]).toBe(marcador);
+      } finally {
+        vi.doUnmock('../../src/core/faturamento-payload.js');
+        vi.resetModules();
+      }
+    });
+
+    // `faturar` valida por conta propria (pedidos.ts:402), alem do builder:
+    // com o builder mockado, o input invalido tem de morrer aqui — nem o
+    // builder nem o gatewayCall sao chamados.
+    it('valida o input antes de chamar o builder (duplicata de pedidos.ts)', async () => {
+      const builder = vi.fn(() => ({ notas: {} }));
+      vi.resetModules();
+      vi.doMock('../../src/core/faturamento-payload.js', () => ({
+        buildFaturarWizardPayload: builder,
+      }));
+      try {
+        const { PedidosResource: PedidosRecarregado } = await import(
+          '../../src/resources/pedidos.js'
+        );
+        const http = createMockHttp();
+        http.gatewayCall.mockResolvedValue({});
+        const invalido: Partial<FaturarPedidoInput> = { codigoTipoOperacao: 1101 };
+
+        await expect(
+          new PedidosRecarregado(http).faturar(invalido as FaturarPedidoInput),
+        ).rejects.toThrow(/codigoPedido/);
+        expect(builder).not.toHaveBeenCalled();
+        expect(http.gatewayCall).not.toHaveBeenCalled();
+      } finally {
+        vi.doUnmock('../../src/core/faturamento-payload.js');
+        vi.resetModules();
+      }
+    });
+
+    it('codigoPedido fracionario lanca antes da rede (inteiro obrigatorio)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+
+      await expect(
+        pedidos.faturar({ codigoPedido: 1.5, codigoTipoOperacao: 1101 }),
+      ).rejects.toThrow(/inteiro/i);
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
+
+    // O 4o argumento de gatewayCall e o objeto de options recebido por
+    // `faturar` — repassado como veio, sem default nem reescrita.
+    it('repassa options como 4o argumento de gatewayCall', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({});
+      const options = { timeout: 5000, idempotencyKey: 'fat-99' };
+
+      await pedidos.faturar({ codigoPedido: 99, codigoTipoOperacao: 1101 }, options);
+
+      expect(http.gatewayCall.mock.calls[0][3]).toEqual({
+        timeout: 5000,
+        idempotencyKey: 'fat-99',
+      });
+    });
+
+    // Sem options, o 4o argumento e `undefined` — nao um literal montado
+    // dentro de `faturar`.
+    it('sem options, o 4o argumento de gatewayCall e undefined', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({});
+
+      await pedidos.faturar({ codigoPedido: 99, codigoTipoOperacao: 1101 });
+
+      expect(http.gatewayCall.mock.calls[0][3]).toBeUndefined();
     });
   });
 

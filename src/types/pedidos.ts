@@ -387,12 +387,24 @@ export interface FaturarPedidoInput {
   codigoPedido: number;
   /** Codigo do tipo de operacao (TOP). */
   codigoTipoOperacao: number;
-  /** Data de faturamento (ISO). */
-  dataFaturamento: string;
+  /**
+   * Data de faturamento (`dd/MM/yyyy`). Omitida ou vazia, o wizard usa a data
+   * corrente do ERP — e o `dtFaturamento: ''` medido (M51).
+   */
+  dataFaturamento?: string;
   /** Tipo de faturamento (default: Normal). */
   tipoFaturamento?: TipoFaturamento;
-  /** Faturar todos os itens (default: true). */
+  /**
+   * Faturar todos os itens (default: `true`). `false` **lanca**: o wizard nao
+   * tem faturamento parcial (M82).
+   */
   faturarTodosItens?: boolean;
+  /** Serie da nota gerada (default: `'1'`, medida em M49). */
+  serie?: string;
+  /** Local de destino (CODLOCALDEST); default `''` = o do cadastro. */
+  codigoLocalDestino?: string;
+  /** Uma nota para cada pedido selecionado (default: `false`). */
+  umaNotaParaCada?: boolean;
 }
 
 /** Dados para cancelamento de um pedido. */
