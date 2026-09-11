@@ -13,8 +13,10 @@ import { ProdutosResource } from '../../src/resources/produtos.js';
 import { VendedoresResource } from '../../src/resources/vendedores.js';
 import type { SankhyaConfig } from '../../src/types/config.js';
 
+// Host de sandbox: desde a D3 a allowlist fail-closed recusa host arbitrario
+// — `https://api.test.com` abortava a construcao. Ver tests/core/environment-guard.test.ts.
 const validConfig: SankhyaConfig = {
-  baseUrl: 'https://api.test.com',
+  baseUrl: 'https://api.sandbox.sankhya.com.br',
   clientId: 'test-id',
   clientSecret: 'test-secret',
   xToken: 'test-token',

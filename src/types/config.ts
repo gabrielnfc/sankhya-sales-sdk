@@ -1,6 +1,6 @@
 /** Configuracao de conexao com a API Sankhya. */
 export interface SankhyaConfig {
-  /** URL base da API (ex: `'https://api.sankhya.com.br'`). */
+  /** URL base da API (ex: `'https://api.sandbox.sankhya.com.br'`). */
   baseUrl: string;
   /** Client ID do OAuth 2.0. */
   clientId: string;
@@ -20,6 +20,21 @@ export interface SankhyaConfig {
   tokenCacheProvider?: TokenCacheProvider;
   /** Opcoes de logging do SDK. */
   logger?: LoggerOptions;
+  /**
+   * Libera explicitamente um host de producao (default: `false` — recusa).
+   *
+   * A guarda de ambiente e uma allowlist fail-closed: sem esta flag, host de
+   * producao aborta a construcao do cliente. Quando ligada, o SDK emite
+   * `logger.warn` citando SO o host — nunca token ou secret.
+   */
+  allowProduction?: boolean;
+  /**
+   * Hosts extras aceitos pela allowlist (ex.: um ERP interno de homologacao).
+   *
+   * Comparacao por host exato, sem subdominio implicito. Hosts de sandbox ja
+   * passam sem precisar constar aqui.
+   */
+  allowedHosts?: readonly string[];
   /**
    * O que fazer quando uma resposta chega degradada.
    *
