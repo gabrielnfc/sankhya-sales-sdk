@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GatewayError } from '../../src/core/errors.js';
 import type { HttpClient } from '../../src/core/http.js';
 import { PedidosResource } from '../../src/resources/pedidos.js';
+import type { FaturarPedidoInput } from '../../src/types/pedidos.js';
 
 function createMockHttp() {
   return {
@@ -598,7 +599,10 @@ describe('PedidosResource', () => {
   });
 
   describe('faturar()', () => {
-    it('calls gatewayCall with defaults for tipoFaturamento and faturarTodosItens', async () => {
+    // D1.3: estes dois testes asseravam o payload QUEBRADO (M51) — `dtFatur`,
+    // `nota` como objeto, `faturarTodosItens` booleano e faturamento parcial
+    // aceito. Eles travavam o bug; foram corrigidos contra o payload medido.
+    it('manda o payload wizard medido (M51), nao o shape antigo', async () => {
       const http = createMockHttp();
       const pedidos = new PedidosResource(http);
       http.gatewayCall.mockResolvedValue({});
@@ -606,7 +610,7 @@ describe('PedidosResource', () => {
       await pedidos.faturar({
         codigoPedido: 99,
         codigoTipoOperacao: 1,
-        dataFaturamento: '2024-06-01',
+        dataFaturamento: '01/06/2024',
       });
 
       expect(http.gatewayCall).toHaveBeenCalledTimes(1);
@@ -615,16 +619,27 @@ describe('PedidosResource', () => {
       expect(service).toBe('SelecaoDocumentoSP.faturar');
       expect(requestBody).toEqual({
         notas: {
-          codTipOper: 1,
-          dtFatur: '2024-06-01',
+          codTipOper: '1',
+          dtFaturamento: '01/06/2024',
+          serie: '1',
           tipoFaturamento: 'FaturamentoNormal',
-          faturarTodosItens: true,
-          nota: { NUNOTA: { $: '99' } },
+          dataValidada: 'true',
+          notasComMoeda: {},
+          nota: [{ $: '99' }],
+          codLocalDestino: '',
+          faturarTodosItens: 'true',
+          umaNotaParaCada: 'false',
+          ehWizardFaturamento: 'true',
+          dtFixaVenc: '',
+          ehPedidoWeb: 'false',
+          nfeDevolucaoViaRecusa: 'false',
+          serieNFDevolucao: '',
+          ehJejum: 'false',
         },
       });
     });
 
-    it('uses custom tipoFaturamento and faturarTodosItens when provided', async () => {
+    it('repassa tipoFaturamento, serie, local de destino e umaNotaParaCada', async () => {
       const http = createMockHttp();
       const pedidos = new PedidosResource(http);
       http.gatewayCall.mockResolvedValue({});
@@ -632,15 +647,127 @@ describe('PedidosResource', () => {
       await pedidos.faturar({
         codigoPedido: 99,
         codigoTipoOperacao: 2,
-        dataFaturamento: '2024-06-01',
         tipoFaturamento: 'FaturamentoDireto' as never,
-        faturarTodosItens: false,
+        serie: '9',
+        codigoLocalDestino: '30301',
+        umaNotaParaCada: true,
       });
 
       const body = http.gatewayCall.mock.calls[0][2] as Record<string, unknown>;
       const notas = body.notas as Record<string, unknown>;
       expect(notas.tipoFaturamento).toBe('FaturamentoDireto');
-      expect(notas.faturarTodosItens).toBe(false);
+      expect(notas.serie).toBe('9');
+      expect(notas.codLocalDestino).toBe('30301');
+      expect(notas.umaNotaParaCada).toBe('true');
+      expect(notas.dtFaturamento).toBe('');
+    });
+
+    it('faturarTodosItens:false lanca antes de qualquer rede (M82)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+
+      await expect(
+        pedidos.faturar({
+          codigoPedido: 99,
+          codigoTipoOperacao: 1101,
+          faturarTodosItens: false,
+        }),
+      ).rejects.toThrow(/faturamento parcial/i);
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
+
+    // Fonte unica (D1.3): o corpo vem de buildFaturarWizardPayload, nao de um
+    // literal dentro de `faturar` — a D2.4 reusa o mesmo builder. Montar o
+    // payload inline aqui derruba este teste.
+    it('delega a montagem do payload a buildFaturarWizardPayload', async () => {
+      const marcador = { notas: { marcadorDoBuilder: 'sim' } };
+      const builder = vi.fn(() => marcador);
+      vi.resetModules();
+      vi.doMock('../../src/core/faturamento-payload.js', () => ({
+        buildFaturarWizardPayload: builder,
+      }));
+      try {
+        const { PedidosResource: PedidosRecarregado } = await import(
+          '../../src/resources/pedidos.js'
+        );
+        const http = createMockHttp();
+        http.gatewayCall.mockResolvedValue({});
+        const input = { codigoPedido: 7, codigoTipoOperacao: 1101 };
+
+        await new PedidosRecarregado(http).faturar(input);
+
+        expect(builder).toHaveBeenCalledWith(input);
+        expect(http.gatewayCall.mock.calls[0][2]).toBe(marcador);
+      } finally {
+        vi.doUnmock('../../src/core/faturamento-payload.js');
+        vi.resetModules();
+      }
+    });
+
+    // `faturar` valida por conta propria (pedidos.ts:402), alem do builder:
+    // com o builder mockado, o input invalido tem de morrer aqui — nem o
+    // builder nem o gatewayCall sao chamados.
+    it('valida o input antes de chamar o builder (duplicata de pedidos.ts)', async () => {
+      const builder = vi.fn(() => ({ notas: {} }));
+      vi.resetModules();
+      vi.doMock('../../src/core/faturamento-payload.js', () => ({
+        buildFaturarWizardPayload: builder,
+      }));
+      try {
+        const { PedidosResource: PedidosRecarregado } = await import(
+          '../../src/resources/pedidos.js'
+        );
+        const http = createMockHttp();
+        http.gatewayCall.mockResolvedValue({});
+        const invalido: Partial<FaturarPedidoInput> = { codigoTipoOperacao: 1101 };
+
+        await expect(
+          new PedidosRecarregado(http).faturar(invalido as FaturarPedidoInput),
+        ).rejects.toThrow(/codigoPedido/);
+        expect(builder).not.toHaveBeenCalled();
+        expect(http.gatewayCall).not.toHaveBeenCalled();
+      } finally {
+        vi.doUnmock('../../src/core/faturamento-payload.js');
+        vi.resetModules();
+      }
+    });
+
+    it('codigoPedido fracionario lanca antes da rede (inteiro obrigatorio)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+
+      await expect(
+        pedidos.faturar({ codigoPedido: 1.5, codigoTipoOperacao: 1101 }),
+      ).rejects.toThrow(/inteiro/i);
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
+
+    // O 4o argumento de gatewayCall e o objeto de options recebido por
+    // `faturar` — repassado como veio, sem default nem reescrita.
+    it('repassa options como 4o argumento de gatewayCall', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({});
+      const options = { timeout: 5000, idempotencyKey: 'fat-99' };
+
+      await pedidos.faturar({ codigoPedido: 99, codigoTipoOperacao: 1101 }, options);
+
+      expect(http.gatewayCall.mock.calls[0][3]).toEqual({
+        timeout: 5000,
+        idempotencyKey: 'fat-99',
+      });
+    });
+
+    // Sem options, o 4o argumento e `undefined` — nao um literal montado
+    // dentro de `faturar`.
+    it('sem options, o 4o argumento de gatewayCall e undefined', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({});
+
+      await pedidos.faturar({ codigoPedido: 99, codigoTipoOperacao: 1101 });
+
+      expect(http.gatewayCall.mock.calls[0][3]).toBeUndefined();
     });
   });
 
@@ -673,7 +800,9 @@ describe('PedidosResource', () => {
               CODPARC: { $: '10' },
               DTNEG: { $: '2024-01-01' },
             }),
-            itens: {
+            // `itens` deixou de ser exato: ganhou `INFORMARPRECO` (M46), travado
+            // no bloco "formato 4midware" abaixo.
+            itens: expect.objectContaining({
               item: [
                 expect.objectContaining({
                   CODPROD: { $: '100' },
@@ -682,7 +811,7 @@ describe('PedidosResource', () => {
                   CODVOL: { $: 'UN' },
                 }),
               ],
-            },
+            }),
           }),
         }),
       );
@@ -739,6 +868,214 @@ describe('PedidosResource', () => {
       const nota = body.nota as Record<string, unknown>;
       const itens = nota.itens as { item: Array<Record<string, unknown>> };
       expect(itens.item[0].CODLOCALORIG).toEqual({ $: '5' });
+    });
+  });
+
+  // Formato medido no sandbox (M34/M46): o payload aceito pelo 4midware traz
+  // `NUNOTA: {}` no cabecalho E em cada item, e `itens.INFORMARPRECO` como
+  // STRING 'True'/'False'. Fonte: spike-raw/cancelamento/C1_INCLUIR_PA.json e
+  // spike-raw/faturamento/ped.ts:8.
+  describe('incluirNotaGateway() — formato 4midware (M34/M46)', () => {
+    it('inclui NUNOTA vazio no cabecalho e em cada item, com AD_NUMPEDIDO', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ pk: { NUNOTA: { $: '1889304' } } });
+
+      const r = await pedidos.incluirNotaGateway({
+        codigoCliente: 312984,
+        dataNegociacao: '06/09/2026 12:00:00',
+        codigoTipoOperacao: 1001,
+        codigoTipoNegociacao: 200,
+        codigoVendedor: 50,
+        codigoEmpresa: 2,
+        tipoMovimento: 'P',
+        statusNota: 'A',
+        numeroPedidoExterno: 'SDK-T-1200',
+        itens: [
+          {
+            codigoProduto: 10051,
+            quantidade: 1,
+            valorUnitario: 10,
+            unidade: 'UN',
+            codigoLocalOrigem: 30301,
+          },
+        ],
+      });
+
+      const body = http.gatewayCall.mock.calls[0][2] as {
+        nota: {
+          cabecalho: Record<string, unknown>;
+          itens: { INFORMARPRECO: string; item: Record<string, unknown>[] };
+        };
+      };
+      expect(body.nota.cabecalho.NUNOTA).toEqual({});
+      expect(body.nota.cabecalho.STATUSNOTA).toEqual({ $: 'A' });
+      expect(body.nota.cabecalho.AD_NUMPEDIDO).toEqual({ $: 'SDK-T-1200' });
+      expect(body.nota.itens.INFORMARPRECO).toBe('True');
+      expect(body.nota.itens.item[0].NUNOTA).toEqual({});
+      expect(body.nota.itens.item[0].CODLOCALORIG).toEqual({ $: '30301' });
+      expect(r.codigoPedido).toBe(1889304);
+    });
+
+    it('camposExtras entram no cabecalho sem serem reinterpretados', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ pk: { NUNOTA: { $: '1' } } });
+
+      await pedidos.incluirNotaGateway({
+        codigoCliente: 1,
+        dataNegociacao: '06/09/2026',
+        codigoTipoOperacao: 1001,
+        codigoTipoNegociacao: 200,
+        codigoVendedor: 50,
+        codigoEmpresa: 2,
+        tipoMovimento: 'P',
+        itens: [],
+        camposExtras: { AD_MARKET_PLACE: 'Shopify.EC.V1', CIF_FOB: 'C', CODCENCUS: '0102002' },
+      });
+
+      const cab = (
+        http.gatewayCall.mock.calls[0][2] as { nota: { cabecalho: Record<string, unknown> } }
+      ).nota.cabecalho;
+      expect(cab.AD_MARKET_PLACE).toEqual({ $: 'Shopify.EC.V1' });
+      expect(cab.CIF_FOB).toEqual({ $: 'C' });
+      expect(cab.CODCENCUS).toEqual({ $: '0102002' });
+    });
+
+    it('camposExtras nao pode sobrescrever campo tipado (falha alto)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+
+      await expect(
+        pedidos.incluirNotaGateway({
+          codigoCliente: 1,
+          dataNegociacao: '06/09/2026',
+          codigoTipoOperacao: 1001,
+          codigoTipoNegociacao: 200,
+          codigoVendedor: 50,
+          codigoEmpresa: 2,
+          tipoMovimento: 'P',
+          itens: [],
+          camposExtras: { CODPARC: '999' },
+        }),
+      ).rejects.toThrow(/CODPARC/);
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
+
+    it('informarPreco: false manda a string False', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ nota: { NUNOTA: { $: '7' } } });
+
+      const r = await pedidos.incluirNotaGateway({
+        codigoCliente: 1,
+        dataNegociacao: '06/09/2026',
+        codigoTipoOperacao: 1001,
+        codigoTipoNegociacao: 200,
+        codigoVendedor: 50,
+        codigoEmpresa: 2,
+        tipoMovimento: 'P',
+        informarPreco: false,
+        itens: [],
+      });
+
+      const body = http.gatewayCall.mock.calls[0][2] as {
+        nota: { itens: { INFORMARPRECO: string } };
+      };
+      expect(body.nota.itens.INFORMARPRECO).toBe('False');
+      // readNunota: 2o lugar da ordem (nota.NUNOTA.$), nao a raiz.
+      expect(r.codigoPedido).toBe(7);
+    });
+
+    // As 11 chaves que o cabecalho tipado monta. `camposExtras` e a passagem
+    // CRUA para os outros 18 campos medidos (29 no total, anexo §D1.2) — nunca
+    // para estas, sob pena de furar o union 'A'|'L' de statusNota e o prefixo
+    // SDK-T- que a D4 pendura em numeroPedidoExterno.
+    const CHAVES_TIPADAS = [
+      'NUNOTA',
+      'CODPARC',
+      'DTNEG',
+      'CODTIPOPER',
+      'CODTIPVENDA',
+      'CODVEND',
+      'CODEMP',
+      'TIPMOV',
+      'OBSERVACAO',
+      'STATUSNOTA',
+      'AD_NUMPEDIDO',
+    ];
+
+    const entradaMinima = {
+      codigoCliente: 1,
+      dataNegociacao: '06/09/2026',
+      codigoTipoOperacao: 1001,
+      codigoTipoNegociacao: 200,
+      codigoVendedor: 50,
+      codigoEmpresa: 2,
+      tipoMovimento: 'P',
+      itens: [],
+    } as const;
+
+    it('camposExtras em QUALQUER chave tipada lanca citando a chave, sem rede', async () => {
+      for (const chave of CHAVES_TIPADAS) {
+        const http = createMockHttp();
+        const pedidos = new PedidosResource(http);
+
+        await expect(
+          pedidos.incluirNotaGateway({ ...entradaMinima, camposExtras: { [chave]: 'x' } }),
+        ).rejects.toThrow(new RegExp(chave));
+        expect(http.gatewayCall).not.toHaveBeenCalled();
+      }
+    });
+
+    it('chave tipada OMITIDA continua protegida (guarda e do conjunto tipado, nao do montado)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+
+      // statusNota, numeroPedidoExterno e observacao NAO vao na entrada: as
+      // chaves nao estao no cabecalho montado, e ainda assim sao tipadas.
+      await expect(
+        pedidos.incluirNotaGateway({
+          ...entradaMinima,
+          camposExtras: { STATUSNOTA: 'ZZZ', AD_NUMPEDIDO: 'NAO-SDK' },
+        }),
+      ).rejects.toThrow(/STATUSNOTA/);
+      await expect(
+        pedidos.incluirNotaGateway({ ...entradaMinima, camposExtras: { AD_NUMPEDIDO: 'NAO-SDK' } }),
+      ).rejects.toThrow(/AD_NUMPEDIDO/);
+      await expect(
+        pedidos.incluirNotaGateway({ ...entradaMinima, camposExtras: { OBSERVACAO: 'crua' } }),
+      ).rejects.toThrow(/OBSERVACAO/);
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
+
+    it('o cabecalho tipado monta exatamente as 11 chaves protegidas (anti-drift)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ pk: { NUNOTA: { $: '1' } } });
+
+      // Todos os opcionais preenchidos: o cabecalho atinge sua superficie maxima.
+      await pedidos.incluirNotaGateway({
+        ...entradaMinima,
+        observacao: 'obs',
+        statusNota: 'L',
+        numeroPedidoExterno: 'SDK-T-1',
+      });
+
+      const cab = (
+        http.gatewayCall.mock.calls[0][2] as { nota: { cabecalho: Record<string, unknown> } }
+      ).nota.cabecalho;
+      // Se o builder ganhar ou perder um campo sem atualizar a guarda, este
+      // teste cai — e a guarda deixaria de cobrir o conjunto real.
+      expect(Object.keys(cab).sort()).toEqual([...CHAVES_TIPADAS].sort());
+    });
+
+    it('resposta sem NUNOTA nos 3 degraus lanca (no silent 0)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ status: '1', statusMessage: 'ok' });
+
+      await expect(pedidos.incluirNotaGateway({ ...entradaMinima })).rejects.toThrow(/NUNOTA/);
     });
   });
 

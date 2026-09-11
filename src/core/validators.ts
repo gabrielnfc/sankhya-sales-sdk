@@ -25,6 +25,20 @@ function requireNumber(o: Record<string, unknown>, field: string, name: string):
   }
 }
 
+/**
+ * Valida que o campo e um numero inteiro.
+ *
+ * Usado so pelo validador de faturamento: `codigoPedido`/`codigoTipoOperacao`
+ * viram string no payload do wizard (`nota: [{ $: '1.5' }]`), e o ERP so
+ * recusaria isso na rede. `requireNumber` continua como esta para os demais
+ * chamadores.
+ */
+function requireInteger(o: Record<string, unknown>, field: string, name: string): void {
+  if (typeof o[field] !== 'number' || !Number.isInteger(o[field] as number)) {
+    throw new SankhyaError(`${name}.${field} deve ser um numero inteiro`, 'VALIDATION_ERROR');
+  }
+}
+
 /** Valida que o campo, se presente, e um numero finito. */
 function optionalNumber(o: Record<string, unknown>, field: string, name: string): void {
   if (o[field] !== undefined && o[field] !== null) {
@@ -304,13 +318,18 @@ export function validateConfirmarPedidoInput(input: unknown, name: string): void
 /**
  * Valida dados de entrada para faturamento de pedido.
  *
- * Campos obrigatorios: codigoPedido, codigoTipoOperacao, dataFaturamento.
+ * Campos obrigatorios: codigoPedido, codigoTipoOperacao.
  */
 export function validateFaturarPedidoInput(input: unknown, name: string): void {
   const o = assertObject(input, name);
-  requireNumber(o, 'codigoPedido', name);
-  requireNumber(o, 'codigoTipoOperacao', name);
-  requireString(o, 'dataFaturamento', name);
+  requireInteger(o, 'codigoPedido', name);
+  requireInteger(o, 'codigoTipoOperacao', name);
+  // `dataFaturamento` e opcional: o payload medido manda `dtFaturamento: ''` e o
+  // ERP usa a data corrente (M51). Exigir string aqui obrigaria o chamador a
+  // inventar uma data que o wizard ignora.
+  optionalString(o, 'dataFaturamento', name);
+  optionalString(o, 'serie', name);
+  optionalString(o, 'codigoLocalDestino', name);
 }
 
 /**

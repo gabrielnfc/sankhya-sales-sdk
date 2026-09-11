@@ -387,12 +387,24 @@ export interface FaturarPedidoInput {
   codigoPedido: number;
   /** Codigo do tipo de operacao (TOP). */
   codigoTipoOperacao: number;
-  /** Data de faturamento (ISO). */
-  dataFaturamento: string;
+  /**
+   * Data de faturamento (`dd/MM/yyyy`). Omitida ou vazia, o wizard usa a data
+   * corrente do ERP — e o `dtFaturamento: ''` medido (M51).
+   */
+  dataFaturamento?: string;
   /** Tipo de faturamento (default: Normal). */
   tipoFaturamento?: TipoFaturamento;
-  /** Faturar todos os itens (default: true). */
+  /**
+   * Faturar todos os itens (default: `true`). `false` **lanca**: o wizard nao
+   * tem faturamento parcial (M82).
+   */
   faturarTodosItens?: boolean;
+  /** Serie da nota gerada (default: `'1'`, medida em M49). */
+  serie?: string;
+  /** Local de destino (CODLOCALDEST); default `''` = o do cadastro. */
+  codigoLocalDestino?: string;
+  /** Uma nota para cada pedido selecionado (default: `false`). */
+  umaNotaParaCada?: boolean;
 }
 
 /** Dados para cancelamento de um pedido. */
@@ -435,6 +447,36 @@ export interface IncluirNotaGatewayInput {
   tipoMovimento: string;
   /** Observacao da nota. */
   observacao?: string;
+  /**
+   * Status da nota (STATUSNOTA): `'A'` aberta, `'L'` liberada.
+   * Omitido, o campo nao vai no cabecalho e o ERP aplica o default do TOP.
+   */
+  statusNota?: 'A' | 'L';
+  /**
+   * Numero do pedido no sistema de origem (AD_NUMPEDIDO) — campo customizado
+   * usado pelo 4midware para rastrear o pedido do marketplace/e-commerce.
+   */
+  numeroPedidoExterno?: string;
+  /**
+   * Se o preco unitario enviado deve ser respeitado (`itens.INFORMARPRECO`).
+   * Default `true`. Serializado como a STRING `'True'`/`'False'` — medido (M46).
+   */
+  informarPreco?: boolean;
+  /**
+   * Campos adicionais do cabecalho, crus, em nome de campo Sankhya
+   * (`AD_MARKET_PLACE`, `CIF_FOB`, `CODCENCUS`, ...). Entram por ultimo e sao
+   * serializados como qualquer outro campo (`{ $: valor }`).
+   *
+   * Citar qualquer uma das **11 chaves tipadas** do cabecalho (`NUNOTA`,
+   * `CODPARC`, `DTNEG`, `CODTIPOPER`, `CODTIPVENDA`, `CODVEND`, `CODEMP`,
+   * `TIPMOV`, `OBSERVACAO`, `STATUSNOTA`, `AD_NUMPEDIDO`) **lanca** — tambem
+   * quando o campo tipado correspondente foi omitido nesta chamada. Nada e
+   * sobrescrito nem contrabandeado em silencio.
+   *
+   * Existe porque o cabecalho medido no sandbox tem 29 campos e o SDK tipa 11:
+   * quem precisa do payload completo nao espera tipagem nova.
+   */
+  camposExtras?: Record<string, string | number>;
   /** Itens da nota. */
   itens: ItemNotaGatewayInput[];
 }
