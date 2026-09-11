@@ -81,10 +81,15 @@ const CODEMP = 2;
 const TIPMOV = 'P';
 const CODPROD_ITEM = 10051;
 const CODLOCALORIG = 30301;
+/**
+ * Natureza da operacao. NAO e chave tipada do cabecalho — entra por
+ * `camposExtras`. Sem ela o ERP recusa: `A Natureza deve ser informada.` +
+ * `O parametro 'EXIGNATCFR' esta ligado.` (CORE_E00899), medido na 1a execucao
+ * da lane. Valor do cabecalho aceito em `spike-raw/faturamento/ped.ts:8`.
+ */
+const CODNAT = '01010101';
 /** Produto com volume cadastrado completo no sandbox (M54). */
 const CODPROD_VOLUME = 13609;
-/** Campos de `TGFVOA` lidos pelo `loadRecords` — premissa (b) da D1.4. */
-const FIELDSET_VOLUME = 'CODPROD,CODVOL,QUANTIDADE,LASTRO,CAMADAS,ATIVO';
 
 const agora = new Date();
 const dois = (n: number): string => String(n).padStart(2, '0');
@@ -244,6 +249,13 @@ describe.skipIf(!habilitada)('Lane WMS — sandbox Sankhya (opt-in duplo)', () =
   });
 
   afterAll(async () => {
+    // SEMPRE, e antes do teardown: quanto a lane gastou. Na 1a execucao real a
+    // unica impressao do orcamento vivia dentro do ramo de read-back, que nao
+    // roda quando nada e criado — e a execucao terminou sem ninguem saber o
+    // numero. Instrumentacao que so aparece no caminho feliz nao instrumenta.
+    const gastas = orcamento.spent();
+    console.log(`[wms-sandbox] chamadas=${gastas}/${TETO_CHAMADAS}`);
+
     try {
       await teardownPorId();
     } finally {
@@ -285,6 +297,7 @@ describe.skipIf(!habilitada)('Lane WMS — sandbox Sankhya (opt-in duplo)', () =
       statusNota: 'A',
       numeroPedidoExterno: PREFIXO,
       observacao: `${PREFIXO} lane WMS do SDK — descartavel`,
+      camposExtras: { CODNAT },
       itens: [
         {
           codigoProduto: CODPROD_ITEM,
@@ -333,42 +346,26 @@ describe.skipIf(!habilitada)('Lane WMS — sandbox Sankhya (opt-in duplo)', () =
     expect(linhas).toEqual([]);
   });
 
-  it('7 — loadRecords com rootEntity VolumeProduto responde (premissa (b) da D1.4)', async (ctx) => {
-    // M57 mediu TGFVOA por SQL (`DbExplorerSP`), nunca por `loadRecords`. Se o
-    // Gateway nao servir a entidade, a premissa e REFUTADA e `volumesProduto`
-    // cai para `dbExplorer.query` (D2.1) — e este passo NAO reprova a lane:
-    // ele registra o motivo e se marca como pendente.
-    let resposta: Record<string, unknown>;
-    try {
-      resposta = await sankhya.gateway.call<Record<string, unknown>>(
-        'mge',
-        'CRUDServiceProvider.loadRecords',
-        {
-          dataSet: {
-            rootEntity: 'VolumeProduto',
-            includePresentationFields: 'N',
-            offsetPage: '0',
-            criteria: { expression: { $: `this.CODPROD = '${CODPROD_VOLUME}'` } },
-            entity: { fieldset: { list: FIELDSET_VOLUME } },
-          },
-        },
-      );
-    } catch (erro) {
-      const motivo = erro instanceof Error ? erro.message : String(erro);
-      console.log(`[wms-sandbox] (b) D1.4 REFUTADA — loadRecords/VolumeProduto recusou: ${motivo}`);
-      ctx.skip(`premissa (b) da D1.4 refutada no sandbox: ${motivo}`);
-      return;
-    }
+  // 7 — MEDIDO E REFUTADO em 2026-09-11, nao ha o que repetir.
+  //
+  // `CRUDServiceProvider.loadRecords` com `rootEntity: 'VolumeProduto'` e o
+  // fieldset `CODPROD,CODVOL,QUANTIDADE,LASTRO,CAMADAS,ATIVO` foi chamado 2
+  // vezes no sandbox e recusou as 2: `GatewayError: Erro interno (NPE)`
+  // (`status '0'`, transactionId B13E2C8D39AEA4CE10EAE94BCF73F6FC), 0 linhas e
+  // 0 colunas. `produtos.volumesProduto` passou a ler TGFVOA por
+  // `dbExplorer.query` (D1.4b) — que e como M54 e o censo T0-3 sempre mediram.
+  //
+  // Fica como `it.skip` e NAO chama o gateway: repetir a chamada so gastaria
+  // orcamento para reconfirmar um NPE. Se um dia o ERP servir a entidade, a
+  // volta e apagar este bloco e medir de novo.
+  it.skip('7 — loadRecords rootEntity VolumeProduto: REFUTADA no sandbox (Erro interno (NPE), transactionId B13E2C8D39AEA4CE10EAE94BCF73F6FC)', () => {});
 
-    console.log(
-      `[wms-sandbox] (b) D1.4 — chaves da resposta: ${Object.keys(resposta).sort().join(', ')}`,
-    );
-    expect(resposta).toHaveProperty('entities');
-  });
-
-  it('8 — cabecalho minimo aceito por CACSP.incluirNota (premissa (b) da D1.2)', async (ctx) => {
-    // So as chaves TIPADAS obrigatorias + `statusNota` + prefixo. Sem
-    // `camposExtras`, sem os 18 campos crus do payload do 4midware.
+  it('8 — cabecalho minimo (11 tipadas + CODNAT) aceito por CACSP.incluirNota (premissa (b) da D1.2)', async (ctx) => {
+    // As chaves TIPADAS + `CODNAT`, e nada mais: sem os outros 17 campos crus do
+    // payload do 4midware. O "minimo" ganhou CODNAT porque a 1a execucao da lane
+    // mediu a recusa `A Natureza deve ser informada.` / `O parametro
+    // 'EXIGNATCFR' esta ligado.` (CORE_E00899) com as 11 tipadas sozinhas — logo
+    // o minimo e >= 12, e e isso que este passo mede agora.
     //
     // Este passo NAO pode falhar em silencio nem "passar" por SKIP:
     // - recusa de NEGOCIO (o ERP entendeu e disse nao) = premissa REFUTADA, e e
@@ -392,6 +389,7 @@ describe.skipIf(!habilitada)('Lane WMS — sandbox Sankhya (opt-in duplo)', () =
           tipoMovimento: TIPMOV,
           statusNota: 'A',
           numeroPedidoExterno: numeroExterno,
+          camposExtras: { CODNAT },
           itens: [
             {
               codigoProduto: CODPROD_ITEM,

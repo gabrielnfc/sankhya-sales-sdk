@@ -410,6 +410,10 @@ ledger): que o sandbox aceite cada passo, os números do `volumesProduto`, e o *
 `TGFCAB` provando que o teardown apagou. A lane só liga em `workflow_dispatch` com a caixa
 `run_wms_lane` marcada; em `push`/`schedule` ela é SKIP.
 
+**Leitura de volume (`TGFVOA`) é por SQL.** `produtos.volumesProduto()` usa `dbExplorer.query`:
+a rota de Gateway (`CRUDServiceProvider.loadRecords` com `rootEntity: 'VolumeProduto'`) foi medida
+no sandbox em 2026-09-11 e devolveu `Erro interno (NPE)` nas duas tentativas, com zero linhas.
+
 Tudo que a execução cria nasce e morre em `A`, marcado com o prefixo `SDK-T-<hhmm>` em
 `AD_NUMPEDIDO`, `OBSERVACAO` e `CONTROLE`. Nota que não estiver mais em `A` na hora do teardown
 **não é apagada**: é impressa como resíduo e derruba a lane.

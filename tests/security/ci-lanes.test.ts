@@ -314,6 +314,15 @@ describe('lane WMS — travas estruturais', () => {
     expect(codigo).toMatch(/restaurar\(\)/);
   });
 
+  it('imprime o orcamento gasto SEMPRE, antes do teardown', () => {
+    // Na 1a execucao real a unica impressao vivia dentro do ramo de read-back e
+    // a lane terminou sem o numero. Agora o `spent()` e lido fora de qualquer
+    // template de log, e antes do teardown.
+    expect(codigo.indexOf('orcamento.spent()')).toBeLessThan(
+      codigo.indexOf('await teardownPorId()'),
+    );
+  });
+
   it('teardown tem guarda contra lista de ids vazia', () => {
     expect(codigo).toMatch(/if \(ids\.length === 0\)/);
   });
