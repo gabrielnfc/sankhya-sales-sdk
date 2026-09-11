@@ -4,6 +4,7 @@ import { createLogger } from './core/logger.js';
 import {
   CadastrosResource,
   ClientesResource,
+  DatasetResource,
   DbExplorerResource,
   EstoqueResource,
   FinanceirosResource,
@@ -52,6 +53,7 @@ export class SankhyaClient {
   private _gateway?: GatewayResource;
   private _metadata?: MetadataResource;
   private _dbExplorer?: DbExplorerResource;
+  private _dataset?: DatasetResource;
 
   /**
    * Cria uma instancia do SDK Sankhya.
@@ -155,6 +157,12 @@ export class SankhyaClient {
   get dbExplorer(): DbExplorerResource {
     this._dbExplorer ??= new DbExplorerResource(this.http);
     return this._dbExplorer;
+  }
+
+  /** Escrita e leitura tipadas sobre o DatasetSP (save, removeRecord, load). */
+  get dataset(): DatasetResource {
+    this._dataset ??= new DatasetResource(this.http);
+    return this._dataset;
   }
 
   /**

@@ -165,3 +165,15 @@ export {
 // DbExplorer (D2.1) — bloco proprio ao fim para merge limpo
 export { DbExplorerResource } from './resources/db-explorer.js';
 export type { DbExplorerRawResponse, DbExplorerRow } from './types/db-explorer.js';
+
+// Dataset (D2.2) — bloco proprio ao fim para merge limpo
+export { DatasetResource, datasetRecord } from './resources/dataset.js';
+export type {
+  DatasetEntity,
+  DatasetLoadParams,
+  DatasetRecord,
+  DatasetRemoveParams,
+  DatasetSaveParams,
+  DatasetSaveRawResponse,
+  DatasetSaveResult,
+} from './types/dataset.js';
