@@ -315,122 +315,62 @@ describe('ProdutosResource', () => {
     ).rejects.toThrow(/dbExplorer/);
   });
 
-  it('le volumes do gateway (TGFVOA) e converte os numericos', async () => {
-    const http = createMockHttp();
-    const produtos = new ProdutosResource(http);
-    http.gatewayCall.mockResolvedValue(
-      makeGatewayResponse(
-        ['CODPROD', 'CODVOL', 'QUANTIDADE', 'LASTRO', 'CAMADAS', 'ATIVO'],
-        [
-          {
-            f0: { $: '13609' },
-            f1: { $: 'CX' },
-            f2: { $: '72' },
-            f3: { $: '12' },
-            f4: { $: '4' },
-            f5: { $: 'S' },
-          },
-        ],
-      ),
-    ); // M54: 13609 = 72 un/cx, 12x4
+  // --- volumesProduto (D1.4b): TGFVOA por SQL ---
+  //
+  // Ate a 1a volta este metodo lia por `CRUDServiceProvider.loadRecords` com
+  // `rootEntity: 'VolumeProduto'`. O spike da D4 REFUTOU a premissa no sandbox:
+  // 2 de 2 chamadas devolveram `GatewayError: Erro interno (NPE)`
+  // (transactionId B13E2C8D39AEA4CE10EAE94BCF73F6FC), 0 linhas e 0 colunas.
+  // M54 sempre foi medido por SQL — e por SQL que se le (RD-7).
+
+  /** SQL exato que o metodo precisa montar, com o inteiro ja validado. */
+  const SQL_VOA_13609 =
+    'SELECT CODPROD, CODVOL, QUANTIDADE, LASTRO, CAMADAS, ATIVO FROM TGFVOA WHERE CODPROD = 13609 ORDER BY CODVOL';
+
+  function produtosComDbx(rows: Array<Record<string, string>>) {
+    const dbx = createMockDbx(rows);
+    return { produtos: new ProdutosResource(createMockHttp(), { dbExplorer: dbx }), dbx };
+  }
+
+  it('le volumes de TGFVOA por SQL e converte os numericos (M54: 13609 = 72, 12x4)', async () => {
+    const { produtos, dbx } = produtosComDbx([
+      { CODPROD: '13609', CODVOL: 'CX', QUANTIDADE: '72', LASTRO: '12', CAMADAS: '4', ATIVO: 'S' },
+    ]);
+
     const vols = await produtos.volumesProduto(13609);
 
-    expect(http.gatewayCall.mock.calls[0][1]).toBe('CRUDServiceProvider.loadRecords');
+    expect(dbx.query).toHaveBeenCalledTimes(1);
+    expect(dbx.query.mock.calls[0][0]).toBe(SQL_VOA_13609);
     expect(vols).toEqual([
       { codProd: 13609, codVol: 'CX', quantidade: 72, lastro: 12, camadas: 4, ativo: true },
     ]);
-
-    // Payload medido preso inteiro: modulo, dataSet e flag de idempotencia.
-    const [modulo, , body, options, idempotent] = http.gatewayCall.mock.calls[0];
-    expect(modulo).toBe('mge');
-    expect(body).toEqual({
-      dataSet: {
-        rootEntity: 'VolumeProduto',
-        includePresentationFields: 'N',
-        offsetPage: '0',
-        criteria: { expression: { $: "this.CODPROD = '13609'" } },
-        entity: { fieldset: { list: 'CODPROD,CODVOL,QUANTIDADE,LASTRO,CAMADAS,ATIVO' } },
-      },
-    });
-    expect(options).toBeUndefined();
-    expect(idempotent).toBe(true);
   });
 
-  it('concatena duas paginas e avanca o offsetPage', async () => {
+  it('nao usa mais o gateway (loadRecords da NPE no sandbox — D4 spike)', async () => {
     const http = createMockHttp();
-    const produtos = new ProdutosResource(http);
-    http.gatewayCall
-      .mockResolvedValueOnce(
-        paginaVoa(
-          [
-            {
-              f0: { $: '13609' },
-              f1: { $: 'CX' },
-              f2: { $: '72' },
-              f3: { $: '12' },
-              f4: { $: '4' },
-              f5: { $: 'S' },
-            },
-          ],
-          'true',
-          '0',
-        ),
-      )
-      .mockResolvedValueOnce(
-        paginaVoa(
-          [
-            {
-              f0: { $: '13609' },
-              f1: { $: 'UN' },
-              f2: { $: '1' },
-              f3: { $: '0' },
-              f4: { $: '0' },
-              f5: { $: 'S' },
-            },
-          ],
-          'false',
-          '1',
-        ),
-      );
+    const dbx = createMockDbx([]);
+
+    await new ProdutosResource(http, { dbExplorer: dbx }).volumesProduto(13609);
+
+    expect(http.gatewayCall).not.toHaveBeenCalled();
+  });
+
+  it('devolve as linhas na ordem do SELECT, sem paginar', async () => {
+    const { produtos, dbx } = produtosComDbx([
+      { CODPROD: '13609', CODVOL: 'CX', QUANTIDADE: '72', LASTRO: '12', CAMADAS: '4', ATIVO: 'S' },
+      { CODPROD: '13609', CODVOL: 'UN', QUANTIDADE: '1', LASTRO: '0', CAMADAS: '0', ATIVO: 'S' },
+    ]);
 
     const vols = await produtos.volumesProduto(13609);
 
-    expect(http.gatewayCall).toHaveBeenCalledTimes(2);
     expect(vols.map((v) => v.codVol)).toEqual(['CX', 'UN']);
-    expect(http.gatewayCall.mock.calls[0][2].dataSet.offsetPage).toBe('0');
-    expect(http.gatewayCall.mock.calls[1][2].dataSet.offsetPage).toBe('1');
+    expect(dbx.query).toHaveBeenCalledTimes(1);
   });
 
-  it('lanca INCOMPLETE_READ quando hasMoreResult e true com pagina vazia (nao devolve [])', async () => {
-    const http = createMockHttp();
-    const produtos = new ProdutosResource(http);
-    http.gatewayCall.mockResolvedValue(paginaVoa([], 'true', '0'));
-
-    // `[]` aqui significaria "sem cadastro" (REQ-CNT-5) — varredura truncada
-    // nao pode se disfarcar disso. I11/G1.
-    // Prende mensagem **e** `code`: a mensagem sozinha nao distingue truncamento
-    // de erro de validacao (M9 do re-review sobrevivia sem o `code`).
-    await expect(produtos.volumesProduto(13609)).rejects.toMatchObject({
-      code: 'INCOMPLETE_READ',
-      message: expect.stringMatching(/incompleta/i),
-    });
-    expect(http.gatewayCall).toHaveBeenCalledTimes(1);
-    expect(mockLogger.error).toHaveBeenCalledTimes(1);
-  });
-
-  it('numerico ausente, nulo ou {} vira 0; CODVOL nulo vira string vazia', async () => {
-    const http = createMockHttp();
-    const produtos = new ProdutosResource(http);
-    http.gatewayCall.mockResolvedValue(
-      paginaVoa(
-        [
-          // f1 = {} (NULL do gateway), f2 = { $: {} }, f3 = { $: null }, f4 ausente
-          { f0: { $: '13609' }, f1: {}, f2: { $: {} }, f3: { $: null }, f5: { $: 'S' } },
-        ],
-        'false',
-        '0',
-      ),
-    );
+  it('numerico vazio vira 0 e CODVOL vazio vira string vazia (cadastro incompleto, M57)', async () => {
+    const { produtos } = produtosComDbx([
+      { CODPROD: '13609', CODVOL: '', QUANTIDADE: '', LASTRO: '', CAMADAS: '', ATIVO: 'S' },
+    ]);
 
     const [vol] = await produtos.volumesProduto(13609);
 
@@ -445,57 +385,75 @@ describe('ProdutosResource', () => {
   });
 
   it('lanca PARSE_ERROR quando QUANTIDADE nao e numero', async () => {
-    const http = createMockHttp();
-    const produtos = new ProdutosResource(http);
-    http.gatewayCall.mockResolvedValue(
-      paginaVoa(
-        [{ f0: { $: '13609' }, f1: { $: 'CX' }, f2: { $: 'ABC' }, f5: { $: 'S' } }],
-        'false',
-        '0',
-      ),
-    );
+    const { produtos } = produtosComDbx([
+      { CODPROD: '13609', CODVOL: 'CX', QUANTIDADE: 'ABC', LASTRO: '0', CAMADAS: '0', ATIVO: 'S' },
+    ]);
 
-    await expect(produtos.volumesProduto(13609)).rejects.toThrow(/QUANTIDADE/);
+    await expect(produtos.volumesProduto(13609)).rejects.toMatchObject({
+      code: 'PARSE_ERROR',
+      message: expect.stringMatching(/QUANTIDADE/),
+    });
   });
 
-  it('devolve [] quando o produto nao tem volume cadastrado (M57) — sem lancar', async () => {
-    const http = createMockHttp();
-    const produtos = new ProdutosResource(http);
-    http.gatewayCall.mockResolvedValue(makeGatewayResponse(['CODPROD'], []));
+  it('lanca PARSE_ERROR quando CODPROD da linha nao e numero', async () => {
+    const { produtos } = produtosComDbx([
+      { CODPROD: '', CODVOL: 'CX', QUANTIDADE: '1', LASTRO: '0', CAMADAS: '0', ATIVO: 'S' },
+    ]);
 
-    await expect(produtos.volumesProduto(10077)).resolves.toEqual([]);
+    await expect(produtos.volumesProduto(13609)).rejects.toMatchObject({
+      code: 'PARSE_ERROR',
+      message: expect.stringMatching(/CODPROD/),
+    });
   });
 
-  // Adicao a §D1.4 do anexo: a mutacao prescrita no Step 5 (`ATIVO === 'S'` ->
-  // `Boolean(ATIVO)`) SOBREVIVIA com a fixture do anexo, que so tem ATIVO='S'.
-  // Este caso e o que a mata.
   it('ativo e false quando ATIVO nao e S (mata Boolean(ATIVO))', async () => {
-    const http = createMockHttp();
-    const produtos = new ProdutosResource(http);
-    http.gatewayCall.mockResolvedValue(
-      makeGatewayResponse(
-        ['CODPROD', 'CODVOL', 'QUANTIDADE', 'LASTRO', 'CAMADAS', 'ATIVO'],
-        [
-          {
-            f0: { $: '13609' },
-            f1: { $: 'UN' },
-            f2: { $: '1' },
-            f3: { $: '0' },
-            f4: { $: '0' },
-            f5: { $: 'N' },
-          },
-        ],
-      ),
-    );
+    const { produtos } = produtosComDbx([
+      { CODPROD: '13609', CODVOL: 'UN', QUANTIDADE: '1', LASTRO: '0', CAMADAS: '0', ATIVO: 'N' },
+    ]);
+
     const [vol] = await produtos.volumesProduto(13609);
 
     expect(vol?.ativo).toBe(false);
   });
 
-  it('recusa codigoProduto que nao e inteiro (guarda de injecao no criteria)', async () => {
-    const http = createMockHttp();
+  it('devolve [] quando o produto nao tem volume cadastrado (M57) — sem lancar', async () => {
+    const { produtos } = produtosComDbx([]);
 
-    await expect(new ProdutosResource(http).volumesProduto(1.5)).rejects.toThrow(/inteiro/i);
-    expect(http.gatewayCall).not.toHaveBeenCalled();
+    await expect(produtos.volumesProduto(10077)).resolves.toEqual([]);
+  });
+
+  it('recusa codigoProduto que nao e inteiro (guarda de injecao no SQL)', async () => {
+    const { produtos, dbx } = produtosComDbx([]);
+
+    await expect(produtos.volumesProduto(1.5)).rejects.toThrow(/inteiro/i);
+    expect(dbx.query).not.toHaveBeenCalled();
+  });
+
+  it('recusa codigoProduto zero e negativo (o `> 0` do guard)', async () => {
+    const { produtos, dbx } = produtosComDbx([]);
+
+    await expect(produtos.volumesProduto(0)).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR',
+      message: expect.stringMatching(/positivo/i),
+    });
+    await expect(produtos.volumesProduto(-13609)).rejects.toThrow(/positivo/i);
+    expect(dbx.query).not.toHaveBeenCalled();
+  });
+
+  it("lanca PARSE_ERROR quando CODPROD da linha e '0' (0 nao e produto)", async () => {
+    const { produtos } = produtosComDbx([
+      { CODPROD: '0', CODVOL: 'CX', QUANTIDADE: '1', LASTRO: '0', CAMADAS: '0', ATIVO: 'S' },
+    ]);
+
+    await expect(produtos.volumesProduto(13609)).rejects.toMatchObject({
+      code: 'PARSE_ERROR',
+      message: expect.stringMatching(/CODPROD/),
+    });
+  });
+
+  it('sem a dep dbExplorer lanca citando a dep faltante', async () => {
+    await expect(new ProdutosResource(createMockHttp()).volumesProduto(13609)).rejects.toThrow(
+      /dbExplorer/,
+    );
   });
 });

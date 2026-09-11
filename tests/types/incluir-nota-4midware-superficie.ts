@@ -18,7 +18,18 @@ export function consumidorMonta4midware(numeroPedidoExterno: string): IncluirNot
     numeroPedidoExterno,
     informarPreco: true,
     camposExtras: { AD_MARKET_PLACE: 'Shopify.EC.V1', CODCENCUS: '0102002', VLRFRETE: 12.5 },
-    itens: [{ codigoProduto: 10051, quantidade: 1, valorUnitario: 10, unidade: 'UN' }],
+    itens: [
+      {
+        codigoProduto: 10051,
+        quantidade: 1,
+        valorUnitario: 10,
+        unidade: 'UN',
+        // D1.2b: opcionais no tipo, obrigatorios no ERP quando omitidos viram
+        // default (PERCDESC 0, VLRTOT = unitario x quantidade).
+        percentualDesconto: 0,
+        valorTotal: 10,
+      },
+    ],
   };
 }
 

@@ -427,6 +427,37 @@ export interface ItemNotaGatewayInput {
   unidade: string;
   /** Codigo do local de origem (CODLOCALORIG). */
   codigoLocalOrigem?: number;
+  /**
+   * Percentual de desconto do item (`PERCDESC`). Default **0**.
+   *
+   * Nao e opcional para o ERP: sem ele `CACSP.incluirNota` recusa com
+   * `O campo 'Perc. desconto' deve ser informado.` (CORE_E03235) — medido na
+   * lane da D4 em 2026-09-11, duas vezes. Por isso o SDK manda 0 quando o
+   * chamador nao informa, em vez de omitir a chave.
+   *
+   * Precisa ser finito e estar em [0, 100]: fora disso o SDK recusa antes da
+   * rede, em vez de deixar o ERP ser o unico juiz.
+   */
+  percentualDesconto?: number;
+  /**
+   * Valor total do item (`VLRTOT`). Precisa ser finito e >= 0.
+   *
+   * Default: `valorUnitario x quantidade` calculado em CENTAVOS e devolvido com
+   * no maximo 2 casas (`'3.03'`, `'0.3'`, `'10'`). ~~Multiplicado como veio —
+   * sem arredondamento inventado~~ _(emenda 2026-09-11, review 4 da D4: o
+   * produto cru em ponto flutuante mandava `'3.0300000000000002'` num campo de
+   * dinheiro; 19,17% dos pares medidos passavam de 2 casas. A casa 17 e que era
+   * o valor inventado.)_
+   *
+   * Implicacoes declaradas do arredondamento: meio centavo sobe (`0.005 x 1`
+   * vira `'0.01'`), preco abaixo de meio centavo colapsa em `'0'`, e `VLRUNIT`
+   * vai CRU — logo `VLRUNIT x QTDNEG` pode diferir do `VLRTOT` em ate 1
+   * centavo.
+   *
+   * Informe este campo quando o total nao for o produto direto — desconto ja
+   * embutido, rateio de frete, arredondamento proprio.
+   */
+  valorTotal?: number;
 }
 
 /** Dados para inclusao de nota via Gateway (CACSP.incluirNota). */

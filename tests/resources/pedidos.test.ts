@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GatewayError } from '../../src/core/errors.js';
 import type { HttpClient } from '../../src/core/http.js';
 import { PedidosResource } from '../../src/resources/pedidos.js';
-import type { FaturarPedidoInput } from '../../src/types/pedidos.js';
+import type { FaturarPedidoInput, ItemNotaGatewayInput } from '../../src/types/pedidos.js';
 
 function createMockHttp() {
   return {
@@ -915,6 +915,264 @@ describe('PedidosResource', () => {
       expect(body.nota.itens.item[0].NUNOTA).toEqual({});
       expect(body.nota.itens.item[0].CODLOCALORIG).toEqual({ $: '30301' });
       expect(r.codigoPedido).toBe(1889304);
+    });
+
+    // D1.2b — item COMPLETO, como medido. Fonte:
+    // `spike-raw/faturamento/S2_INCLUIR_P1.json` (`nota.itens.item[0]`) e
+    // `ped.ts:6`: 8 chaves, com `VLRTOT` e `PERCDESC`. A lane da D4 mediu 2x que
+    // sem o percentual o ERP recusa — `O campo 'Perc. desconto' deve ser
+    // informado.` (CORE_E03235) — e que o campo NAO e do cabecalho: a recusa
+    // sobreviveu a `PERCDESC` no cabecalho (spike 4).
+    it('monta o item com as 8 chaves medidas, incluindo VLRTOT e PERCDESC (D1.2b)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ pk: { NUNOTA: { $: '1889304' } } });
+
+      await pedidos.incluirNotaGateway({
+        codigoCliente: 312984,
+        dataNegociacao: '06/09/2026 12:00:00',
+        codigoTipoOperacao: 1001,
+        codigoTipoNegociacao: 200,
+        codigoVendedor: 50,
+        codigoEmpresa: 2,
+        tipoMovimento: 'P',
+        statusNota: 'A',
+        numeroPedidoExterno: 'SDK-T-1200',
+        itens: [
+          {
+            codigoProduto: 10077,
+            quantidade: 3,
+            valorUnitario: 10,
+            unidade: 'UN',
+            codigoLocalOrigem: 30301,
+          },
+        ],
+      });
+
+      const body = http.gatewayCall.mock.calls[0][2] as {
+        nota: { itens: { item: Record<string, unknown>[] } };
+      };
+      // Corpo INTEIRO do item: chave a mais ou a menos reprova.
+      expect(body.nota.itens.item[0]).toEqual({
+        NUNOTA: {},
+        CODPROD: { $: '10077' },
+        CODLOCALORIG: { $: '30301' },
+        QTDNEG: { $: '3' },
+        CODVOL: { $: 'UN' },
+        VLRUNIT: { $: '10' },
+        VLRTOT: { $: '30' },
+        PERCDESC: { $: '0' },
+      });
+    });
+
+    /** Monta um pedido de 1 item e devolve o item serializado. */
+    async function itemDe(
+      item: Partial<{
+        codigoProduto: number;
+        quantidade: number;
+        valorUnitario: number;
+        unidade: string;
+        percentualDesconto: number;
+        valorTotal: number;
+      }>,
+    ): Promise<Record<string, unknown>> {
+      const http = createMockHttp();
+      http.gatewayCall.mockResolvedValue({ pk: { NUNOTA: { $: '1' } } });
+      await new PedidosResource(http).incluirNotaGateway({
+        codigoCliente: 1,
+        dataNegociacao: '06/09/2026',
+        codigoTipoOperacao: 1001,
+        codigoTipoNegociacao: 200,
+        codigoVendedor: 50,
+        codigoEmpresa: 2,
+        tipoMovimento: 'P',
+        itens: [
+          {
+            codigoProduto: 10077,
+            quantidade: 1,
+            valorUnitario: 10,
+            unidade: 'UN',
+            ...item,
+          },
+        ],
+      });
+      return (
+        http.gatewayCall.mock.calls[0][2] as {
+          nota: { itens: { item: Record<string, unknown>[] } };
+        }
+      ).nota.itens.item[0] as Record<string, unknown>;
+    }
+
+    // VLRTOT e DINHEIRO indo para ERP de terceiro. O produto cru em ponto
+    // flutuante manda lixo binario: medido no review 4, `1.01 * 3` serializa
+    // como '3.0300000000000002', e 19,17% dos pares (preco de 2 casas x qtd
+    // 1-20) passam de 2 casas. Nenhum spike mediu VLRTOT fracionario — a
+    // reacao do ERP e desconhecida (I11), entao o SDK nao inventa a casa 17.
+    it.each([
+      { valorUnitario: 1.01, quantidade: 3, esperado: '3.03' },
+      { valorUnitario: 0.1, quantidade: 3, esperado: '0.3' },
+      { valorUnitario: 10, quantidade: 1, esperado: '10' },
+      { valorUnitario: 19.99, quantidade: 7, esperado: '139.93' },
+      { valorUnitario: 10, quantidade: 0.5, esperado: '5' },
+    ])(
+      'VLRTOT default de $valorUnitario x $quantidade sai como $esperado (centavos, sem lixo binario)',
+      async ({ valorUnitario, quantidade, esperado }) => {
+        const item = await itemDe({ valorUnitario, quantidade });
+        expect(item.VLRTOT).toEqual({ $: esperado });
+      },
+    );
+
+    it.each([
+      { campo: 'valorUnitario', valor: Number.NaN },
+      { campo: 'valorUnitario', valor: -5 },
+      { campo: 'quantidade', valor: Number.NaN },
+      { campo: 'quantidade', valor: -5 },
+      { campo: 'quantidade', valor: 0 },
+    ])('recusa $campo = $valor antes da rede (entra no VLRTOT)', async ({ campo, valor }) => {
+      const http = createMockHttp();
+      await expect(
+        new PedidosResource(http).incluirNotaGateway({
+          codigoCliente: 1,
+          dataNegociacao: '06/09/2026',
+          codigoTipoOperacao: 1001,
+          codigoTipoNegociacao: 200,
+          codigoVendedor: 50,
+          codigoEmpresa: 2,
+          tipoMovimento: 'P',
+          itens: [
+            {
+              codigoProduto: 10077,
+              quantidade: 1,
+              valorUnitario: 10,
+              unidade: 'UN',
+              [campo]: valor,
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: 'VALIDATION_ERROR', message: expect.stringMatching(campo) });
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
+
+    // Ramo `undefined` dos obrigatorios: o tipo exige number, mas o consumidor
+    // em JS puro nao tem tipo — e `undefined` em conta vira `NaN`, que iria ao
+    // ERP como a string 'NaN' (R9/I11).
+    it.each(['valorUnitario', 'quantidade'])(
+      'recusa %s ausente (consumidor sem tipagem)',
+      async (campo) => {
+        const http = createMockHttp();
+        const item: Record<string, unknown> = {
+          codigoProduto: 10077,
+          quantidade: 1,
+          valorUnitario: 10,
+          unidade: 'UN',
+        };
+        delete item[campo];
+
+        await expect(
+          new PedidosResource(http).incluirNotaGateway({
+            codigoCliente: 1,
+            dataNegociacao: '06/09/2026',
+            codigoTipoOperacao: 1001,
+            codigoTipoNegociacao: 200,
+            codigoVendedor: 50,
+            codigoEmpresa: 2,
+            tipoMovimento: 'P',
+            itens: [item as ItemNotaGatewayInput],
+          }),
+        ).rejects.toMatchObject({
+          code: 'VALIDATION_ERROR',
+          message: expect.stringMatching(new RegExp(`${campo}.*obrigatorio`)),
+        });
+        expect(http.gatewayCall).not.toHaveBeenCalled();
+      },
+    );
+
+    // Arredondamento declarado: half-up para +infinito no meio centavo, e preco
+    // abaixo de meio centavo colapsa em '0' — nao e bug, e a consequencia de
+    // arredondar dinheiro em 2 casas, e fica travada para nao mudar calada.
+    it.each([
+      { valorUnitario: 0.005, quantidade: 1, esperado: '0.01' },
+      { valorUnitario: 1e-7, quantidade: 1, esperado: '0' },
+    ])(
+      'VLRTOT de $valorUnitario x $quantidade arredonda para $esperado (half-up, 2 casas)',
+      async ({ valorUnitario, quantidade, esperado }) => {
+        const item = await itemDe({ valorUnitario, quantidade });
+        expect(item.VLRTOT).toEqual({ $: esperado });
+      },
+    );
+
+    it.each([
+      { campo: 'percentualDesconto', valor: -15 },
+      { campo: 'percentualDesconto', valor: 101 },
+      { campo: 'percentualDesconto', valor: Number.NaN },
+      { campo: 'valorTotal', valor: -1 },
+      { campo: 'valorTotal', valor: Number.NaN },
+    ])('recusa $campo = $valor antes da rede', async ({ campo, valor }) => {
+      const http = createMockHttp();
+      await expect(
+        new PedidosResource(http).incluirNotaGateway({
+          codigoCliente: 1,
+          dataNegociacao: '06/09/2026',
+          codigoTipoOperacao: 1001,
+          codigoTipoNegociacao: 200,
+          codigoVendedor: 50,
+          codigoEmpresa: 2,
+          tipoMovimento: 'P',
+          itens: [
+            {
+              codigoProduto: 10077,
+              quantidade: 1,
+              valorUnitario: 10,
+              unidade: 'UN',
+              [campo]: valor,
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: 'VALIDATION_ERROR', message: expect.stringMatching(campo) });
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
+
+    it('aceita as bordas validas: desconto 0 e 100, valorTotal 0', async () => {
+      for (const percentualDesconto of [0, 100]) {
+        const item = await itemDe({ percentualDesconto });
+        expect(item.PERCDESC).toEqual({ $: String(percentualDesconto) });
+      }
+      const item = await itemDe({ valorTotal: 0 });
+      expect(item.VLRTOT).toEqual({ $: '0' });
+    });
+
+    it('percentualDesconto e valorTotal do input vencem os defaults', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ pk: { NUNOTA: { $: '1' } } });
+
+      await pedidos.incluirNotaGateway({
+        codigoCliente: 1,
+        dataNegociacao: '06/09/2026',
+        codigoTipoOperacao: 1001,
+        codigoTipoNegociacao: 200,
+        codigoVendedor: 50,
+        codigoEmpresa: 2,
+        tipoMovimento: 'P',
+        itens: [
+          {
+            codigoProduto: 10077,
+            quantidade: 2,
+            valorUnitario: 10,
+            unidade: 'UN',
+            percentualDesconto: 15,
+            valorTotal: 17,
+          },
+        ],
+      });
+
+      const item = (
+        http.gatewayCall.mock.calls[0][2] as {
+          nota: { itens: { item: Record<string, unknown>[] } };
+        }
+      ).nota.itens.item[0];
+      expect(item.PERCDESC).toEqual({ $: '15' });
+      expect(item.VLRTOT).toEqual({ $: '17' });
     });
 
     it('camposExtras entram no cabecalho sem serem reinterpretados', async () => {

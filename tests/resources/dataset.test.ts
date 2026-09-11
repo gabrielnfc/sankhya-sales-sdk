@@ -210,13 +210,143 @@ describe('DatasetResource', () => {
     const http = createMockHttp();
     http.gatewayCall.mockResolvedValue({ total: '1', result: [['1889349', {}, null]] });
 
+    // 3 campos para 3 celulas: desde a D2.2b, celula EXCEDENTE que nao seja a
+    // metadata `_rmd` reprova — e este teste e sobre normalizacao de celula,
+    // nao sobre excedente.
     const out = await new DatasetResource(http).save({
       entityName: 'CabecalhoNota',
-      fields: ['NUNOTA'],
-      records: [datasetRecord(['NUNOTA'], { set: { NUNOTA: '1889349' } })],
+      fields: ['NUNOTA', 'NUCONFATUAL', 'OBSERVACAO'],
+      records: [
+        datasetRecord(['NUNOTA', 'NUCONFATUAL', 'OBSERVACAO'], { set: { NUNOTA: '1889349' } }),
+      ],
     });
 
     expect(out.result).toEqual([['1889349', '', '']]);
+  });
+
+  // --- D2.2b: a celula final `_rmd` do DatasetSP (RD-8) ---
+  //
+  // Fato medido (a): toda resposta de `DatasetSP.save` nos fixtures de 06/09
+  // traz, DEPOIS das celulas dos `fields`, uma celula a mais com metadata de
+  // renderizacao — `spike-raw/faturamento/S1_DS_ITENS_1813.json` e
+  // `S1_DS_ESTOQUE_DATAS.json` (`/res/result`). Ate a D2.2b o SDK a tratava
+  // como valor e lancava `DATASET_SAVE_MALFORMED_RESPONSE`: no spike 6 o ERP
+  // ACEITOU o item (pedido 1890082) e quem reprovou a lane foi o SDK.
+  const LINHA_MEDIDA_1813 = [
+    '1889306',
+    '10077',
+    '10',
+    '1',
+    'UN',
+    '30301',
+    'SPIKE-T002-A',
+    '1',
+    {
+      _rmd: {
+        provider: 'PRODUTORMP',
+        CODPROD: {
+          decVlr: 4,
+          decQtd: 4,
+          controle: {
+            tipoContEst: 'L',
+            labelContEst: 'Lote',
+            listaContEst: [''],
+            usaMascara: false,
+          },
+        },
+      },
+    },
+  ];
+  const CAMPOS_1813 = [
+    'NUNOTA',
+    'CODPROD',
+    'QTDNEG',
+    'VLRUNIT',
+    'CODVOL',
+    'CODLOCALORIG',
+    'CONTROLE',
+    'ATUALESTOQUE',
+  ];
+
+  it('save descarta a celula final _rmd e devolve so as celulas dos fields (D2.2b)', async () => {
+    const http = createMockHttp();
+    http.gatewayCall.mockResolvedValue({ total: '1', result: [LINHA_MEDIDA_1813] });
+
+    const out = await new DatasetResource(http).save({
+      entityName: 'ItemNota',
+      fields: CAMPOS_1813,
+      records: [datasetRecord(CAMPOS_1813, { set: { NUNOTA: '1889306' } })],
+    });
+
+    expect(out).toEqual({
+      total: 1,
+      result: [['1889306', '10077', '10', '1', 'UN', '30301', 'SPIKE-T002-A', '1']],
+    });
+  });
+
+  it('save lanca quando a celula excedente NAO e a metadata _rmd', async () => {
+    const http = createMockHttp();
+    http.gatewayCall.mockResolvedValue({
+      total: '1',
+      result: [['1889306', { outra: 'coisa' }]],
+    });
+
+    await expect(
+      new DatasetResource(http).save({
+        entityName: 'ItemNota',
+        fields: ['NUNOTA'],
+        records: [datasetRecord(['NUNOTA'], { set: { NUNOTA: '1889306' } })],
+      }),
+    ).rejects.toMatchObject({ code: 'DATASET_SAVE_MALFORMED_RESPONSE' });
+  });
+
+  it('save lanca quando a celula excedente e HIBRIDA (_rmd + campo)', async () => {
+    const http = createMockHttp();
+    http.gatewayCall.mockResolvedValue({
+      total: '1',
+      result: [['1889306', { _rmd: { provider: 'PRODUTORMP' }, VLRTOT: '10' }]],
+    });
+
+    // Descartar isto jogaria fora um valor de campo em silencio.
+    await expect(
+      new DatasetResource(http).save({
+        entityName: 'ItemNota',
+        fields: ['NUNOTA'],
+        records: [datasetRecord(['NUNOTA'], { set: { NUNOTA: '1889306' } })],
+      }),
+    ).rejects.toMatchObject({ code: 'DATASET_SAVE_MALFORMED_RESPONSE' });
+  });
+
+  it('save lanca quando ha mais de uma celula excedente, mesmo com _rmd', async () => {
+    const http = createMockHttp();
+    http.gatewayCall.mockResolvedValue({
+      total: '1',
+      result: [['1889306', 'sobra', { _rmd: {} }]],
+    });
+
+    await expect(
+      new DatasetResource(http).save({
+        entityName: 'ItemNota',
+        fields: ['NUNOTA'],
+        records: [datasetRecord(['NUNOTA'], { set: { NUNOTA: '1889306' } })],
+      }),
+    ).rejects.toMatchObject({ code: 'DATASET_SAVE_MALFORMED_RESPONSE' });
+  });
+
+  it('save continua lancando com objeto nao vazio em POSICAO DE CAMPO (D2.2 intocada)', async () => {
+    const http = createMockHttp();
+    http.gatewayCall.mockResolvedValue({
+      total: '1',
+      result: [[{ $: '1889306' }, { _rmd: {} }]],
+    });
+
+    await expect(
+      new DatasetResource(http).save({
+        entityName: 'ItemNota',
+        fields: ['NUNOTA'],
+        records: [datasetRecord(['NUNOTA'], { set: { NUNOTA: '1889306' } })],
+      }),
+    ).rejects.toMatchObject({ code: 'DATASET_SAVE_MALFORMED_RESPONSE' });
   });
 
   it('save lanca quando uma celula e objeto nao vazio (nunca "[object Object]")', async () => {

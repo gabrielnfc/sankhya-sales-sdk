@@ -376,6 +376,56 @@ claude mcp add --transport http sankhya-docs https://developer.sankhya.com.br/mc
 Contribuidores deste repositório já têm o servidor pré-configurado via [`.mcp.json`](./.mcp.json)
 na raiz (o Claude Code detecta automaticamente).
 
+## Lane WMS opt-in (integração no sandbox)
+
+`tests/integration/wms-sandbox.test.ts` exercita, **contra o sandbox Sankhya**, o caminho que o
+WMS usa: estoque → volume do produto → pedido em `A` → item com `CONTROLE` → `consultarVar`.
+Ela **escreve** no ERP de homologação, então é opt-in duplo e fica fora do `npm test`:
+
+```bash
+# credenciais de SANDBOX no ambiente (host api.sandbox.…) + a flag explícita
+SDK_INTEGRATION_WMS=1 npm run test:integration
+```
+
+Sem as credenciais **ou** sem `SDK_INTEGRATION_WMS=1` a suíte é SKIP e imprime o motivo — nunca
+faz rede por acidente.
+
+**Dois conjuntos de credenciais, com precedência:** se `SANKHYA_SANDBOX_API_URL` estiver definida,
+a lane usa o conjunto `SANKHYA_SANDBOX_*` **inteiro** (`…_API_URL`, `…_CLIENT_ID`,
+`…_CLIENT_SECRET`, `…_TOKEN`) e ignora os nomes genéricos; senão usa `SANKHYA_BASE_URL` e irmãos,
+que é o que o workflow injeta. Os dois nunca se misturam — conjunto escolhido pela metade vira
+SKIP nomeando a chave que falta, jamais completado com a chave do outro conjunto.
+
+**Travado por teste, no CI de PR e sem rede** (`tests/security/ci-lanes.test.ts`):
+
+| Garantia | Como é verificada |
+|---|---|
+| opt-in duplo: credencial sozinha não autoriza | comportamento — `optInSatisfeito()` é chamada com cada combinação de ambiente |
+| teto de **40** chamadas HTTP, que lança antes do request | comportamento — `callBudget` e `interceptarFetch` são exercitados de verdade |
+| a suíte usa esse opt-in e esse teto, prova o sandbox antes de construir o client, intercepta e restaura o `fetch`, lê `STATUSNOTA` antes de excluir, guarda contra lista de ids vazia, nunca libera nem fatura | presença no **código** da suíte (comentários e texto de log são removidos antes do match) |
+| o workflow de integração não dispara em `pull_request` e `npm test` exclui `tests/integration/**` | leitura do `integration.yml` e do `package.json` |
+
+**Não travado por teste — só a execução real da lane prova** (o dono roda e cola o resultado no
+ledger): que o sandbox aceite cada passo, os números do `volumesProduto`, e o *read-back* em
+`TGFCAB` provando que o teardown apagou. A lane só liga em `workflow_dispatch` com a caixa
+`run_wms_lane` marcada; em `push`/`schedule` ela é SKIP.
+
+**O cabeçalho do pedido vai inteiro.** A lane manda, via `camposExtras`, o cabeçalho completo que
+o ERP aceitou em 2026-09-06 (`CODNAT`, `PERCDESC` e os demais campos não tipados) — descobrir o
+mínimo campo a campo custava uma rodada por exigência revelada.
+
+**O item é gravado num lote real.** O passo que grava `ItemNota` usa um `CONTROLE` com saldo medido
+no sandbox e confere a disponibilidade antes (`ESTOQUE − RESERVADO`): lote inventado devolve
+`ORA-20101 ESTOQUE INSUFICIENTE`, e o teardown prova ausência também em `TGFITE`.
+
+**Leitura de volume (`TGFVOA`) é por SQL.** `produtos.volumesProduto()` usa `dbExplorer.query`:
+a rota de Gateway (`CRUDServiceProvider.loadRecords` com `rootEntity: 'VolumeProduto'`) foi medida
+no sandbox em 2026-09-11 e devolveu `Erro interno (NPE)` nas duas tentativas, com zero linhas.
+
+Tudo que a execução cria nasce e morre em `A`, marcado com o prefixo `SDK-T-<hhmm>` em
+`AD_NUMPEDIDO`, `OBSERVACAO` e `CONTROLE`. Nota que não estiver mais em `A` na hora do teardown
+**não é apagada**: é impressa como resíduo e derruba a lane.
+
 ## Contribuindo
 
 Veja [CONTRIBUTING.md](./CONTRIBUTING.md) para instruções de setup, convenções e processo de PR.

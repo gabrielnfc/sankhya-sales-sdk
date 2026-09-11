@@ -52,6 +52,84 @@ const CHAVES_TIPADAS_CABECALHO: ReadonlySet<string> = new Set([
   'AD_NUMPEDIDO',
 ]);
 
+/**
+ * Total do item em CENTAVOS, para nao mandar lixo binario num campo de dinheiro.
+ *
+ * Medido (review 4 da D4): `1.01 * 3` em ponto flutuante serializa como
+ * `'3.0300000000000002'`, e **19,17%** dos pares (preco de 2 casas entre R$1 e
+ * R$500 x quantidade 1-20) passam de 2 casas. Nenhum spike mediu `VLRTOT`
+ * fracionario — todos os medidos sao `'10'`, `'30'`, `'40'` — entao a reacao do
+ * ERP a uma 17a casa e DESCONHECIDA, e escrita ambigua e o que I11 proibe.
+ *
+ * A conta vai pelo inteiro de centavos e volta dividida por 100: `Math.round`
+ * duas vezes, porque `quantidade` pode ser fracionaria (0,5 kg, 1,25 m) e o
+ * produto em centavos tambem quebra. O resultado e exato ate 2 casas, e
+ * `String()` devolve a forma canonica — `'3.03'`, `'0.3'`, `'10'` —, nunca uma
+ * casa inventada.
+ *
+ * O que o arredondamento IMPLICA, declarado para nao surpreender ninguem:
+ * - meio centavo sobe (`Math.round` e half-up para +infinito): `0.005 x 1`
+ *   vira `'0.01'`, nao `'0'`;
+ * - preco abaixo de meio centavo colapsa: `1e-7 x 1` vira `'0'`;
+ * - `VLRUNIT` continua indo CRU, sem arredondamento. Logo
+ *   `VLRUNIT x QTDNEG` pode diferir de `VLRTOT` em ate 1 centavo, e e o
+ *   `VLRTOT` que vale como total do documento. Quem precisa dos dois
+ *   coerentes informa `valorTotal` explicitamente.
+ */
+function totalEmCentavos(valorUnitario: number, quantidade: number): number {
+  const centavos = Math.round(valorUnitario * 100);
+  return Math.round(centavos * quantidade) / 100;
+}
+
+/** Faixa aceita para um numero de item, e se a ausencia tambem reprova. */
+interface FaixaDoItem {
+  readonly minimo: number;
+  readonly maximo: number;
+  /** `true` quando o minimo NAO e aceito (quantidade tem de ser > 0). */
+  readonly minimoExclusivo?: boolean;
+  /** `true` quando `undefined` tambem reprova (campo obrigatorio). */
+  readonly obrigatorio?: boolean;
+}
+
+/**
+ * Recusa numero de item invalido ANTES da rede (R9/I11).
+ *
+ * Um helper so, sem delegacao interna: a versao com duas funcoes tinha uma
+ * chamada a dois espacos de indentacao e o comando de contagem de metodos
+ * publicos (B5) a contava como metodo, inflando a superficie medida para 104.
+ * Regra que so vale se ninguem escrever a linha errada nao e regra — juntar os
+ * dois casos num lugar e mais simples e ainda mata o falso positivo.
+ *
+ * `undefined` passa quando o campo e opcional: quem nao informa cai no default
+ * do chamador. Em campo obrigatorio ele reprova — em JS puro a ausencia chega, e
+ * `undefined` em conta vira `NaN`.
+ */
+function assertNumeroDoItem(
+  valor: number | undefined,
+  campo: string,
+  faixa: FaixaDoItem,
+  indice: number,
+): void {
+  const { minimo, maximo, minimoExclusivo = false, obrigatorio = false } = faixa;
+
+  if (valor === undefined) {
+    if (!obrigatorio) return;
+    throw new SankhyaError(
+      `incluirNotaGateway: itens[${indice}].${campo} e obrigatorio. Nenhuma chamada foi feita.`,
+      'VALIDATION_ERROR',
+    );
+  }
+
+  const abaixo = minimoExclusivo ? valor <= minimo : valor < minimo;
+  if (!Number.isFinite(valor) || abaixo || valor > maximo) {
+    const limite = `${minimoExclusivo ? 'maior que' : 'a partir de'} ${minimo} e ate ${maximo}`;
+    throw new SankhyaError(
+      `incluirNotaGateway: itens[${indice}].${campo} precisa ser um numero finito ${limite}; recebido: ${String(valor)}. Nenhuma chamada foi feita.`,
+      'VALIDATION_ERROR',
+    );
+  }
+}
+
 /** Estreita para objeto simples sem usar `any`. */
 function ehRegistro(valor: unknown): valor is Record<string, unknown> {
   return typeof valor === 'object' && valor !== null && !Array.isArray(valor);
@@ -438,16 +516,50 @@ export class PedidosResource {
     // Formato aceito pelo 4midware (M34/M46): `NUNOTA: {}` (objeto vazio, NAO
     // `{ $: '' }`) no cabecalho e em CADA item; `itens.INFORMARPRECO` e a
     // STRING 'True'/'False', fora do serializador. Nao "simplificar".
-    const itens = input.itens.map((item) => ({
-      NUNOTA: {},
-      ...serialize({
-        CODPROD: item.codigoProduto,
-        QTDNEG: item.quantidade,
-        VLRUNIT: item.valorUnitario,
-        CODVOL: item.unidade,
-        ...(item.codigoLocalOrigem ? { CODLOCALORIG: item.codigoLocalOrigem } : {}),
-      }),
-    }));
+    // Item COMPLETO, na forma medida (`spike-raw/faturamento/S2_INCLUIR_P1.json`
+    // -> `nota.itens.item[0]`, e `ped.ts:6`, 06/09): 8 chaves. `VLRTOT` e
+    // `PERCDESC` nao sao decorativos — a lane da D4 mediu duas vezes que, sem o
+    // percentual, `CACSP.incluirNota` recusa com `O campo 'Perc. desconto' deve
+    // ser informado.` (CORE_E03235); e o campo e do ITEM, nao do cabecalho: a
+    // recusa sobreviveu a `PERCDESC` no cabecalho.
+    const itens = input.itens.map((item, indice) => {
+      // Lixo nao cruza a fronteira: o juiz e local, nao o ERP (R9/I11). Os dois
+      // obrigatorios vem PRIMEIRO porque alimentam o VLRTOT default: `NaN`
+      // sairia como a string 'NaN' e `-5` inverteria o sinal do total.
+      const DINHEIRO = { minimo: 0, maximo: Number.MAX_SAFE_INTEGER } as const;
+      assertNumeroDoItem(
+        item.valorUnitario,
+        'valorUnitario',
+        { ...DINHEIRO, obrigatorio: true },
+        indice,
+      );
+      assertNumeroDoItem(
+        item.quantidade,
+        'quantidade',
+        { ...DINHEIRO, minimoExclusivo: true, obrigatorio: true }, // quantidade zero nao e item
+        indice,
+      );
+      assertNumeroDoItem(
+        item.percentualDesconto,
+        'percentualDesconto',
+        { minimo: 0, maximo: 100 },
+        indice,
+      );
+      assertNumeroDoItem(item.valorTotal, 'valorTotal', DINHEIRO, indice);
+
+      return {
+        NUNOTA: {},
+        ...serialize({
+          CODPROD: item.codigoProduto,
+          QTDNEG: item.quantidade,
+          VLRUNIT: item.valorUnitario,
+          CODVOL: item.unidade,
+          ...(item.codigoLocalOrigem ? { CODLOCALORIG: item.codigoLocalOrigem } : {}),
+          VLRTOT: item.valorTotal ?? totalEmCentavos(item.valorUnitario, item.quantidade),
+          PERCDESC: item.percentualDesconto ?? 0,
+        }),
+      };
+    });
 
     const cabecalho: Record<string, unknown> = {
       NUNOTA: {},

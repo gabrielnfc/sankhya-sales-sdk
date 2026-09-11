@@ -1,5 +1,4 @@
 import { SankhyaError } from '../core/errors.js';
-import { deserializeRows } from '../core/gateway-serializer.js';
 import type { HttpClient } from '../core/http.js';
 import {
   createPaginator,
@@ -63,25 +62,39 @@ const DESCRITOR_VOLUMES: ResourceDescriptor = {
 };
 
 /**
- * Entidade do Gateway que mapeia `TGFVOA`.
+ * Colunas de `TGFVOA` lidas por `volumesProduto`, na ordem do `SELECT`.
  *
- * **(b) premissa, nao medida.** O nome veio do plano D1.4, nao de chamada ao
- * sandbox: o censo M57 leu `TGFVOA` por SQL (`DbExplorerSP`), nunca por
- * `CRUDServiceProvider.loadRecords`. **Gatilho: medir na D4 (lane de
- * integracao, sandbox)** — 1 chamada confirmando `rootEntity` e os 6 campos de
- * {@link CAMPOS_VOLUME_PRODUTO}. Enquanto nao medido, trate um resultado
- * uniforme de zeros como suspeita de nome errado, nao como cadastro incompleto.
+ * Forma medida no censo T0-3 (`spike-raw/censos/censos.ts:81-82,90-91`), que le
+ * `TGFVOA` por `CODPROD` com `QUANTIDADE`, `LASTRO`, `CAMADAS` e `ATIVO`;
+ * `CODVOL` entra porque e a chave do volume no retorno.
  */
-const ENTIDADE_VOLUME_PRODUTO = 'VolumeProduto';
-const CAMPOS_VOLUME_PRODUTO = 'CODPROD,CODVOL,QUANTIDADE,LASTRO,CAMADAS,ATIVO';
+const COLUNAS_TGFVOA = ['CODPROD', 'CODVOL', 'QUANTIDADE', 'LASTRO', 'CAMADAS', 'ATIVO'] as const;
+
+/** Linha crua de `TGFVOA` como o DbExplorer devolve: toda celula string. */
+type LinhaVolume = Record<string, string>;
 
 /**
- * Normaliza texto vindo do Gateway: campo NULL chega como o literal `'{}'`
- * (fato medido 2026-09-08), que nao e conteudo — e ausencia.
+ * Parse estrito do `CODPROD` da linha.
+ *
+ * `safeParseNumber` devolveria `0` para vazio (`src/core/parse-utils.ts:11-21`),
+ * e `0` aqui seria um produto inventado — identidade de linha nao se adivinha.
+ * Os outros numericos seguem com `safeParseNumber`: vazio ali significa
+ * cadastro incompleto, que e o caso comum (M57).
+ *
+ * @throws {SankhyaError} `PARSE_ERROR`.
  */
-function limpaTextoGateway(valor: string | undefined): string {
+function parseCodProdEstrito(valor: string | undefined): number {
   const texto = (valor ?? '').trim();
-  return texto === '{}' || texto === '[]' ? '' : texto;
+  const numero = Number(texto);
+  // `'0'` tambem lanca: passa pelo `Number.isFinite`, mas CODPROD 0 nao existe
+  // — aceita-lo seria justamente inventar o produto que a guarda evita.
+  if (texto === '' || !Number.isFinite(numero) || numero <= 0) {
+    throw new SankhyaError(
+      'produtos.volumesProduto: coluna CODPROD veio vazia, nao numerica ou <= 0 em TGFVOA. Nenhum 0 foi inventado — 0 seria um produto que nao existe.',
+      'PARSE_ERROR',
+    );
+  }
+  return numero;
 }
 
 const DESCRITOR_GRUPOS: ResourceDescriptor = {
@@ -386,26 +399,45 @@ export class ProdutosResource {
   }
 
   /**
-   * Le os volumes de um produto em `TGFVOA` pelo Gateway (`CRUDServiceProvider.loadRecords`).
+   * Le os volumes de um produto em `TGFVOA` por **SQL** (`dbExplorer.query`).
    *
    * Caminho recomendado para un/volume e lastro x camadas: o REST
    * {@link ProdutosResource.volumes} devolve `[]` no sandbox (M54).
    *
-   * Cadastro incompleto e comum (M57: 38,4% dos PA ativos com `QUANTIDADE > 1`),
-   * entao produto sem volume devolve `[]` **sem lancar** — a decisao de tratar
-   * a lacuna e do consumidor (REQ-CNT-5).
+   * **Por que SQL e nao Gateway (RD-7).** Ate a 1.5 este metodo chamava
+   * `CRUDServiceProvider.loadRecords` com `rootEntity: 'VolumeProduto'` — nome
+   * que era premissa, nunca medida. A lane de integracao da D4 mediu no
+   * sandbox: 2 de 2 chamadas devolveram `GatewayError: Erro interno (NPE)`
+   * (`serviceName CRUDServiceProvider.loadRecords`, transactionId
+   * `B13E2C8D39AEA4CE10EAE94BCF73F6FC`), com 0 linhas e 0 colunas. M54 sempre
+   * foi medido por SQL; e por SQL que se le. Medido verde na lane em 2026-09-11:
+   * 13609 devolve `{ quantidade: 72, lastro: 12, camadas: 4 }` (a), com o
+   * `ORDER BY CODVOL` desta consulta.
    *
-   * @param codigoProduto - Codigo do produto. Precisa ser inteiro: o valor
-   * entra no `criteria` do Gateway, e nao-inteiro e recusado antes de qualquer
-   * chamada (guarda de injecao).
-   * @returns Array de volumes do produto; `[]` quando nao ha cadastro. Campo
-   * numerico ausente, nulo ou `{}` vira **0** (cadastro incompleto e o caso
-   * comum — M57: 318 dos 513 PA ativos sem `LASTRO`+`CAMADAS`); valor nao
-   * numerico continua lancando `PARSE_ERROR`.
-   * @throws {SankhyaError} `VALIDATION_ERROR` se `codigoProduto` nao for inteiro;
-   * `INCOMPLETE_READ` se o Gateway sinalizar mais paginas e devolver zero linhas
-   * (varredura truncada — nunca devolvemos `[]` nesse caso); `PARSE_ERROR` em
-   * valor numerico invalido.
+   * Uma chamada, sem paginacao — e aqui a afirmacao e do CLIENTE, nao do
+   * servidor: `dbExplorer.query` nao expoe teto de linhas nem flag de
+   * truncamento (`src/resources/db-explorer.ts:74-105`), e **nenhum spike mediu
+   * `DbExplorerSP.executeQuery` sem `OFFSET/FETCH`** — os censos sempre
+   * paginaram (`censos.ts:95,188`). O que torna o risco nulo na pratica e o
+   * tamanho do dado: `TGFVOA` tem **no maximo 2 linhas por produto** nos 513 PA
+   * do censo T0-3. Por isso nao ha `INCOMPLETE_READ` aqui; se um dia o servidor
+   * truncar, sera preciso medir e paginar.
+   *
+   * Cadastro incompleto e comum (M57: so 38,4% dos PA ativos com
+   * `QUANTIDADE > 1`), entao produto sem volume devolve `[]` **sem lancar** — a
+   * decisao de tratar a lacuna e do consumidor (REQ-CNT-5).
+   *
+   * @param codigoProduto - Codigo do produto. Precisa ser inteiro positivo: o
+   * valor e **interpolado** no SQL, e nao-inteiro e recusado antes de qualquer
+   * chamada (guarda de injecao, G3).
+   * @returns Array de volumes do produto; `[]` quando nao ha cadastro.
+   * `QUANTIDADE`, `LASTRO` e `CAMADAS` vazios viram **0** (cadastro incompleto e
+   * o caso comum — M57: 318 dos 513 PA ativos sem `LASTRO`+`CAMADAS`); valor nao
+   * numerico lanca `PARSE_ERROR`. `CODPROD` e a identidade da linha: vazio
+   * tambem lanca, porque `0` ali seria um produto inventado.
+   * @throws {SankhyaError} `VALIDATION_ERROR` se `codigoProduto` nao for inteiro
+   * positivo ou se a dependencia `dbExplorer` nao tiver sido injetada;
+   * `PARSE_ERROR` em valor numerico invalido.
    * @throws {GatewayError} Em erro de negocio Sankhya.
    * @throws {AuthError} Se autenticacao falhar.
    * @example
@@ -415,66 +447,38 @@ export class ProdutosResource {
    * ```
    */
   async volumesProduto(codigoProduto: number): Promise<VolumeProduto[]> {
-    if (!Number.isInteger(codigoProduto)) {
+    if (!Number.isInteger(codigoProduto) || codigoProduto <= 0) {
       throw new SankhyaError(
-        `codigoProduto precisa ser um inteiro; recebido: ${String(codigoProduto)}.`,
+        `produtos.volumesProduto: codigoProduto precisa ser um inteiro positivo; recebido: ${String(codigoProduto)}. Nenhuma consulta foi feita.`,
         'VALIDATION_ERROR',
       );
     }
 
-    const volumes: VolumeProduto[] = [];
-    let pagina = 0;
-    let temMais = true;
-
-    // Pagina ate vir pagina incompleta: `[]` precisa significar "sem cadastro",
-    // nunca "a primeira pagina do Gateway acabou".
-    while (temMais) {
-      const result = await this.http.gatewayCall<Record<string, unknown>>(
-        'mge',
-        'CRUDServiceProvider.loadRecords',
-        {
-          dataSet: {
-            rootEntity: ENTIDADE_VOLUME_PRODUTO,
-            includePresentationFields: 'N',
-            offsetPage: String(pagina),
-            criteria: { expression: { $: `this.CODPROD = '${codigoProduto}'` } },
-            entity: { fieldset: { list: CAMPOS_VOLUME_PRODUTO } },
-          },
-        },
-        undefined,
-        true, // idempotent: leitura, elegivel a retry em falha transiente
+    const dbExplorer = this.deps?.dbExplorer;
+    if (dbExplorer === undefined) {
+      throw new SankhyaError(
+        'produtos.volumesProduto exige a dependencia dbExplorer, que so o SankhyaClient injeta. Use `sankhya.produtos`. Nenhuma consulta foi feita.',
+        'VALIDATION_ERROR',
       );
-
-      const { rows, hasMore } = deserializeRows(result, this.http.getLogger());
-
-      // Estado impossivel (I11/G1): o Gateway diz que ha mais paginas e manda
-      // zero linhas. Sem parada seria laco infinito; com parada silenciosa o
-      // resultado truncado viraria `[]`, que neste metodo e o sinal contratual
-      // de "produto sem volume cadastrado" (REQ-CNT-5). Logamos como
-      // `src/core/pagination.ts:297-303` e **lancamos** em vez de devolver
-      // censo parcial.
-      if (hasMore && rows.length === 0) {
-        const motivo = `Leitura de volumes do produto ${codigoProduto} incompleta: pagina ${pagina} veio vazia com hasMoreResult verdadeiro`;
-        this.http.getLogger().error(motivo);
-        throw new SankhyaError(motivo, 'INCOMPLETE_READ');
-      }
-
-      for (const row of rows) {
-        volumes.push({
-          codProd: safeParseNumber(row.CODPROD, 'CODPROD'),
-          codVol: limpaTextoGateway(row.CODVOL),
-          quantidade: safeParseNumber(row.QUANTIDADE, 'QUANTIDADE'),
-          lastro: safeParseNumber(row.LASTRO, 'LASTRO'),
-          camadas: safeParseNumber(row.CAMADAS, 'CAMADAS'),
-          ativo: row.ATIVO === 'S',
-        });
-      }
-
-      temMais = hasMore;
-      pagina += 1;
     }
 
-    return volumes;
+    // Colunas e WHERE na forma medida do censo T0-3
+    // (`spike-raw/censos/censos.ts:81-82,90-91`): `TGFVOA` por `CODPROD`, com
+    // `QUANTIDADE`, `LASTRO`, `CAMADAS` e `ATIVO`. Aqui o filtro `ATIVO = 'S'`
+    // do censo NAO entra: este metodo devolve `ativo` e quem decide e o
+    // chamador. `ORDER BY CODVOL` para a ordem nao depender do plano do banco.
+    const linhas = await dbExplorer.query<LinhaVolume>(
+      `SELECT ${COLUNAS_TGFVOA.join(', ')} FROM TGFVOA WHERE CODPROD = ${codigoProduto} ORDER BY CODVOL`,
+    );
+
+    return linhas.map((linha) => ({
+      codProd: parseCodProdEstrito(linha.CODPROD),
+      codVol: (linha.CODVOL ?? '').trim(),
+      quantidade: safeParseNumber(linha.QUANTIDADE, 'QUANTIDADE'),
+      lastro: safeParseNumber(linha.LASTRO, 'LASTRO'),
+      camadas: safeParseNumber(linha.CAMADAS, 'CAMADAS'),
+      ativo: linha.ATIVO === 'S',
+    }));
   }
 
   /**
