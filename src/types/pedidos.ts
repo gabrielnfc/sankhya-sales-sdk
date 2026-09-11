@@ -449,6 +449,11 @@ export interface ItemNotaGatewayInput {
    * dinheiro; 19,17% dos pares medidos passavam de 2 casas. A casa 17 e que era
    * o valor inventado.)_
    *
+   * Implicacoes declaradas do arredondamento: meio centavo sobe (`0.005 x 1`
+   * vira `'0.01'`), preco abaixo de meio centavo colapsa em `'0'`, e `VLRUNIT`
+   * vai CRU — logo `VLRUNIT x QTDNEG` pode diferir do `VLRTOT` em ate 1
+   * centavo.
+   *
    * Informe este campo quando o total nao for o produto direto — desconto ja
    * embutido, rateio de frete, arredondamento proprio.
    */

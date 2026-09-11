@@ -1023,6 +1023,51 @@ describe('PedidosResource', () => {
     );
 
     it.each([
+      { campo: 'valorUnitario', valor: Number.NaN },
+      { campo: 'valorUnitario', valor: -5 },
+      { campo: 'quantidade', valor: Number.NaN },
+      { campo: 'quantidade', valor: -5 },
+      { campo: 'quantidade', valor: 0 },
+    ])('recusa $campo = $valor antes da rede (entra no VLRTOT)', async ({ campo, valor }) => {
+      const http = createMockHttp();
+      await expect(
+        new PedidosResource(http).incluirNotaGateway({
+          codigoCliente: 1,
+          dataNegociacao: '06/09/2026',
+          codigoTipoOperacao: 1001,
+          codigoTipoNegociacao: 200,
+          codigoVendedor: 50,
+          codigoEmpresa: 2,
+          tipoMovimento: 'P',
+          itens: [
+            {
+              codigoProduto: 10077,
+              quantidade: 1,
+              valorUnitario: 10,
+              unidade: 'UN',
+              [campo]: valor,
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: 'VALIDATION_ERROR', message: expect.stringMatching(campo) });
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
+
+    // Arredondamento declarado: half-up para +infinito no meio centavo, e preco
+    // abaixo de meio centavo colapsa em '0' — nao e bug, e a consequencia de
+    // arredondar dinheiro em 2 casas, e fica travada para nao mudar calada.
+    it.each([
+      { valorUnitario: 0.005, quantidade: 1, esperado: '0.01' },
+      { valorUnitario: 1e-7, quantidade: 1, esperado: '0' },
+    ])(
+      'VLRTOT de $valorUnitario x $quantidade arredonda para $esperado (half-up, 2 casas)',
+      async ({ valorUnitario, quantidade, esperado }) => {
+        const item = await itemDe({ valorUnitario, quantidade });
+        expect(item.VLRTOT).toEqual({ $: esperado });
+      },
+    );
+
+    it.each([
       { campo: 'percentualDesconto', valor: -15 },
       { campo: 'percentualDesconto', valor: 101 },
       { campo: 'percentualDesconto', valor: Number.NaN },

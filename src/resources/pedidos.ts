@@ -66,27 +66,63 @@ const CHAVES_TIPADAS_CABECALHO: ReadonlySet<string> = new Set([
  * produto em centavos tambem quebra. O resultado e exato ate 2 casas, e
  * `String()` devolve a forma canonica — `'3.03'`, `'0.3'`, `'10'` —, nunca uma
  * casa inventada.
+ *
+ * O que o arredondamento IMPLICA, declarado para nao surpreender ninguem:
+ * - meio centavo sobe (`Math.round` e half-up para +infinito): `0.005 x 1`
+ *   vira `'0.01'`, nao `'0'`;
+ * - preco abaixo de meio centavo colapsa: `1e-7 x 1` vira `'0'`;
+ * - `VLRUNIT` continua indo CRU, sem arredondamento. Logo
+ *   `VLRUNIT x QTDNEG` pode diferir de `VLRTOT` em ate 1 centavo, e e o
+ *   `VLRTOT` que vale como total do documento. Quem precisa dos dois
+ *   coerentes informa `valorTotal` explicitamente.
  */
 function totalEmCentavos(valorUnitario: number, quantidade: number): number {
   const centavos = Math.round(valorUnitario * 100);
   return Math.round(centavos * quantidade) / 100;
 }
 
-/** Recusa numero de item fora da faixa ANTES da rede (R9/I11). */
+/**
+ * Recusa numero de item invalido ANTES da rede (R9/I11).
+ *
+ * `undefined` passa: quem e opcional cai no default do chamador. Campo
+ * obrigatorio usa {@link assertNumeroObrigatorioDoItem}, que nao perdoa a
+ * ausencia — em JS puro ela chega, e `undefined` em conta vira `NaN`.
+ */
 function assertNumeroDoItem(
   valor: number | undefined,
   campo: string,
   minimo: number,
   maximo: number,
   indice: number,
+  minimoExclusivo = false,
 ): void {
   if (valor === undefined) return;
-  if (!Number.isFinite(valor) || valor < minimo || valor > maximo) {
+  const abaixo = minimoExclusivo ? valor <= minimo : valor < minimo;
+  if (!Number.isFinite(valor) || abaixo || valor > maximo) {
+    const faixa = `${minimoExclusivo ? 'maior que' : 'a partir de'} ${minimo} e ate ${maximo}`;
     throw new SankhyaError(
-      `incluirNotaGateway: itens[${indice}].${campo} precisa ser um numero finito entre ${minimo} e ${maximo}; recebido: ${String(valor)}. Nenhuma chamada foi feita.`,
+      `incluirNotaGateway: itens[${indice}].${campo} precisa ser um numero finito ${faixa}; recebido: ${String(valor)}. Nenhuma chamada foi feita.`,
       'VALIDATION_ERROR',
     );
   }
+}
+
+/** Como {@link assertNumeroDoItem}, mas `undefined` tambem reprova. */
+function assertNumeroObrigatorioDoItem(
+  valor: number | undefined,
+  campo: string,
+  minimo: number,
+  maximo: number,
+  indice: number,
+  minimoExclusivo = false,
+): void {
+  if (valor === undefined) {
+    throw new SankhyaError(
+      `incluirNotaGateway: itens[${indice}].${campo} e obrigatorio. Nenhuma chamada foi feita.`,
+      'VALIDATION_ERROR',
+    );
+  }
+  assertNumeroDoItem(valor, campo, minimo, maximo, indice, minimoExclusivo);
 }
 
 /** Estreita para objeto simples sem usar `any`. */
@@ -482,7 +518,24 @@ export class PedidosResource {
     // ser informado.` (CORE_E03235); e o campo e do ITEM, nao do cabecalho: a
     // recusa sobreviveu a `PERCDESC` no cabecalho.
     const itens = input.itens.map((item, indice) => {
-      // Lixo nao cruza a fronteira: o juiz e local, nao o ERP (R9/I11).
+      // Lixo nao cruza a fronteira: o juiz e local, nao o ERP (R9/I11). Os dois
+      // obrigatorios vem PRIMEIRO porque alimentam o VLRTOT default: `NaN`
+      // sairia como a string 'NaN' e `-5` inverteria o sinal do total.
+      assertNumeroObrigatorioDoItem(
+        item.valorUnitario,
+        'valorUnitario',
+        0,
+        Number.MAX_SAFE_INTEGER,
+        indice,
+      );
+      assertNumeroObrigatorioDoItem(
+        item.quantidade,
+        'quantidade',
+        0,
+        Number.MAX_SAFE_INTEGER,
+        indice,
+        true, // quantidade zero nao e item
+      );
       assertNumeroDoItem(item.percentualDesconto, 'percentualDesconto', 0, 100, indice);
       assertNumeroDoItem(item.valorTotal, 'valorTotal', 0, Number.MAX_SAFE_INTEGER, indice);
 
