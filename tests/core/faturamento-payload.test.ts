@@ -60,6 +60,27 @@ describe('buildFaturarWizardPayload', () => {
     ).toThrow(/serie/i);
   });
 
+  // A validacao vem ANTES do guard M82: com input invalido E
+  // `faturarTodosItens: false`, quem vence e o VALIDATION_ERROR do input —
+  // inverter a ordem troca o erro que o chamador ve.
+  it('valida o input ANTES do guard M82: input invalido vence faturarTodosItens:false', () => {
+    const semPedido: Partial<FaturarPedidoInput> = {
+      codigoTipoOperacao: 1101,
+      faturarTodosItens: false,
+    };
+
+    let capturado: unknown;
+    try {
+      buildFaturarWizardPayload(semPedido as FaturarPedidoInput);
+    } catch (err) {
+      capturado = err;
+    }
+
+    expect(capturado).toBeInstanceOf(SankhyaError);
+    expect((capturado as SankhyaError).message).toMatch(/codigoPedido/);
+    expect((capturado as SankhyaError).message).not.toMatch(/faturamento parcial/i);
+  });
+
   it('valida o input: codigoPedido fracionario e recusado (inteiro obrigatorio)', () => {
     expect(() =>
       buildFaturarWizardPayload({ codigoPedido: 1.5, codigoTipoOperacao: 1101 }),

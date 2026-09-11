@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GatewayError } from '../../src/core/errors.js';
 import type { HttpClient } from '../../src/core/http.js';
 import { PedidosResource } from '../../src/resources/pedidos.js';
+import type { FaturarPedidoInput } from '../../src/types/pedidos.js';
 
 function createMockHttp() {
   return {
@@ -703,6 +704,34 @@ describe('PedidosResource', () => {
       }
     });
 
+    // `faturar` valida por conta propria (pedidos.ts:402), alem do builder:
+    // com o builder mockado, o input invalido tem de morrer aqui — nem o
+    // builder nem o gatewayCall sao chamados.
+    it('valida o input antes de chamar o builder (duplicata de pedidos.ts)', async () => {
+      const builder = vi.fn(() => ({ notas: {} }));
+      vi.resetModules();
+      vi.doMock('../../src/core/faturamento-payload.js', () => ({
+        buildFaturarWizardPayload: builder,
+      }));
+      try {
+        const { PedidosResource: PedidosRecarregado } = await import(
+          '../../src/resources/pedidos.js'
+        );
+        const http = createMockHttp();
+        http.gatewayCall.mockResolvedValue({});
+        const invalido: Partial<FaturarPedidoInput> = { codigoTipoOperacao: 1101 };
+
+        await expect(
+          new PedidosRecarregado(http).faturar(invalido as FaturarPedidoInput),
+        ).rejects.toThrow(/codigoPedido/);
+        expect(builder).not.toHaveBeenCalled();
+        expect(http.gatewayCall).not.toHaveBeenCalled();
+      } finally {
+        vi.doUnmock('../../src/core/faturamento-payload.js');
+        vi.resetModules();
+      }
+    });
+
     it('codigoPedido fracionario lanca antes da rede (inteiro obrigatorio)', async () => {
       const http = createMockHttp();
       const pedidos = new PedidosResource(http);
@@ -727,6 +756,18 @@ describe('PedidosResource', () => {
         timeout: 5000,
         idempotencyKey: 'fat-99',
       });
+    });
+
+    // Sem options, o 4o argumento e `undefined` — nao um literal montado
+    // dentro de `faturar`.
+    it('sem options, o 4o argumento de gatewayCall e undefined', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({});
+
+      await pedidos.faturar({ codigoPedido: 99, codigoTipoOperacao: 1101 });
+
+      expect(http.gatewayCall.mock.calls[0][3]).toBeUndefined();
     });
   });
 
