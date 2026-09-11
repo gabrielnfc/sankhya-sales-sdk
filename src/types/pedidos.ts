@@ -453,8 +453,13 @@ export interface IncluirNotaGatewayInput {
   /**
    * Campos adicionais do cabecalho, crus, em nome de campo Sankhya
    * (`AD_MARKET_PLACE`, `CIF_FOB`, `CODCENCUS`, ...). Entram por ultimo e sao
-   * serializados como qualquer outro campo (`{ $: valor }`). Colisao com um
-   * campo tipado **lanca** — nao sobrescreve em silencio.
+   * serializados como qualquer outro campo (`{ $: valor }`).
+   *
+   * Citar qualquer uma das **11 chaves tipadas** do cabecalho (`NUNOTA`,
+   * `CODPARC`, `DTNEG`, `CODTIPOPER`, `CODTIPVENDA`, `CODVEND`, `CODEMP`,
+   * `TIPMOV`, `OBSERVACAO`, `STATUSNOTA`, `AD_NUMPEDIDO`) **lanca** — tambem
+   * quando o campo tipado correspondente foi omitido nesta chamada. Nada e
+   * sobrescrito nem contrabandeado em silencio.
    *
    * Existe porque o cabecalho medido no sandbox tem 29 campos e o SDK tipa 11:
    * quem precisa do payload completo nao espera tipagem nova.

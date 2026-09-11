@@ -859,6 +859,97 @@ describe('PedidosResource', () => {
       // readNunota: 2o lugar da ordem (nota.NUNOTA.$), nao a raiz.
       expect(r.codigoPedido).toBe(7);
     });
+
+    // As 11 chaves que o cabecalho tipado monta. `camposExtras` e a passagem
+    // CRUA para os outros 18 campos medidos (29 no total, anexo §D1.2) — nunca
+    // para estas, sob pena de furar o union 'A'|'L' de statusNota e o prefixo
+    // SDK-T- que a D4 pendura em numeroPedidoExterno.
+    const CHAVES_TIPADAS = [
+      'NUNOTA',
+      'CODPARC',
+      'DTNEG',
+      'CODTIPOPER',
+      'CODTIPVENDA',
+      'CODVEND',
+      'CODEMP',
+      'TIPMOV',
+      'OBSERVACAO',
+      'STATUSNOTA',
+      'AD_NUMPEDIDO',
+    ];
+
+    const entradaMinima = {
+      codigoCliente: 1,
+      dataNegociacao: '06/09/2026',
+      codigoTipoOperacao: 1001,
+      codigoTipoNegociacao: 200,
+      codigoVendedor: 50,
+      codigoEmpresa: 2,
+      tipoMovimento: 'P',
+      itens: [],
+    } as const;
+
+    it('camposExtras em QUALQUER chave tipada lanca citando a chave, sem rede', async () => {
+      for (const chave of CHAVES_TIPADAS) {
+        const http = createMockHttp();
+        const pedidos = new PedidosResource(http);
+
+        await expect(
+          pedidos.incluirNotaGateway({ ...entradaMinima, camposExtras: { [chave]: 'x' } }),
+        ).rejects.toThrow(new RegExp(chave));
+        expect(http.gatewayCall).not.toHaveBeenCalled();
+      }
+    });
+
+    it('chave tipada OMITIDA continua protegida (guarda e do conjunto tipado, nao do montado)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+
+      // statusNota, numeroPedidoExterno e observacao NAO vao na entrada: as
+      // chaves nao estao no cabecalho montado, e ainda assim sao tipadas.
+      await expect(
+        pedidos.incluirNotaGateway({
+          ...entradaMinima,
+          camposExtras: { STATUSNOTA: 'ZZZ', AD_NUMPEDIDO: 'NAO-SDK' },
+        }),
+      ).rejects.toThrow(/STATUSNOTA/);
+      await expect(
+        pedidos.incluirNotaGateway({ ...entradaMinima, camposExtras: { AD_NUMPEDIDO: 'NAO-SDK' } }),
+      ).rejects.toThrow(/AD_NUMPEDIDO/);
+      await expect(
+        pedidos.incluirNotaGateway({ ...entradaMinima, camposExtras: { OBSERVACAO: 'crua' } }),
+      ).rejects.toThrow(/OBSERVACAO/);
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
+
+    it('o cabecalho tipado monta exatamente as 11 chaves protegidas (anti-drift)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ pk: { NUNOTA: { $: '1' } } });
+
+      // Todos os opcionais preenchidos: o cabecalho atinge sua superficie maxima.
+      await pedidos.incluirNotaGateway({
+        ...entradaMinima,
+        observacao: 'obs',
+        statusNota: 'L',
+        numeroPedidoExterno: 'SDK-T-1',
+      });
+
+      const cab = (
+        http.gatewayCall.mock.calls[0][2] as { nota: { cabecalho: Record<string, unknown> } }
+      ).nota.cabecalho;
+      // Se o builder ganhar ou perder um campo sem atualizar a guarda, este
+      // teste cai — e a guarda deixaria de cobrir o conjunto real.
+      expect(Object.keys(cab).sort()).toEqual([...CHAVES_TIPADAS].sort());
+    });
+
+    it('resposta sem NUNOTA nos 3 degraus lanca (no silent 0)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ status: '1', statusMessage: 'ok' });
+
+      await expect(pedidos.incluirNotaGateway({ ...entradaMinima })).rejects.toThrow(/NUNOTA/);
+    });
   });
 
   describe('incluirAlterarItem()', () => {

@@ -29,6 +29,28 @@ import type {
   PedidoVendaInput,
 } from '../types/pedidos.js';
 
+/**
+ * As 11 chaves que `incluirNotaGateway` monta no cabecalho a partir de campos
+ * TIPADOS de `IncluirNotaGatewayInput`. `camposExtras` e a passagem crua para
+ * os outros 18 campos medidos (29 no total, anexo §D1.2) e nunca para estas —
+ * inclusive quando o campo tipado correspondente foi omitido: deixar
+ * `STATUSNOTA` ou `AD_NUMPEDIDO` passar cru furaria o union `'A' | 'L'` e o
+ * contrato de prefixo `SDK-T-` que a D4 pendura em `numeroPedidoExterno`.
+ */
+const CHAVES_TIPADAS_CABECALHO: ReadonlySet<string> = new Set([
+  'NUNOTA',
+  'CODPARC',
+  'DTNEG',
+  'CODTIPOPER',
+  'CODTIPVENDA',
+  'CODVEND',
+  'CODEMP',
+  'TIPMOV',
+  'OBSERVACAO',
+  'STATUSNOTA',
+  'AD_NUMPEDIDO',
+]);
+
 /** Estreita para objeto simples sem usar `any`. */
 function ehRegistro(valor: unknown): valor is Record<string, unknown> {
   return typeof valor === 'object' && valor !== null && !Array.isArray(valor);
@@ -392,11 +414,25 @@ export class PedidosResource {
   }
 
   /**
-   * Inclui uma nota via Gateway (CACSP.incluirNota).
+   * Inclui uma nota via Gateway (CACSP.incluirNota), no formato aceito pelo
+   * 4midware (medido, M34/M46): `NUNOTA: {}` no cabecalho e em cada item, e
+   * `itens.INFORMARPRECO` como a STRING `'True'`/`'False'`.
+   *
+   * Campos opcionais do cabecalho: `statusNota` (STATUSNOTA, `'A' | 'L'`),
+   * `numeroPedidoExterno` (AD_NUMPEDIDO), `informarPreco` (default `true`) e
+   * `camposExtras` — passagem crua para os campos do cabecalho que o SDK nao
+   * tipa. `camposExtras` entra por ultimo e **lanca** se citar qualquer uma das
+   * 11 chaves tipadas (`CHAVES_TIPADAS_CABECALHO`), inclusive quando o campo
+   * tipado correspondente foi omitido.
+   *
+   * O NUNOTA de retorno e lido em `pk.NUNOTA.$` -> `nota.NUNOTA.$` -> raiz
+   * `NUNOTA`; ausente nos tres, **lanca** em vez de devolver `0`.
    *
    * @param input - Dados completos da nota (cliente, itens, operacao).
    * @param options - Opcoes de requisicao.
    * @returns Codigo do pedido/nota criado.
+   * @throws {SankhyaError} Se `camposExtras` citar chave tipada, ou se a
+   *   resposta nao trouxer NUNOTA.
    * @throws {GatewayError} Em erro de negocio Sankhya.
    * @throws {AuthError} Se autenticacao falhar.
    */
@@ -434,14 +470,15 @@ export class PedidosResource {
       }),
     };
 
-    // camposExtras entra POR ULTIMO, depois de checar colisao: sobrescrever um
-    // campo tipado em silencio mandaria ao ERP um valor que o chamador nao
-    // pediu. Falha alto, antes de qualquer side-effect (nenhuma rede).
+    // camposExtras entra POR ULTIMO, depois de checar colisao contra o conjunto
+    // TIPADO (nao contra as chaves montadas): sobrescrever — ou contrabandear
+    // por um opcional omitido — um campo tipado mandaria ao ERP um valor que o
+    // chamador nao pediu. Falha alto, antes de qualquer side-effect (sem rede).
     if (input.camposExtras) {
       for (const [campo, valor] of Object.entries(input.camposExtras)) {
-        if (campo in cabecalho) {
+        if (CHAVES_TIPADAS_CABECALHO.has(campo)) {
           throw new SankhyaError(
-            `IncluirNotaGatewayInput.camposExtras nao pode sobrescrever o campo tipado '${campo}' do cabecalho`,
+            `IncluirNotaGatewayInput.camposExtras nao pode escrever no campo tipado '${campo}' do cabecalho`,
             'VALIDATION_ERROR',
           );
         }
@@ -464,7 +501,18 @@ export class PedidosResource {
       options,
     );
 
-    return { codigoPedido: safeParseNumber(readNunota(result), 'NUNOTA') };
+    // `safeParseNumber` devolve 0 para ausente/vazio/`{}` — e NUNOTA 0 nao
+    // existe (sequencia de identidade do ERP). Lancar e preferivel a fabricar
+    // um id silencioso que o chamador levaria para `confirmar`/`faturar`, como
+    // ja faz `extractCodigoPedido` em `criar()`.
+    const codigoPedido = safeParseNumber(readNunota(result), 'NUNOTA');
+    if (codigoPedido === 0) {
+      throw new SankhyaError(
+        'Resposta de CACSP.incluirNota sem NUNOTA em pk/nota/raiz (envelope inesperado da API)',
+        'API_ERROR',
+      );
+    }
+    return { codigoPedido };
   }
 
   /**
