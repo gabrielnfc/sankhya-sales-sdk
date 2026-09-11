@@ -107,6 +107,11 @@ describe('PedidosResource idempotency', () => {
   });
 
   it('incluirNotaGateway forwards RequestOptions to gatewayCall', async () => {
+    // D1.2: resposta sem NUNOTA agora lanca (no silent 0); este teste mede o
+    // repasse de RequestOptions, entao devolve a pk medida no sandbox.
+    (http as unknown as { gatewayCall: ReturnType<typeof vi.fn> }).gatewayCall.mockResolvedValue({
+      pk: { NUNOTA: { $: '1' } },
+    });
     await pedidos.incluirNotaGateway(
       {
         codigoCliente: 1,

@@ -62,6 +62,9 @@ describe('escritas do Gateway NAO passam idempotent (5o arg falsy)', () => {
 
   it('pedidos.incluirNotaGateway', async () => {
     const { http, gatewayCall } = createHttpSpy();
+    // D1.2: resposta sem NUNOTA agora lanca (no silent 0) — este teste mede o
+    // 5o argumento, nao o envelope, entao devolve a pk medida no sandbox.
+    gatewayCall.mockResolvedValue({ pk: { NUNOTA: { $: '1' } } });
     await new PedidosResource(http).incluirNotaGateway(notaInput);
     expect(idempotentArgOf(gatewayCall)).toBeFalsy();
   });

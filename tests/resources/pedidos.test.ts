@@ -673,7 +673,9 @@ describe('PedidosResource', () => {
               CODPARC: { $: '10' },
               DTNEG: { $: '2024-01-01' },
             }),
-            itens: {
+            // `itens` deixou de ser exato: ganhou `INFORMARPRECO` (M46), travado
+            // no bloco "formato 4midware" abaixo.
+            itens: expect.objectContaining({
               item: [
                 expect.objectContaining({
                   CODPROD: { $: '100' },
@@ -682,7 +684,7 @@ describe('PedidosResource', () => {
                   CODVOL: { $: 'UN' },
                 }),
               ],
-            },
+            }),
           }),
         }),
       );
@@ -739,6 +741,214 @@ describe('PedidosResource', () => {
       const nota = body.nota as Record<string, unknown>;
       const itens = nota.itens as { item: Array<Record<string, unknown>> };
       expect(itens.item[0].CODLOCALORIG).toEqual({ $: '5' });
+    });
+  });
+
+  // Formato medido no sandbox (M34/M46): o payload aceito pelo 4midware traz
+  // `NUNOTA: {}` no cabecalho E em cada item, e `itens.INFORMARPRECO` como
+  // STRING 'True'/'False'. Fonte: spike-raw/cancelamento/C1_INCLUIR_PA.json e
+  // spike-raw/faturamento/ped.ts:8.
+  describe('incluirNotaGateway() — formato 4midware (M34/M46)', () => {
+    it('inclui NUNOTA vazio no cabecalho e em cada item, com AD_NUMPEDIDO', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ pk: { NUNOTA: { $: '1889304' } } });
+
+      const r = await pedidos.incluirNotaGateway({
+        codigoCliente: 312984,
+        dataNegociacao: '06/09/2026 12:00:00',
+        codigoTipoOperacao: 1001,
+        codigoTipoNegociacao: 200,
+        codigoVendedor: 50,
+        codigoEmpresa: 2,
+        tipoMovimento: 'P',
+        statusNota: 'A',
+        numeroPedidoExterno: 'SDK-T-1200',
+        itens: [
+          {
+            codigoProduto: 10051,
+            quantidade: 1,
+            valorUnitario: 10,
+            unidade: 'UN',
+            codigoLocalOrigem: 30301,
+          },
+        ],
+      });
+
+      const body = http.gatewayCall.mock.calls[0][2] as {
+        nota: {
+          cabecalho: Record<string, unknown>;
+          itens: { INFORMARPRECO: string; item: Record<string, unknown>[] };
+        };
+      };
+      expect(body.nota.cabecalho.NUNOTA).toEqual({});
+      expect(body.nota.cabecalho.STATUSNOTA).toEqual({ $: 'A' });
+      expect(body.nota.cabecalho.AD_NUMPEDIDO).toEqual({ $: 'SDK-T-1200' });
+      expect(body.nota.itens.INFORMARPRECO).toBe('True');
+      expect(body.nota.itens.item[0].NUNOTA).toEqual({});
+      expect(body.nota.itens.item[0].CODLOCALORIG).toEqual({ $: '30301' });
+      expect(r.codigoPedido).toBe(1889304);
+    });
+
+    it('camposExtras entram no cabecalho sem serem reinterpretados', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ pk: { NUNOTA: { $: '1' } } });
+
+      await pedidos.incluirNotaGateway({
+        codigoCliente: 1,
+        dataNegociacao: '06/09/2026',
+        codigoTipoOperacao: 1001,
+        codigoTipoNegociacao: 200,
+        codigoVendedor: 50,
+        codigoEmpresa: 2,
+        tipoMovimento: 'P',
+        itens: [],
+        camposExtras: { AD_MARKET_PLACE: 'Shopify.EC.V1', CIF_FOB: 'C', CODCENCUS: '0102002' },
+      });
+
+      const cab = (
+        http.gatewayCall.mock.calls[0][2] as { nota: { cabecalho: Record<string, unknown> } }
+      ).nota.cabecalho;
+      expect(cab.AD_MARKET_PLACE).toEqual({ $: 'Shopify.EC.V1' });
+      expect(cab.CIF_FOB).toEqual({ $: 'C' });
+      expect(cab.CODCENCUS).toEqual({ $: '0102002' });
+    });
+
+    it('camposExtras nao pode sobrescrever campo tipado (falha alto)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+
+      await expect(
+        pedidos.incluirNotaGateway({
+          codigoCliente: 1,
+          dataNegociacao: '06/09/2026',
+          codigoTipoOperacao: 1001,
+          codigoTipoNegociacao: 200,
+          codigoVendedor: 50,
+          codigoEmpresa: 2,
+          tipoMovimento: 'P',
+          itens: [],
+          camposExtras: { CODPARC: '999' },
+        }),
+      ).rejects.toThrow(/CODPARC/);
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
+
+    it('informarPreco: false manda a string False', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ nota: { NUNOTA: { $: '7' } } });
+
+      const r = await pedidos.incluirNotaGateway({
+        codigoCliente: 1,
+        dataNegociacao: '06/09/2026',
+        codigoTipoOperacao: 1001,
+        codigoTipoNegociacao: 200,
+        codigoVendedor: 50,
+        codigoEmpresa: 2,
+        tipoMovimento: 'P',
+        informarPreco: false,
+        itens: [],
+      });
+
+      const body = http.gatewayCall.mock.calls[0][2] as {
+        nota: { itens: { INFORMARPRECO: string } };
+      };
+      expect(body.nota.itens.INFORMARPRECO).toBe('False');
+      // readNunota: 2o lugar da ordem (nota.NUNOTA.$), nao a raiz.
+      expect(r.codigoPedido).toBe(7);
+    });
+
+    // As 11 chaves que o cabecalho tipado monta. `camposExtras` e a passagem
+    // CRUA para os outros 18 campos medidos (29 no total, anexo §D1.2) — nunca
+    // para estas, sob pena de furar o union 'A'|'L' de statusNota e o prefixo
+    // SDK-T- que a D4 pendura em numeroPedidoExterno.
+    const CHAVES_TIPADAS = [
+      'NUNOTA',
+      'CODPARC',
+      'DTNEG',
+      'CODTIPOPER',
+      'CODTIPVENDA',
+      'CODVEND',
+      'CODEMP',
+      'TIPMOV',
+      'OBSERVACAO',
+      'STATUSNOTA',
+      'AD_NUMPEDIDO',
+    ];
+
+    const entradaMinima = {
+      codigoCliente: 1,
+      dataNegociacao: '06/09/2026',
+      codigoTipoOperacao: 1001,
+      codigoTipoNegociacao: 200,
+      codigoVendedor: 50,
+      codigoEmpresa: 2,
+      tipoMovimento: 'P',
+      itens: [],
+    } as const;
+
+    it('camposExtras em QUALQUER chave tipada lanca citando a chave, sem rede', async () => {
+      for (const chave of CHAVES_TIPADAS) {
+        const http = createMockHttp();
+        const pedidos = new PedidosResource(http);
+
+        await expect(
+          pedidos.incluirNotaGateway({ ...entradaMinima, camposExtras: { [chave]: 'x' } }),
+        ).rejects.toThrow(new RegExp(chave));
+        expect(http.gatewayCall).not.toHaveBeenCalled();
+      }
+    });
+
+    it('chave tipada OMITIDA continua protegida (guarda e do conjunto tipado, nao do montado)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+
+      // statusNota, numeroPedidoExterno e observacao NAO vao na entrada: as
+      // chaves nao estao no cabecalho montado, e ainda assim sao tipadas.
+      await expect(
+        pedidos.incluirNotaGateway({
+          ...entradaMinima,
+          camposExtras: { STATUSNOTA: 'ZZZ', AD_NUMPEDIDO: 'NAO-SDK' },
+        }),
+      ).rejects.toThrow(/STATUSNOTA/);
+      await expect(
+        pedidos.incluirNotaGateway({ ...entradaMinima, camposExtras: { AD_NUMPEDIDO: 'NAO-SDK' } }),
+      ).rejects.toThrow(/AD_NUMPEDIDO/);
+      await expect(
+        pedidos.incluirNotaGateway({ ...entradaMinima, camposExtras: { OBSERVACAO: 'crua' } }),
+      ).rejects.toThrow(/OBSERVACAO/);
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
+
+    it('o cabecalho tipado monta exatamente as 11 chaves protegidas (anti-drift)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ pk: { NUNOTA: { $: '1' } } });
+
+      // Todos os opcionais preenchidos: o cabecalho atinge sua superficie maxima.
+      await pedidos.incluirNotaGateway({
+        ...entradaMinima,
+        observacao: 'obs',
+        statusNota: 'L',
+        numeroPedidoExterno: 'SDK-T-1',
+      });
+
+      const cab = (
+        http.gatewayCall.mock.calls[0][2] as { nota: { cabecalho: Record<string, unknown> } }
+      ).nota.cabecalho;
+      // Se o builder ganhar ou perder um campo sem atualizar a guarda, este
+      // teste cai — e a guarda deixaria de cobrir o conjunto real.
+      expect(Object.keys(cab).sort()).toEqual([...CHAVES_TIPADAS].sort());
+    });
+
+    it('resposta sem NUNOTA nos 3 degraus lanca (no silent 0)', async () => {
+      const http = createMockHttp();
+      const pedidos = new PedidosResource(http);
+      http.gatewayCall.mockResolvedValue({ status: '1', statusMessage: 'ok' });
+
+      await expect(pedidos.incluirNotaGateway({ ...entradaMinima })).rejects.toThrow(/NUNOTA/);
     });
   });
 

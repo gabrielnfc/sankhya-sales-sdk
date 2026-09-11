@@ -435,6 +435,36 @@ export interface IncluirNotaGatewayInput {
   tipoMovimento: string;
   /** Observacao da nota. */
   observacao?: string;
+  /**
+   * Status da nota (STATUSNOTA): `'A'` aberta, `'L'` liberada.
+   * Omitido, o campo nao vai no cabecalho e o ERP aplica o default do TOP.
+   */
+  statusNota?: 'A' | 'L';
+  /**
+   * Numero do pedido no sistema de origem (AD_NUMPEDIDO) — campo customizado
+   * usado pelo 4midware para rastrear o pedido do marketplace/e-commerce.
+   */
+  numeroPedidoExterno?: string;
+  /**
+   * Se o preco unitario enviado deve ser respeitado (`itens.INFORMARPRECO`).
+   * Default `true`. Serializado como a STRING `'True'`/`'False'` — medido (M46).
+   */
+  informarPreco?: boolean;
+  /**
+   * Campos adicionais do cabecalho, crus, em nome de campo Sankhya
+   * (`AD_MARKET_PLACE`, `CIF_FOB`, `CODCENCUS`, ...). Entram por ultimo e sao
+   * serializados como qualquer outro campo (`{ $: valor }`).
+   *
+   * Citar qualquer uma das **11 chaves tipadas** do cabecalho (`NUNOTA`,
+   * `CODPARC`, `DTNEG`, `CODTIPOPER`, `CODTIPVENDA`, `CODVEND`, `CODEMP`,
+   * `TIPMOV`, `OBSERVACAO`, `STATUSNOTA`, `AD_NUMPEDIDO`) **lanca** — tambem
+   * quando o campo tipado correspondente foi omitido nesta chamada. Nada e
+   * sobrescrito nem contrabandeado em silencio.
+   *
+   * Existe porque o cabecalho medido no sandbox tem 29 campos e o SDK tipa 11:
+   * quem precisa do payload completo nao espera tipagem nova.
+   */
+  camposExtras?: Record<string, string | number>;
   /** Itens da nota. */
   itens: ItemNotaGatewayInput[];
 }
