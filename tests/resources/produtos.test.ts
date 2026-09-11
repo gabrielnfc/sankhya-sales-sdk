@@ -13,7 +13,30 @@ function createMockHttp(overrides?: Partial<HttpClient>) {
     gatewayCall: vi.fn(),
     getLogger: vi.fn(() => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })),
     ...overrides,
-  } as unknown as HttpClient;
+  } as unknown as HttpClient & {
+    restGet: ReturnType<typeof vi.fn>;
+    restPost: ReturnType<typeof vi.fn>;
+    restPut: ReturnType<typeof vi.fn>;
+    gatewayCall: ReturnType<typeof vi.fn>;
+    getLogger: ReturnType<typeof vi.fn>;
+  };
+}
+
+/** Copiado de tests/resources/gateway.test.ts:23-36 — nao criar variante. */
+function makeGatewayResponse(fieldNames: string[], entities: Array<Record<string, unknown>>) {
+  return {
+    entities: {
+      total: String(entities.length),
+      hasMoreResult: 'false',
+      offsetPage: '0',
+      metadata: {
+        fields: {
+          field: fieldNames.map((name) => ({ name })),
+        },
+      },
+      entity: entities,
+    },
+  };
 }
 
 describe('ProdutosResource', () => {
@@ -154,5 +177,72 @@ describe('ProdutosResource', () => {
 
     expect(items).toHaveLength(1);
     expect(items[0]).toEqual({ codigoProduto: 1, descricao: 'Widget' });
+  });
+
+  it('le volumes do gateway (TGFVOA) e converte os numericos', async () => {
+    const http = createMockHttp();
+    const produtos = new ProdutosResource(http);
+    http.gatewayCall.mockResolvedValue(
+      makeGatewayResponse(
+        ['CODPROD', 'CODVOL', 'QUANTIDADE', 'LASTRO', 'CAMADAS', 'ATIVO'],
+        [
+          {
+            f0: { $: '13609' },
+            f1: { $: 'CX' },
+            f2: { $: '72' },
+            f3: { $: '12' },
+            f4: { $: '4' },
+            f5: { $: 'S' },
+          },
+        ],
+      ),
+    ); // M54: 13609 = 72 un/cx, 12x4
+    const vols = await produtos.volumesProduto(13609);
+
+    expect(http.gatewayCall.mock.calls[0][1]).toBe('CRUDServiceProvider.loadRecords');
+    expect(vols).toEqual([
+      { codProd: 13609, codVol: 'CX', quantidade: 72, lastro: 12, camadas: 4, ativo: true },
+    ]);
+  });
+
+  it('devolve [] quando o produto nao tem volume cadastrado (M57) — sem lancar', async () => {
+    const http = createMockHttp();
+    const produtos = new ProdutosResource(http);
+    http.gatewayCall.mockResolvedValue(makeGatewayResponse(['CODPROD'], []));
+
+    await expect(produtos.volumesProduto(10077)).resolves.toEqual([]);
+  });
+
+  // Adicao a §D1.4 do anexo: a mutacao prescrita no Step 5 (`ATIVO === 'S'` ->
+  // `Boolean(ATIVO)`) SOBREVIVIA com a fixture do anexo, que so tem ATIVO='S'.
+  // Este caso e o que a mata.
+  it('ativo e false quando ATIVO nao e S (mata Boolean(ATIVO))', async () => {
+    const http = createMockHttp();
+    const produtos = new ProdutosResource(http);
+    http.gatewayCall.mockResolvedValue(
+      makeGatewayResponse(
+        ['CODPROD', 'CODVOL', 'QUANTIDADE', 'LASTRO', 'CAMADAS', 'ATIVO'],
+        [
+          {
+            f0: { $: '13609' },
+            f1: { $: 'UN' },
+            f2: { $: '1' },
+            f3: { $: '0' },
+            f4: { $: '0' },
+            f5: { $: 'N' },
+          },
+        ],
+      ),
+    );
+    const [vol] = await produtos.volumesProduto(13609);
+
+    expect(vol?.ativo).toBe(false);
+  });
+
+  it('recusa codigoProduto que nao e inteiro (guarda de injecao no criteria)', async () => {
+    const http = createMockHttp();
+
+    await expect(new ProdutosResource(http).volumesProduto(1.5)).rejects.toThrow(/inteiro/i);
+    expect(http.gatewayCall).not.toHaveBeenCalled();
   });
 });

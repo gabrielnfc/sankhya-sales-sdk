@@ -1,3 +1,5 @@
+import { SankhyaError } from '../core/errors.js';
+import { deserializeRows } from '../core/gateway-serializer.js';
 import type { HttpClient } from '../core/http.js';
 import {
   createPaginator,
@@ -5,6 +7,7 @@ import {
   extractRestRecordOrThrow,
   normalizePagination,
 } from '../core/pagination.js';
+import { safeParseNumber } from '../core/parse-utils.js';
 import type { PaginatedResult } from '../types/common.js';
 import type { DegradedInfo, ResourceDescriptor } from '../types/pagination-contracts.js';
 import type {
@@ -14,6 +17,7 @@ import type {
   Produto,
   ProdutoAlternativo,
   Volume,
+  VolumeProduto,
 } from '../types/produtos.js';
 
 const DESCRITOR_PRODUTOS: ResourceDescriptor = {
@@ -54,6 +58,10 @@ const DESCRITOR_VOLUMES: ResourceDescriptor = {
   expectPagination: true,
   endpoint: '/volumes-produtos',
 };
+
+/** Entidade do Gateway que mapeia `TGFVOA`. Nome ainda nao medido no sandbox (premissa do plano D1.4). */
+const ENTIDADE_VOLUME_PRODUTO = 'VolumeProduto';
+const CAMPOS_VOLUME_PRODUTO = 'CODPROD,CODVOL,QUANTIDADE,LASTRO,CAMADAS,ATIVO';
 
 const DESCRITOR_GRUPOS: ResourceDescriptor = {
   resourceKey: 'grupos',
@@ -144,10 +152,15 @@ export class ProdutosResource {
   }
 
   /**
-   * Lista volumes de um produto especifico.
+   * Lista volumes de um produto especifico pelo REST v1.
+   *
+   * @deprecated Nao e o caminho recomendado: medido em 2026-09-03 no sandbox
+   * (M54), `/produtos/{id}/volumes` devolve `[]` mesmo para produto com
+   * `TGFVOA` populado. Use {@link ProdutosResource.volumesProduto}, que le a
+   * mesma informacao pelo Gateway. Mantido por compatibilidade.
    *
    * @param codigoProduto - Codigo do produto.
-   * @returns Array de volumes.
+   * @returns Array de volumes — `[]` no sandbox (M54).
    * @throws {ApiError} Em erro HTTP.
    * @throws {AuthError} Se autenticacao falhar.
    * @remarks
@@ -181,6 +194,79 @@ export class ProdutosResource {
       todos.push(volume);
     }
     return todos;
+  }
+
+  /**
+   * Le os volumes de um produto em `TGFVOA` pelo Gateway (`CRUDServiceProvider.loadRecords`).
+   *
+   * Caminho recomendado para un/volume e lastro x camadas: o REST
+   * {@link ProdutosResource.volumes} devolve `[]` no sandbox (M54).
+   *
+   * Cadastro incompleto e comum (M57: 38,4% dos PA ativos com `QUANTIDADE > 1`),
+   * entao produto sem volume devolve `[]` **sem lancar** — a decisao de tratar
+   * a lacuna e do consumidor (REQ-CNT-5).
+   *
+   * @param codigoProduto - Codigo do produto. Precisa ser inteiro: o valor
+   * entra no `criteria` do Gateway, e nao-inteiro e recusado antes de qualquer
+   * chamada (guarda de injecao).
+   * @returns Array de volumes do produto; `[]` quando nao ha cadastro.
+   * @throws {SankhyaError} `VALIDATION_ERROR` se `codigoProduto` nao for inteiro.
+   * @throws {GatewayError} Em erro de negocio Sankhya.
+   * @throws {AuthError} Se autenticacao falhar.
+   * @example
+   * ```ts
+   * const [cx] = await sankhya.produtos.volumesProduto(13609);
+   * // { codProd: 13609, codVol: 'CX', quantidade: 72, lastro: 12, camadas: 4, ativo: true }
+   * ```
+   */
+  async volumesProduto(codigoProduto: number): Promise<VolumeProduto[]> {
+    if (!Number.isInteger(codigoProduto)) {
+      throw new SankhyaError(
+        `codigoProduto precisa ser um inteiro; recebido: ${String(codigoProduto)}.`,
+        'VALIDATION_ERROR',
+      );
+    }
+
+    const volumes: VolumeProduto[] = [];
+    let pagina = 0;
+    let temMais = true;
+
+    // Pagina ate vir pagina incompleta: `[]` precisa significar "sem cadastro",
+    // nunca "a primeira pagina do Gateway acabou".
+    while (temMais) {
+      const result = await this.http.gatewayCall<Record<string, unknown>>(
+        'mge',
+        'CRUDServiceProvider.loadRecords',
+        {
+          dataSet: {
+            rootEntity: ENTIDADE_VOLUME_PRODUTO,
+            includePresentationFields: 'N',
+            offsetPage: String(pagina),
+            criteria: { expression: { $: `this.CODPROD = '${codigoProduto}'` } },
+            entity: { fieldset: { list: CAMPOS_VOLUME_PRODUTO } },
+          },
+        },
+        undefined,
+        true, // idempotent: leitura, elegivel a retry em falha transiente
+      );
+
+      const { rows, hasMore } = deserializeRows(result, this.http.getLogger());
+      for (const row of rows) {
+        volumes.push({
+          codProd: safeParseNumber(row.CODPROD, 'CODPROD'),
+          codVol: row.CODVOL ?? '',
+          quantidade: safeParseNumber(row.QUANTIDADE, 'QUANTIDADE'),
+          lastro: safeParseNumber(row.LASTRO, 'LASTRO'),
+          camadas: safeParseNumber(row.CAMADAS, 'CAMADAS'),
+          ativo: row.ATIVO === 'S',
+        });
+      }
+
+      temMais = hasMore && rows.length > 0;
+      pagina += 1;
+    }
+
+    return volumes;
   }
 
   /**
