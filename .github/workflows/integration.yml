@@ -7,6 +7,15 @@ on:
     # Nightly contract check against the Sankhya sandbox — 05:37 UTC (~02:37 BRT).
     - cron: '37 5 * * *'
   workflow_dispatch:
+    inputs:
+      run_wms_lane:
+        description: 'Rodar tambem a lane WMS (ESCREVE pedido descartavel no sandbox e apaga por id)'
+        type: boolean
+        default: false
+
+# Nao existe gatilho `pull_request` aqui, de proposito: esta lane escreve no ERP
+# de homologacao e PR de fork exporia os secrets. `tests/security/ci-lanes.test.ts`
+# trava a ausencia desse gatilho e roda no CI de PR.
 
 jobs:
   integration:
@@ -17,6 +26,10 @@ jobs:
       SANKHYA_CLIENT_ID: ${{ secrets.SANKHYA_CLIENT_ID }}
       SANKHYA_CLIENT_SECRET: ${{ secrets.SANKHYA_CLIENT_SECRET }}
       SANKHYA_X_TOKEN: ${{ secrets.SANKHYA_X_TOKEN }}
+      # Opt-in duplo: a lane WMS so roda em execucao manual que marque a caixa.
+      # Nos demais gatilhos (push, schedule) a variavel fica vazia e a suite se
+      # auto-pula imprimindo o motivo.
+      SDK_INTEGRATION_WMS: ${{ inputs.run_wms_lane && '1' || '' }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

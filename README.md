@@ -376,6 +376,29 @@ claude mcp add --transport http sankhya-docs https://developer.sankhya.com.br/mc
 Contribuidores deste repositório já têm o servidor pré-configurado via [`.mcp.json`](./.mcp.json)
 na raiz (o Claude Code detecta automaticamente).
 
+## Lane WMS opt-in (integração no sandbox)
+
+`tests/integration/wms-sandbox.test.ts` exercita, **contra o sandbox Sankhya**, o caminho que o
+WMS usa: estoque → volume do produto → pedido em `A` → item com `CONTROLE` → `consultarVar`.
+Ela **escreve** no ERP de homologação, então é opt-in duplo e fica fora do `npm test`:
+
+```bash
+# credenciais de SANDBOX no ambiente (host api.sandbox.…) + a flag explícita
+SDK_INTEGRATION_WMS=1 npm run test:integration
+```
+
+Sem as credenciais **ou** sem `SDK_INTEGRATION_WMS=1` a suíte é SKIP e imprime o motivo — nunca
+faz rede por acidente. Garantias, todas travadas por `tests/security/ci-lanes.test.ts` (que roda
+no CI de PR, sem rede):
+
+- **sandbox ou nada** — `assertSandbox` no `beforeAll`; o log cita só o *hostname*;
+- **teto de 40 chamadas HTTP** — estourou, a suíte aborta (`tests/integration/_call-budget.ts`);
+- **nunca libera nem fatura** — objeto que vira `L` é resíduo permanente no sandbox;
+- **teardown por id** — só os `NUNOTA` que a execução criou (prefixo `SDK-T-<hhmm>`), com guarda
+  contra lista vazia e *read-back* em `TGFCAB` provando a ausência;
+- **nunca em CI de PR** — o workflow de integração não tem gatilho `pull_request`; a lane WMS só
+  liga em `workflow_dispatch` com a caixa `run_wms_lane` marcada.
+
 ## Contribuindo
 
 Veja [CONTRIBUTING.md](./CONTRIBUTING.md) para instruções de setup, convenções e processo de PR.
