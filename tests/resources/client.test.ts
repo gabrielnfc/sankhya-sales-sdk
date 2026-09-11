@@ -3,6 +3,7 @@ import { SankhyaClient } from '../../src/client.js';
 import { HttpClient } from '../../src/core/http.js';
 import { CadastrosResource } from '../../src/resources/cadastros.js';
 import { ClientesResource } from '../../src/resources/clientes.js';
+import { DatasetResource } from '../../src/resources/dataset.js';
 import { DbExplorerResource } from '../../src/resources/db-explorer.js';
 import { EstoqueResource } from '../../src/resources/estoque.js';
 import { FinanceirosResource } from '../../src/resources/financeiros.js';
@@ -174,6 +175,12 @@ describe('SankhyaClient', () => {
       const client = new SankhyaClient(validConfig);
       expect(client.dbExplorer).toBeInstanceOf(DbExplorerResource);
       expect(client.dbExplorer).toBe(client.dbExplorer);
+    });
+
+    it('client.dataset returns DatasetResource instance (lazy, mesma instancia)', () => {
+      const client = new SankhyaClient(validConfig);
+      expect(client.dataset).toBeInstanceOf(DatasetResource);
+      expect(client.dataset).toBe(client.dataset);
     });
   });
 
