@@ -24,13 +24,19 @@ import {
  * 1. **Comportamento.** Opt-in, teto e interceptacao do `fetch` sao funcoes
  *    puras em `tests/integration/_call-budget.ts` e sao chamadas aqui de
  *    verdade. Nada de casar prosa.
- * 2. **Presenca no CODIGO** (`linhasDeCodigo`), so para o que e estrutural — que
- *    a suite realmente chame essas funcoes. O texto passa por um strip de
- *    comentarios e de literais de string ANTES do match: uma trava que casasse
- *    o fonte inteiro morreria no dia em que alguem citasse o nome numa frase, e
- *    foi exatamente assim que a trava do opt-in nasceu morta na primeira volta
- *    desta task. O strip so pode tornar o match mais estrito — logo, erro dele
- *    reprova (falso positivo barato), nunca aprova (I9).
+ * 2. **Presenca estrutural**, so para o que e estrutural — que a suite realmente
+ *    chame essas funcoes. Aqui a DIRECAO da trava decide o texto, e trocar as
+ *    duas ja produziu defeito real (re-review, N3):
+ *
+ *    - trava **POSITIVA** ("tem de existir") roda sobre `linhasDeCodigo(fonte)`:
+ *      sem o strip, um nome citado num comentario a satisfaria sozinho — foi
+ *      assim que a trava do opt-in nasceu morta na 1a volta. Aqui o strip so
+ *      aperta: se ele errar e apagar codigo, a trava fica VERMELHA.
+ *    - trava **NEGATIVA** ("nao pode existir") roda sobre o **fonte CRU**: o
+ *      strip apaga literais de log inteiros, `${…}` incluso, e uma chamada
+ *      proibida escondida dentro de um template de log escaparia. No cru, o
+ *      preco de citar o nome numa frase e um falso positivo — o lado barato do
+ *      I9, porque falso negativo de guarda nao se aceita.
  */
 
 const SUITE = 'tests/integration/wms-sandbox.test.ts';
@@ -225,8 +231,11 @@ describe('teto da lane — comportamento', () => {
   });
 });
 
-describe('lane WMS — travas estruturais (so linhas de codigo)', () => {
-  const codigo = linhasDeCodigo(readFileSync(SUITE, 'utf8'));
+describe('lane WMS — travas estruturais', () => {
+  /** Fonte cru: usado pelas travas NEGATIVAS (ver o cabecalho deste arquivo). */
+  const cru = readFileSync(SUITE, 'utf8');
+  /** So linhas de codigo: usado pelas travas POSITIVAS. */
+  const codigo = linhasDeCodigo(cru);
 
   it('decide o skip pelo opt-in duplo, nao por conta propria', () => {
     expect(codigo).toMatch(/optInSatisfeito\(process\.env\)/);
@@ -258,15 +267,44 @@ describe('lane WMS — travas estruturais (so linhas de codigo)', () => {
     expect(codigo).toMatch(/lerStatus\(residuo\.pedidos\)/);
     expect(codigo).toMatch(/status\.get\(nunota\) === 'A'/);
     expect(codigo).toMatch(/notas\.excluir\(emA\)/);
-    expect(codigo).not.toMatch(/notas\.excluir\(residuo\.pedidos\)/);
+    // NEGATIVA: fonte cru (ver cabecalho) — `${…}` dentro de log tambem e codigo.
+    expect(cru).not.toMatch(/notas\.excluir\(residuo\.pedidos\)/);
+  });
+
+  it('teardown nao deixa NUNOTA sem linha passar calado (I4)', () => {
+    expect(codigo).toMatch(/!status\.has\(nunota\)/);
+    expect(codigo).toMatch(/for \(const nunota of ausentes\)/);
+    expect(codigo).toMatch(/\[\.\.\.foraDeA, \.\.\.ausentes\]/);
+    // Formato da mensagem: vive dentro do template de log, entao so o cru a ve.
+    expect(cru).toContain('STATUSNOTA=AUSENTE');
+  });
+
+  it('passo 8: so recusa de NEGOCIO vira skip; teto e transporte fazem throw', () => {
+    expect(codigo).toMatch(/classifyFailure\(falha\) !== 'NEGOCIO'/);
+    expect(codigo).toMatch(/throw falha/);
+    // A assercao do passo 8 fica FORA do `try`: dentro dele, `expect` vermelho
+    // viraria SKIP verde. Prova pela posicao — `lastIndexOf` porque o passo 3
+    // usa a mesma assercao antes; a ULTIMA ocorrencia e a do passo 8.
+    expect(codigo.indexOf('falha = erro;')).toBeLessThan(
+      codigo.lastIndexOf('expect(codigoPedido).toBeGreaterThan(0)'),
+    );
+  });
+
+  it('recupera por AD_NUMPEDIDO antes de dar veredito no passo 8 (I3/I11)', () => {
+    expect(codigo).toMatch(/SELECT NUNOTA FROM TGFCAB WHERE AD_NUMPEDIDO/);
+    expect(codigo.indexOf('WHERE AD_NUMPEDIDO')).toBeLessThan(codigo.lastIndexOf('ctx.skip('));
   });
 
   it('registra id so depois de validar inteiro positivo', () => {
     expect(codigo).toMatch(/Number\.isInteger\(nunota\)/);
-    expect(codigo).not.toMatch(/residuo\.pedidos\.push\(codigoPedido\)/);
+    // NEGATIVA: fonte cru.
+    expect(cru).not.toMatch(/residuo\.pedidos\.push\(codigoPedido\)/);
   });
 
   it('nunca confirma nem fatura (regra de ouro T0-4: objeto em L e residuo permanente)', () => {
-    expect(codigo).not.toMatch(/\.confirmar\s*\(|\.faturar\s*\(/);
+    // NEGATIVA contra o fonte CRU: `faturar` escondido dentro de um template de
+    // log continua sendo uma chamada. Prosa que cite o nome custa um falso
+    // positivo — o lado barato do I9.
+    expect(cru).not.toMatch(/\.confirmar\s*\(|\.faturar\s*\(/);
   });
 });

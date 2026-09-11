@@ -191,9 +191,16 @@ async function teardownPorId(): Promise<void> {
   const foraDeA = residuo.pedidos.filter(
     (nunota) => status.has(nunota) && status.get(nunota) !== 'A',
   );
+  // Id registrado cuja linha NAO voltou. Leitura vazia nao prova remocao (I4):
+  // pode ser leitura truncada, permissao, ou a nota noutro lugar. Nunca e
+  // "sumiu, tudo certo" — e achado, como qualquer outro residuo.
+  const ausentes = residuo.pedidos.filter((nunota) => !status.has(nunota));
 
   for (const nunota of foraDeA) {
     console.log(`[wms-sandbox] RESIDUO NUNOTA=${nunota} STATUSNOTA=${status.get(nunota)}`);
+  }
+  for (const nunota of ausentes) {
+    console.log(`[wms-sandbox] RESIDUO NUNOTA=${nunota} STATUSNOTA=AUSENTE`);
   }
 
   if (emA.length > 0) {
@@ -207,9 +214,10 @@ async function teardownPorId(): Promise<void> {
     );
   }
 
-  if (foraDeA.length > 0) {
+  const naoApagados = [...foraDeA, ...ausentes];
+  if (naoApagados.length > 0) {
     throw new Error(
-      `[wms-sandbox] residuo NAO apagado (fora de 'A'): ${foraDeA.join(', ')}. Apague a mao e investigue quem liberou a nota.`,
+      `[wms-sandbox] residuo NAO apagado (fora de 'A' ou sem linha em TGFCAB): ${naoApagados.join(', ')}. Confira a mao antes de repetir a lane.`,
     );
   }
 }
