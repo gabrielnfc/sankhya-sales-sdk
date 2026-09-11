@@ -22,6 +22,7 @@ describe('classifyFailure', () => {
       new GatewayError('O pedido 544437 nao esta pendente.', 'SelecaoDocumentoSP.faturar'),
       'NEGOCIO',
     ],
+    [new ApiError('x', '/p', 'POST', 408, ''), 'TIMEOUT'],
     [new ApiError('x', '/p', 'POST', 400, ''), 'NEGOCIO'],
     [new ApiError('x', '/p', 'POST', undefined, ''), 'TIMEOUT'],
     [new Error('boom'), 'TIMEOUT'],
