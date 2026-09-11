@@ -338,12 +338,22 @@ describe('FaturamentoResource', () => {
   });
 
   describe('consultarVar', () => {
-    it('converte as colunas para numero e preserva a ordem das linhas', async () => {
+    it('converte as colunas para numero e devolve o censo inteiro, na ordem', async () => {
+      // Censo real de 2 linhas, medido no spike S6
+      // (`spike-raw/faturamento/S6_VAR_P3.json`, NUNOTAORIG 1889310): um pedido
+      // de 2 itens gera 2 linhas em TGFVAR para a MESMA nota, com SEQUENCIA e
+      // SEQUENCIAORIG cruzadas. Devolver so a primeira seria censo parcial (I1).
       const dbx = {
-        query: vi.fn().mockResolvedValue([varRow('1889311')]),
+        query: vi.fn().mockResolvedValue([
+          { NUNOTA: '1889311', SEQUENCIA: '1', SEQUENCIAORIG: '2', QTDATENDIDA: '2' },
+          { NUNOTA: '1889311', SEQUENCIA: '2', SEQUENCIAORIG: '1', QTDATENDIDA: '2' },
+        ]),
       } as unknown as DbExplorerResource & { query: ReturnType<typeof vi.fn> };
-      const out = await new FaturamentoResource(createMockHttp(), dbx).consultarVar(1889309);
-      expect(out).toEqual([{ nunota: 1889311, sequencia: 1, sequenciaOrig: 2, qtdAtendida: 4 }]);
+      const out = await new FaturamentoResource(createMockHttp(), dbx).consultarVar(1889310);
+      expect(out).toEqual([
+        { nunota: 1889311, sequencia: 1, sequenciaOrig: 2, qtdAtendida: 2 },
+        { nunota: 1889311, sequencia: 2, sequenciaOrig: 1, qtdAtendida: 2 },
+      ]);
     });
 
     it.each([
