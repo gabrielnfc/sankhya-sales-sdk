@@ -147,6 +147,41 @@ describe('NotasResource', () => {
       ).resolves.toMatchObject({ confirmadoPorReadBack: true, statusNfe: 'C' });
     });
 
+    it('cancelar NAO confirma quando o Gateway diz 1 mas TGFCAN esta vazia (M75/M94)', async () => {
+      const http = createMockHttp();
+      http.gatewayCall.mockResolvedValue({
+        resultadoCancelamento: { totalNotasCanceladas: '1', gerouRecebimento: 'false' },
+      });
+      const dbx = createMockDbx([]); // o ERP disse que cancelou; o banco nao mostra nada
+      const out = await new NotasResource(http, dbx).cancelar({
+        nunota: 1889277,
+        justificativa: 'x',
+      });
+      // O numero do Gateway e informativo; a prova e o read-back (I3).
+      expect(out).toEqual({
+        totalNotasCanceladas: 1,
+        gerouRecebimento: false,
+        confirmadoPorReadBack: false,
+        statusNfe: null,
+      });
+    });
+
+    it('cancelar confirma pela linha de TGFCAN mesmo com total 0 no Gateway', async () => {
+      const http = createMockHttp();
+      http.gatewayCall.mockResolvedValue({
+        resultadoCancelamento: { totalNotasCanceladas: '0', gerouRecebimento: 'false' },
+      });
+      const dbx = createMockDbx([{ NUNOTA: '1889277', STATUSNFE: 'C' }]);
+      await expect(
+        new NotasResource(http, dbx).cancelar({ nunota: 1889277, justificativa: 'x' }),
+      ).resolves.toEqual({
+        totalNotasCanceladas: 0,
+        gerouRecebimento: false,
+        confirmadoPorReadBack: true,
+        statusNfe: 'C',
+      });
+    });
+
     it('cancelar com resposta sem resultadoCancelamento nao explode e nao confirma', async () => {
       const http = createMockHttp();
       http.gatewayCall.mockResolvedValue({});
