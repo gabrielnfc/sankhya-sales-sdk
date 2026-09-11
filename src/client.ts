@@ -4,6 +4,7 @@ import { createLogger } from './core/logger.js';
 import {
   CadastrosResource,
   ClientesResource,
+  ConferenciaResource,
   DatasetResource,
   DbExplorerResource,
   EstoqueResource,
@@ -56,6 +57,7 @@ export class SankhyaClient {
   private _dbExplorer?: DbExplorerResource;
   private _dataset?: DatasetResource;
   private _notas?: NotasResource;
+  private _conferencia?: ConferenciaResource;
 
   /**
    * Cria uma instancia do SDK Sankhya.
@@ -176,6 +178,18 @@ export class SankhyaClient {
   get notas(): NotasResource {
     this._notas ??= new NotasResource(this.http, this.dbExplorer);
     return this._notas;
+  }
+
+  /**
+   * Conferencia nativa (`TGFCON2`/`TGFCOI2`) via DatasetSP: carimbo, abrir,
+   * bipar, fechar e os ponteiros E1/E2.
+   *
+   * Recebe o `dataset` e o `dbExplorer` deste mesmo client: a escrita e toda
+   * Dataset, e os guards de carimbo (M76) e de duplicata (M110) sao leitura.
+   */
+  get conferencia(): ConferenciaResource {
+    this._conferencia ??= new ConferenciaResource(this.dataset, this.dbExplorer);
+    return this._conferencia;
   }
 
   /**

@@ -30,7 +30,7 @@ describe('api-surface', () => {
       expect(sdk.isTimeoutError).toBeDefined();
     });
 
-    it('exports all 14 resource classes', () => {
+    it('exports all 15 resource classes', () => {
       expect(sdk.ClientesResource).toBeDefined();
       expect(sdk.VendedoresResource).toBeDefined();
       expect(sdk.ProdutosResource).toBeDefined();
@@ -45,6 +45,7 @@ describe('api-surface', () => {
       expect(sdk.DbExplorerResource).toBeDefined();
       expect(sdk.DatasetResource).toBeDefined();
       expect(sdk.NotasResource).toBeDefined();
+      expect(sdk.ConferenciaResource).toBeDefined();
     });
 
     it('exports datasetRecord (helper de modulo, nao metodo de resource)', () => {
