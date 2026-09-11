@@ -24,14 +24,16 @@ import { GatewayResource } from './gateway.js';
  *
  * @param cell - Celula crua.
  * @param where - Posicao na resposta, para a mensagem de erro (ex: `result[0][2]`).
- * @throws {SankhyaError} `DATASET_SAVE_MALFORMED_RESPONSE` em objeto/array nao vazio.
+ * @throws {SankhyaError} `DATASET_SAVE_MALFORMED_RESPONSE` em objeto/array nao
+ * vazio. Este throw acontece **depois** da escrita: a mensagem declara que o
+ * efeito no ERP e indeterminado e exige read-back (I3/I11).
  */
 function cellToString(cell: unknown, where: string): string {
   if (cell === null || cell === undefined) return '';
   if (typeof cell === 'object') {
     if (!Array.isArray(cell) && Object.keys(cell).length === 0) return '';
     throw new SankhyaError(
-      `dataset.save: ${where} veio como objeto/array nao vazio, forma nao prevista para uma celula. Nenhum valor foi convertido — '[object Object]' seria um dado inventado.`,
+      `dataset.save: ${where} veio como objeto/array nao vazio, forma nao prevista para uma celula. Nenhum valor foi convertido — '[object Object]' seria um dado inventado. A chamada ja foi enviada: o efeito no ERP e indeterminado — nao repita sem read-back.`,
       'DATASET_SAVE_MALFORMED_RESPONSE',
     );
   }
@@ -58,7 +60,8 @@ function kindOf(value: unknown): string {
 }
 
 /**
- * Uma pk utilizavel: ao menos uma chave, e **todo** valor uma string nao vazia.
+ * Uma pk utilizavel: ao menos uma chave com nome preenchido, e **todo** valor uma
+ * string nao vazia.
  *
  * Contar chaves nao basta. `JSON.stringify` (`src/core/http.ts:272`) descarta
  * par com valor `undefined`, entao `{ NUNOTA: undefined }` tem `Object.keys`
@@ -88,6 +91,12 @@ function assertPkUsable(pk: unknown, index: number, entityName: string): void {
   }
 
   for (const [key, value] of entries) {
+    if (key.trim() === '') {
+      throw new SankhyaError(
+        `dataset.removeRecord: pks[${index}] tem chave vazia (nome de campo em branco). E um filtro vazio com outro nome: apagaria todos os registros de ${entityName}. Nenhuma chamada foi feita.`,
+        'VALIDATION_ERROR',
+      );
+    }
     if (typeof value !== 'string' || value.trim() === '') {
       throw new SankhyaError(
         `dataset.removeRecord: pks[${index}].${key} nao e uma string preenchida (recebido: ${kindOf(value)}). A serializacao descartaria a chave e o servidor receberia um filtro vazio, apagando todos os registros de ${entityName}. Nenhuma chamada foi feita.`,
@@ -171,8 +180,9 @@ export class DatasetResource {
    * @param params - Entidade, campos, registros e `standAlone` (default `false`).
    * @param options - Opcoes de requisicao (timeout, `signal`).
    * @returns `total` convertido para numero e `result` com toda celula em string.
-   * @throws {SankhyaError} `VALIDATION_ERROR` se `records` vier vazio (efeito de
-   * 0 registros nao medido — nenhuma chamada e feita);
+   * @throws {SankhyaError} `VALIDATION_ERROR` se `records` vier vazio ou se algum
+   * record nao tiver nenhum valor em `values` (efeito nao medido — nenhuma
+   * chamada e feita);
    * `DATASET_SAVE_MALFORMED_RESPONSE` se a resposta nao
    * trouxer `total` ou `result` em forma utilizavel (I11 — ambiguidade nunca
    * vira estado terminal em silencio); `PARSE_ERROR` se `total` nao for numero.
@@ -196,6 +206,15 @@ export class DatasetResource {
       );
     }
 
+    for (const [index, record] of params.records.entries()) {
+      if (Object.keys(record.values ?? {}).length === 0) {
+        throw new SankhyaError(
+          `dataset.save: records[${index}].values nao tem nenhum campo. O efeito de um registro sem valores nao foi medido no Sankhya — nenhuma chamada foi feita.`,
+          'VALIDATION_ERROR',
+        );
+      }
+    }
+
     const raw = await this.http.gatewayCall<DatasetSaveRawResponse>(
       'mge',
       'DatasetSP.save',
@@ -212,13 +231,13 @@ export class DatasetResource {
 
     if (raw === null || typeof raw !== 'object' || !hasUsableTotal(raw.total)) {
       throw new SankhyaError(
-        `dataset.save: resposta de DatasetSP.save sem 'total'. O efeito no ERP e indeterminado — nenhum total foi inventado. Confira o registro antes de repetir a chamada.`,
+        `dataset.save: resposta de DatasetSP.save sem 'total'. Nenhum total foi inventado. A chamada ja foi enviada: o efeito no ERP e indeterminado — nao repita sem read-back.`,
         'DATASET_SAVE_MALFORMED_RESPONSE',
       );
     }
     if (!Array.isArray(raw.result)) {
       throw new SankhyaError(
-        `dataset.save: resposta de DatasetSP.save sem 'result' em forma de lista. O efeito no ERP e indeterminado — nenhuma lista vazia foi inventada.`,
+        `dataset.save: resposta de DatasetSP.save sem 'result' em forma de lista. Nenhuma lista vazia foi inventada. A chamada ja foi enviada: o efeito no ERP e indeterminado — nao repita sem read-back.`,
         'DATASET_SAVE_MALFORMED_RESPONSE',
       );
     }
@@ -226,7 +245,7 @@ export class DatasetResource {
     const result = raw.result.map((row, index) => {
       if (!Array.isArray(row)) {
         throw new SankhyaError(
-          `dataset.save: result[${index}] nao e uma linha (array). Resposta inconsistente — nenhuma linha parcial foi devolvida.`,
+          `dataset.save: result[${index}] nao e uma linha (array). Resposta inconsistente — nenhuma linha parcial foi devolvida. A chamada ja foi enviada: o efeito no ERP e indeterminado — nao repita sem read-back.`,
           'DATASET_SAVE_MALFORMED_RESPONSE',
         );
       }

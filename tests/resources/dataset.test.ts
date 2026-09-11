@@ -178,6 +178,32 @@ describe('DatasetResource', () => {
     expect(http.gatewayCall).not.toHaveBeenCalled();
   });
 
+  // MENOR 2 do re-review: record sem nenhum valor tem o mesmo efeito nao medido
+  // de `records: []`.
+  it('save recusa record sem values antes da rede (efeito nao medido)', async () => {
+    const http = createMockHttp();
+    await expect(
+      new DatasetResource(http).save({
+        entityName: 'CabecalhoNota',
+        fields: ['NUNOTA'],
+        records: [{ values: {} }],
+      }),
+    ).rejects.toThrow(/values/);
+    expect(http.gatewayCall).not.toHaveBeenCalled();
+  });
+
+  it('save recusa record sem values mesmo quando o primeiro record e valido', async () => {
+    const http = createMockHttp();
+    await expect(
+      new DatasetResource(http).save({
+        entityName: 'CabecalhoNota',
+        fields: ['NUNOTA'],
+        records: [datasetRecord(['NUNOTA'], { set: { NUNOTA: '1889349' } }), { values: {} }],
+      }),
+    ).rejects.toThrow(/records\[1\]/);
+    expect(http.gatewayCall).not.toHaveBeenCalled();
+  });
+
   // Item 6 do review (MENOR): `{}` e a forma medida de campo vazio do Gateway
   // (src/core/parse-utils.ts:14-17) — virar `'[object Object]'` seria inventar valor.
   it('save normaliza celula {} (campo vazio do Gateway) para string vazia', async () => {
@@ -204,6 +230,26 @@ describe('DatasetResource', () => {
         records: [datasetRecord(['NUNOTA'], { set: { NUNOTA: '1889349' } })],
       }),
     ).rejects.toThrow(/result\[0\]\[0\]/);
+  });
+
+  // MENOR 3 do re-review: este throw acontece DEPOIS da escrita — a mensagem
+  // precisa dizer que o efeito no ERP e indeterminado (I3/I11).
+  it.each([
+    ['celula objeto nao vazio', { total: '1', result: [[{ $: '1889349' }]] }],
+    ['total ausente', { result: [['1889349']] }],
+    ['result ausente', { total: '1' }],
+    ['linha que nao e array', { total: '1', result: ['1889349'] }],
+  ])('a mensagem do throw pos-escrita manda fazer read-back (%s)', async (_nome, resposta) => {
+    const http = createMockHttp();
+    http.gatewayCall.mockResolvedValue(resposta);
+
+    await expect(
+      new DatasetResource(http).save({
+        entityName: 'CabecalhoNota',
+        fields: ['NUNOTA'],
+        records: [datasetRecord(['NUNOTA'], { set: { NUNOTA: '1889349' } })],
+      }),
+    ).rejects.toThrow(/efeito no ERP e indeterminado — nao repita sem read-back/);
   });
 
   // Item 4 do review (M11/M12 sobreviveram): os ramos que o JSDoc vende como
@@ -313,6 +359,18 @@ describe('DatasetResource', () => {
     await expect(
       new DatasetResource(http).removeRecord({ entityName: 'CabecalhoNota', pks: [pk] }),
     ).rejects.toThrow(/NUNOTA/);
+    expect(http.gatewayCall).not.toHaveBeenCalled();
+  });
+
+  // MENOR 1 do re-review: chave vazia e filtro vazio com outro nome.
+  it.each([
+    ['chave vazia', { '': 'x' }],
+    ['chave so com espacos', { '  ': 'x' }],
+  ])('removeRecord recusa pk com %s', async (_nome, pk) => {
+    const http = createMockHttp();
+    await expect(
+      new DatasetResource(http).removeRecord({ entityName: 'CabecalhoNota', pks: [pk] }),
+    ).rejects.toThrow(/chave vazia/);
     expect(http.gatewayCall).not.toHaveBeenCalled();
   });
 
