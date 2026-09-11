@@ -116,6 +116,25 @@ const CABECALHO_REFERENCIA_06_09: Record<string, string | number> = {
   CODNAT: '01010101',
   AD_STATUSPED: 'P',
 };
+/**
+ * Lote REAL com saldo no sandbox, para o passo 4.
+ *
+ * Medido no spike 5 (2026-09-11): `CODEMP 2 / CODLOCAL 30301 / CODPROD 10077 /
+ * CONTROLE 'SPIKE-T002-A'` com **5 disponiveis**. Ate entao o passo 4 inventava
+ * o `CONTROLE` com o prefixo da execucao e o ERP recusava com
+ * `ORA-20101 ESTOQUE INSUFICIENTE ... CONTROLE : SDK-T-...` — lote que nao
+ * existe nao tem saldo, e nenhum prefixo conserta isso.
+ *
+ * O marcador `SDK-T-` continua em `AD_NUMPEDIDO` e `OBSERVACAO`: e por eles que
+ * o teardown acha o que esta execucao criou, nunca pelo CONTROLE.
+ */
+const LOTE_REFERENCIA = {
+  codEmp: 2,
+  codLocal: 30301,
+  codProd: 10077,
+  controle: 'SPIKE-T002-A',
+} as const;
+
 /** Produto com volume cadastrado completo no sandbox (M54). */
 const CODPROD_VOLUME = 13609;
 
@@ -246,9 +265,16 @@ async function teardownPorId(): Promise<void> {
   if (emA.length > 0) {
     await sankhya.notas.excluir(emA);
 
-    // Read-back (I3): resposta do ERP nao prova efeito. A prova e a ausencia em TGFCAB.
+    // Read-back (I3): resposta do ERP nao prova efeito. A prova e a ausencia em
+    // TGFCAB — e tambem em TGFITE, porque o passo 4 grava item num lote REAL:
+    // item orfao sobrando seguraria saldo de um lote que nao e nosso.
     const sobrando = await lerStatus(emA);
     expect([...sobrando.keys()]).toEqual([]);
+
+    const itensOrfaos = await sankhya.dbExplorer.query<{ NUNOTA: string }>(
+      `SELECT NUNOTA FROM TGFITE WHERE NUNOTA IN (${emA.join(', ')})`,
+    );
+    expect(itensOrfaos).toEqual([]);
     console.log(
       `[wms-sandbox] read-back: 0 linhas em TGFCAB para ${emA.join(', ')}. Chamadas gastas: ${orcamento.spent()}.`,
     );
@@ -365,10 +391,38 @@ describe.skipIf(!habilitada)('Lane WMS — sandbox Sankhya (opt-in duplo)', () =
     expect(codigoPedido).toBeGreaterThan(0);
   });
 
-  it('4 — dataset.save grava ItemNota com CONTROLE prefixado', async () => {
+  it('4 — dataset.save grava ItemNota em lote REAL com saldo (spike 5)', async () => {
     const nunota = pedidoDoPasso3();
 
-    const campos = ['NUNOTA', 'CODPROD', 'QTDNEG', 'VLRUNIT', 'CODVOL', 'CODLOCALORIG', 'CONTROLE'];
+    // Disponibilidade ANTES de gravar: o ERP recusa a gravacao por
+    // `ORA-20101 ESTOQUE INSUFICIENTE`, e sem este read-back a lane reprovaria
+    // sem dizer que o problema e saldo. Custa 1 chamada do orcamento.
+    const [saldo] = await sankhya.dbExplorer.query<{ ESTOQUE: string; RESERVADO: string }>(
+      `SELECT ESTOQUE, RESERVADO FROM TGFEST WHERE CODEMP = ${LOTE_REFERENCIA.codEmp} AND CODLOCAL = ${LOTE_REFERENCIA.codLocal} AND CODPROD = ${LOTE_REFERENCIA.codProd} AND CONTROLE = '${LOTE_REFERENCIA.controle}'`,
+    );
+    const disponivel = Number(saldo?.ESTOQUE ?? 0) - Number(saldo?.RESERVADO ?? 0);
+    console.log(`[wms-sandbox] lote de referencia: disponivel=${disponivel}`);
+
+    if (disponivel < 1) {
+      // FALHA, nao skip: o dono precisa saber que a premissa (b) do lote
+      // (5 disponiveis em 11/09) caducou — outra execucao consumiu o saldo.
+      throw new Error(
+        `[wms-sandbox] sandbox sem saldo no lote de referencia (b): disponivel=${disponivel} em CODPROD ${LOTE_REFERENCIA.codProd} / CONTROLE ${LOTE_REFERENCIA.controle}. Reponha o lote ou meça outro.`,
+      );
+    }
+
+    // Item na forma medida de 06/09 (`S2_INCLUIR_P1.json`), com o lote real.
+    const campos = [
+      'NUNOTA',
+      'CODPROD',
+      'QTDNEG',
+      'VLRUNIT',
+      'VLRTOT',
+      'PERCDESC',
+      'CODVOL',
+      'CODLOCALORIG',
+      'CONTROLE',
+    ];
     const out = await sankhya.dataset.save({
       entityName: 'ItemNota',
       fields: campos,
@@ -376,12 +430,14 @@ describe.skipIf(!habilitada)('Lane WMS — sandbox Sankhya (opt-in duplo)', () =
         datasetRecord(campos, {
           set: {
             NUNOTA: String(nunota),
-            CODPROD: String(CODPROD_ITEM),
+            CODPROD: String(LOTE_REFERENCIA.codProd),
             QTDNEG: '1',
             VLRUNIT: '10',
+            VLRTOT: '10',
+            PERCDESC: '0',
             CODVOL: 'UN',
-            CODLOCALORIG: String(CODLOCALORIG),
-            CONTROLE: PREFIXO,
+            CODLOCALORIG: String(LOTE_REFERENCIA.codLocal),
+            CONTROLE: LOTE_REFERENCIA.controle,
           },
         }),
       ],

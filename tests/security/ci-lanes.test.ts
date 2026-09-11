@@ -385,6 +385,20 @@ describe('lane WMS — travas estruturais', () => {
     expect(cru).not.toMatch(/residuo\.pedidos\.push\(codigoPedido\)/);
   });
 
+  it('passo 4 grava em lote REAL, nunca num CONTROLE inventado (spike 5)', () => {
+    expect(codigo).toMatch(/LOTE_REFERENCIA/);
+    expect(codigo).toMatch(/SELECT ESTOQUE, RESERVADO FROM TGFEST/);
+    // NEGATIVA, fonte cru: lote com o prefixo da execucao nao existe no ERP e o
+    // ORA-20101 (ESTOQUE INSUFICIENTE) e a unica resposta possivel.
+    // Qualquer aspa, e tambem template: `CONTROLE: \`SDK-T-${…}\`` e a forma
+    // que o passo tinha antes, e uma regex so com aspa simples deixava passar.
+    expect(cru).not.toMatch(/CONTROLE:\s*['"`]SDK-T/);
+  });
+
+  it('teardown prova ausencia tambem em TGFITE (item segura saldo de lote real)', () => {
+    expect(codigo).toMatch(/SELECT NUNOTA FROM TGFITE WHERE NUNOTA IN/);
+  });
+
   it('nunca confirma nem fatura (regra de ouro T0-4: objeto em L e residuo permanente)', () => {
     // NEGATIVA contra o fonte CRU: `faturar` escondido dentro de um template de
     // log continua sendo uma chamada. Prosa que cite o nome custa um falso

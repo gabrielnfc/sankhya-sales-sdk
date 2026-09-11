@@ -414,6 +414,10 @@ ledger): que o sandbox aceite cada passo, os números do `volumesProduto`, e o *
 o ERP aceitou em 2026-09-06 (`CODNAT`, `PERCDESC` e os demais campos não tipados) — descobrir o
 mínimo campo a campo custava uma rodada por exigência revelada.
 
+**O item é gravado num lote real.** O passo que grava `ItemNota` usa um `CONTROLE` com saldo medido
+no sandbox e confere a disponibilidade antes (`ESTOQUE − RESERVADO`): lote inventado devolve
+`ORA-20101 ESTOQUE INSUFICIENTE`, e o teardown prova ausência também em `TGFITE`.
+
 **Leitura de volume (`TGFVOA`) é por SQL.** `produtos.volumesProduto()` usa `dbExplorer.query`:
 a rota de Gateway (`CRUDServiceProvider.loadRecords` com `rootEntity: 'VolumeProduto'`) foi medida
 no sandbox em 2026-09-11 e devolveu `Erro interno (NPE)` nas duas tentativas, com zero linhas.
