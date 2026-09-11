@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
+import { assertSandbox } from './_write-guard.js';
 
 /**
  * Cobertura live das correcoes 1.2.3: cliente (PF/PJ + AD_), financeiro
@@ -18,6 +19,9 @@ const config = {
   logger: { level: 'silent' as const },
 };
 const has = config.baseUrl && config.clientId && config.clientSecret && config.xToken;
+
+// Esta suite ESCREVE no ERP. Sandbox ou nada.
+assertSandbox(config.baseUrl);
 
 const n = (env: string, fb: number) => {
   const v = process.env[env] ? Number(process.env[env]) : fb;

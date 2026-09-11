@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
+import { assertSandbox } from './_write-guard.js';
 
 /**
  * Round-trip de escrita REAL contra o Sankhya: CRIA um pedido de venda pela API
@@ -21,6 +22,9 @@ const config = {
   logger: { level: 'silent' as const },
 };
 const has = config.baseUrl && config.clientId && config.clientSecret && config.xToken;
+
+// Esta suite ESCREVE no ERP. Sandbox ou nada.
+assertSandbox(config.baseUrl);
 
 const num = (env: string, fallback: number) => {
   const v = process.env[env];

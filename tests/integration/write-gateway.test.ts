@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
 import { ApiError, GatewayError } from '../../src/core/errors.js';
+import { assertSandbox } from './_write-guard.js';
 
 const config = {
   baseUrl: process.env.SANKHYA_BASE_URL ?? '',
@@ -12,6 +13,9 @@ const config = {
 };
 
 const has = config.baseUrl && config.clientId && config.clientSecret && config.xToken;
+
+// Esta suite ESCREVE no ERP. Sandbox ou nada.
+assertSandbox(config.baseUrl);
 
 describe.skipIf(!has)('Gateway CRUD — Sandbox Validation', () => {
   let sankhya: SankhyaClient;
