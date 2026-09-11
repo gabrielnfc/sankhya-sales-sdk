@@ -18,7 +18,7 @@ const sankhya = new SankhyaClient(config: SankhyaConfig);
 
 | Parâmetro | Tipo | Obrigatório | Default | Descrição |
 |-----------|------|-------------|---------|-----------|
-| `baseUrl` | `string` | Sim | — | URL base da API (`https://api.sankhya.com.br` ou `https://api.sandbox.sankhya.com.br`) |
+| `baseUrl` | `string` | Sim | — | URL base da API. Nos exemplos deste repositório, sempre o sandbox (`https://api.sandbox.sankhya.com.br`). Host de produção exige `allowProduction: true` — ver [Guarda de ambiente](#guarda-de-ambiente-allowlist-de-host-fail-closed) |
 | `clientId` | `string` | Sim | — | OAuth 2.0 client_id (Portal do Desenvolvedor) |
 | `clientSecret` | `string` | Sim | — | OAuth 2.0 client_secret |
 | `xToken` | `string` | Sim | — | Token Gateway (gerado na tela Configurações Gateway do Sankhya Om) |
@@ -32,7 +32,9 @@ const sankhya = new SankhyaClient(config: SankhyaConfig);
 | `circuitBreaker` | `CircuitBreakerConfig` | Não | `{ threshold: 3, resetTimeoutMs: 30000 }` | Circuit breaker local de autenticação |
 | `onDegradedResponse` | `'flag'` | Não | `'flag'` | Política para resposta degradada. **Sem efeito hoje**: o SDK não lê o valor, porque só existe uma política implementada. O default passa a `'throw'` na 2.0.0 |
 
-### Guarda de ambiente (allowlist de host, fail-closed) — novo em 1.6.0
+### Guarda de ambiente (allowlist de host, fail-closed)
+
+**Novo em 1.6.0.**
 
 O construtor decide o host **antes** de instanciar `AuthManager`/`HttpClient`: nenhum
 recurso de rede é criado para um host que a guarda recusaria. A ordem está travada em
@@ -81,7 +83,7 @@ arquivo de `src/`, `tests/` ou `.github/` que ligue `allowProduction`.
 
 ```typescript
 const sankhya = new SankhyaClient({
-  baseUrl: 'https://api.sankhya.com.br',
+  baseUrl: 'https://api.sandbox.sankhya.com.br',
   clientId: process.env.SANKHYA_CLIENT_ID!,
   clientSecret: process.env.SANKHYA_CLIENT_SECRET!,
   xToken: process.env.SANKHYA_X_TOKEN!,
@@ -96,7 +98,7 @@ import Redis from 'ioredis';
 const redis = new Redis();
 
 const sankhya = new SankhyaClient({
-  baseUrl: 'https://api.sankhya.com.br',
+  baseUrl: 'https://api.sandbox.sankhya.com.br',
   clientId: process.env.SANKHYA_CLIENT_ID!,
   clientSecret: process.env.SANKHYA_CLIENT_SECRET!,
   xToken: process.env.SANKHYA_X_TOKEN!,

@@ -1,5 +1,12 @@
 # Arquitetura do SDK
 
+> **Allowlist de host (desde a 1.6.0).** Os exemplos usam o **sandbox**, que sobe sem
+> nenhuma flag. Host de produção exige `allowProduction: true` e emite um `logger.warn`
+> citando só o host; qualquer outro host precisa constar de `allowedHosts`, senão o
+> cliente **aborta**. Ver
+> [SankhyaClient — Guarda de ambiente](../api-reference/cliente-sdk.md#guarda-de-ambiente-allowlist-de-host-fail-closed).
+
+
 ## Diagrama Geral
 
 ```
@@ -58,7 +65,7 @@ Classe principal que o usuário instancia. Recebe configuração e expõe todos 
 
 ```typescript
 const sankhya = new SankhyaClient({
-  baseUrl: 'https://api.sankhya.com.br',
+  baseUrl: 'https://api.sandbox.sankhya.com.br',
   clientId: '...',
   clientSecret: '...',
   xToken: '...',

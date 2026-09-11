@@ -20,7 +20,7 @@ npm install sankhya-sales-sdk
 Crie um arquivo `.env` na raiz do seu projeto:
 
 ```env
-SANKHYA_BASE_URL=https://api.sankhya.com.br
+SANKHYA_BASE_URL=https://api.sandbox.sankhya.com.br
 SANKHYA_CLIENT_ID=seu_client_id
 SANKHYA_CLIENT_SECRET=seu_client_secret
 SANKHYA_X_TOKEN=seu_x_token
@@ -114,8 +114,12 @@ console.log('Pedido confirmado!');
 
 | Ambiente | Base URL | Uso |
 |----------|----------|-----|
-| **Produção** | `https://api.sankhya.com.br` | Dados reais |
-| **Sandbox** | `https://api.sandbox.sankhya.com.br` | Testes |
+| **Produção** | o host que consta de `PRODUCTION_HOSTS` | Dados reais. **Desde a 1.6.0 exige `allowProduction: true`** na config — sem a flag o cliente aborta com `PRODUCTION_BLOCKED`, e com ela sai um `logger.warn` citando o host |
+| **Sandbox** | `https://api.sandbox.sankhya.com.br` | Testes. Sobe sem flag e sem aviso |
+
+> **A guarda de ambiente é fail-closed (1.6.0).** Host que não é sandbox nem produção só
+> sobe se constar de `allowedHosts`. Detalhes em
+> [SankhyaClient — Guarda de ambiente](../api-reference/cliente-sdk.md#guarda-de-ambiente-allowlist-de-host-fail-closed).
 
 > **Atenção:** Cada ambiente gera tokens independentes. Credenciais de sandbox **não funcionam** com produção, e vice-versa.
 

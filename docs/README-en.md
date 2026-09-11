@@ -27,7 +27,7 @@ npm install sankhya-sales-sdk
 ### Environment variables
 
 ```bash
-export SANKHYA_BASE_URL=https://api.sankhya.com.br
+export SANKHYA_BASE_URL=https://api.sandbox.sankhya.com.br
 export SANKHYA_CLIENT_ID=your-client-id
 export SANKHYA_CLIENT_SECRET=your-client-secret
 export SANKHYA_X_TOKEN=your-x-token

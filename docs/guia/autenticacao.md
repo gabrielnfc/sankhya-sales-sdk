@@ -1,5 +1,12 @@
 # Guia de Autenticação
 
+> **Allowlist de host (desde a 1.6.0).** Os exemplos usam o **sandbox**, que sobe sem
+> nenhuma flag. Host de produção exige `allowProduction: true` e emite um `logger.warn`
+> citando só o host; qualquer outro host precisa constar de `allowedHosts`, senão o
+> cliente **aborta**. Ver
+> [SankhyaClient — Guarda de ambiente](../api-reference/cliente-sdk.md#guarda-de-ambiente-allowlist-de-host-fail-closed).
+
+
 Como o `sankhya-sales-sdk` gerencia autenticação OAuth 2.0 com a API Sankhya.
 
 ## Visão Geral
@@ -26,7 +33,7 @@ Três credenciais são necessárias:
 
 ```typescript
 const sankhya = new SankhyaClient({
-  baseUrl: 'https://api.sankhya.com.br',
+  baseUrl: 'https://api.sandbox.sankhya.com.br',
   clientId: process.env.SANKHYA_CLIENT_ID!,
   clientSecret: process.env.SANKHYA_CLIENT_SECRET!,
   xToken: process.env.SANKHYA_X_TOKEN!,
@@ -53,7 +60,7 @@ import Redis from 'ioredis';
 const redis = new Redis();
 
 const sankhya = new SankhyaClient({
-  baseUrl: 'https://api.sankhya.com.br',
+  baseUrl: 'https://api.sandbox.sankhya.com.br',
   clientId: process.env.SANKHYA_CLIENT_ID!,
   clientSecret: process.env.SANKHYA_CLIENT_SECRET!,
   xToken: process.env.SANKHYA_X_TOKEN!,
@@ -123,7 +130,7 @@ Produção e sandbox usam tokens **completamente independentes**:
 ```typescript
 // Produção
 const sankhyaProd = new SankhyaClient({
-  baseUrl: 'https://api.sankhya.com.br',
+  baseUrl: 'https://api.sandbox.sankhya.com.br',
   clientId: process.env.SANKHYA_PROD_CLIENT_ID!,
   clientSecret: process.env.SANKHYA_PROD_CLIENT_SECRET!,
   xToken: process.env.SANKHYA_PROD_X_TOKEN!,
