@@ -52,6 +52,43 @@ const CHAVES_TIPADAS_CABECALHO: ReadonlySet<string> = new Set([
   'AD_NUMPEDIDO',
 ]);
 
+/**
+ * Total do item em CENTAVOS, para nao mandar lixo binario num campo de dinheiro.
+ *
+ * Medido (review 4 da D4): `1.01 * 3` em ponto flutuante serializa como
+ * `'3.0300000000000002'`, e **19,17%** dos pares (preco de 2 casas entre R$1 e
+ * R$500 x quantidade 1-20) passam de 2 casas. Nenhum spike mediu `VLRTOT`
+ * fracionario — todos os medidos sao `'10'`, `'30'`, `'40'` — entao a reacao do
+ * ERP a uma 17a casa e DESCONHECIDA, e escrita ambigua e o que I11 proibe.
+ *
+ * A conta vai pelo inteiro de centavos e volta dividida por 100: `Math.round`
+ * duas vezes, porque `quantidade` pode ser fracionaria (0,5 kg, 1,25 m) e o
+ * produto em centavos tambem quebra. O resultado e exato ate 2 casas, e
+ * `String()` devolve a forma canonica — `'3.03'`, `'0.3'`, `'10'` —, nunca uma
+ * casa inventada.
+ */
+function totalEmCentavos(valorUnitario: number, quantidade: number): number {
+  const centavos = Math.round(valorUnitario * 100);
+  return Math.round(centavos * quantidade) / 100;
+}
+
+/** Recusa numero de item fora da faixa ANTES da rede (R9/I11). */
+function assertNumeroDoItem(
+  valor: number | undefined,
+  campo: string,
+  minimo: number,
+  maximo: number,
+  indice: number,
+): void {
+  if (valor === undefined) return;
+  if (!Number.isFinite(valor) || valor < minimo || valor > maximo) {
+    throw new SankhyaError(
+      `incluirNotaGateway: itens[${indice}].${campo} precisa ser um numero finito entre ${minimo} e ${maximo}; recebido: ${String(valor)}. Nenhuma chamada foi feita.`,
+      'VALIDATION_ERROR',
+    );
+  }
+}
+
 /** Estreita para objeto simples sem usar `any`. */
 function ehRegistro(valor: unknown): valor is Record<string, unknown> {
   return typeof valor === 'object' && valor !== null && !Array.isArray(valor);
@@ -444,18 +481,24 @@ export class PedidosResource {
     // percentual, `CACSP.incluirNota` recusa com `O campo 'Perc. desconto' deve
     // ser informado.` (CORE_E03235); e o campo e do ITEM, nao do cabecalho: a
     // recusa sobreviveu a `PERCDESC` no cabecalho.
-    const itens = input.itens.map((item) => ({
-      NUNOTA: {},
-      ...serialize({
-        CODPROD: item.codigoProduto,
-        QTDNEG: item.quantidade,
-        VLRUNIT: item.valorUnitario,
-        CODVOL: item.unidade,
-        ...(item.codigoLocalOrigem ? { CODLOCALORIG: item.codigoLocalOrigem } : {}),
-        VLRTOT: item.valorTotal ?? item.valorUnitario * item.quantidade,
-        PERCDESC: item.percentualDesconto ?? 0,
-      }),
-    }));
+    const itens = input.itens.map((item, indice) => {
+      // Lixo nao cruza a fronteira: o juiz e local, nao o ERP (R9/I11).
+      assertNumeroDoItem(item.percentualDesconto, 'percentualDesconto', 0, 100, indice);
+      assertNumeroDoItem(item.valorTotal, 'valorTotal', 0, Number.MAX_SAFE_INTEGER, indice);
+
+      return {
+        NUNOTA: {},
+        ...serialize({
+          CODPROD: item.codigoProduto,
+          QTDNEG: item.quantidade,
+          VLRUNIT: item.valorUnitario,
+          CODVOL: item.unidade,
+          ...(item.codigoLocalOrigem ? { CODLOCALORIG: item.codigoLocalOrigem } : {}),
+          VLRTOT: item.valorTotal ?? totalEmCentavos(item.valorUnitario, item.quantidade),
+          PERCDESC: item.percentualDesconto ?? 0,
+        }),
+      };
+    });
 
     const cabecalho: Record<string, unknown> = {
       NUNOTA: {},

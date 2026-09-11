@@ -965,6 +965,103 @@ describe('PedidosResource', () => {
       });
     });
 
+    /** Monta um pedido de 1 item e devolve o item serializado. */
+    async function itemDe(
+      item: Partial<{
+        codigoProduto: number;
+        quantidade: number;
+        valorUnitario: number;
+        unidade: string;
+        percentualDesconto: number;
+        valorTotal: number;
+      }>,
+    ): Promise<Record<string, unknown>> {
+      const http = createMockHttp();
+      http.gatewayCall.mockResolvedValue({ pk: { NUNOTA: { $: '1' } } });
+      await new PedidosResource(http).incluirNotaGateway({
+        codigoCliente: 1,
+        dataNegociacao: '06/09/2026',
+        codigoTipoOperacao: 1001,
+        codigoTipoNegociacao: 200,
+        codigoVendedor: 50,
+        codigoEmpresa: 2,
+        tipoMovimento: 'P',
+        itens: [
+          {
+            codigoProduto: 10077,
+            quantidade: 1,
+            valorUnitario: 10,
+            unidade: 'UN',
+            ...item,
+          },
+        ],
+      });
+      return (
+        http.gatewayCall.mock.calls[0][2] as {
+          nota: { itens: { item: Record<string, unknown>[] } };
+        }
+      ).nota.itens.item[0] as Record<string, unknown>;
+    }
+
+    // VLRTOT e DINHEIRO indo para ERP de terceiro. O produto cru em ponto
+    // flutuante manda lixo binario: medido no review 4, `1.01 * 3` serializa
+    // como '3.0300000000000002', e 19,17% dos pares (preco de 2 casas x qtd
+    // 1-20) passam de 2 casas. Nenhum spike mediu VLRTOT fracionario — a
+    // reacao do ERP e desconhecida (I11), entao o SDK nao inventa a casa 17.
+    it.each([
+      { valorUnitario: 1.01, quantidade: 3, esperado: '3.03' },
+      { valorUnitario: 0.1, quantidade: 3, esperado: '0.3' },
+      { valorUnitario: 10, quantidade: 1, esperado: '10' },
+      { valorUnitario: 19.99, quantidade: 7, esperado: '139.93' },
+      { valorUnitario: 10, quantidade: 0.5, esperado: '5' },
+    ])(
+      'VLRTOT default de $valorUnitario x $quantidade sai como $esperado (centavos, sem lixo binario)',
+      async ({ valorUnitario, quantidade, esperado }) => {
+        const item = await itemDe({ valorUnitario, quantidade });
+        expect(item.VLRTOT).toEqual({ $: esperado });
+      },
+    );
+
+    it.each([
+      { campo: 'percentualDesconto', valor: -15 },
+      { campo: 'percentualDesconto', valor: 101 },
+      { campo: 'percentualDesconto', valor: Number.NaN },
+      { campo: 'valorTotal', valor: -1 },
+      { campo: 'valorTotal', valor: Number.NaN },
+    ])('recusa $campo = $valor antes da rede', async ({ campo, valor }) => {
+      const http = createMockHttp();
+      await expect(
+        new PedidosResource(http).incluirNotaGateway({
+          codigoCliente: 1,
+          dataNegociacao: '06/09/2026',
+          codigoTipoOperacao: 1001,
+          codigoTipoNegociacao: 200,
+          codigoVendedor: 50,
+          codigoEmpresa: 2,
+          tipoMovimento: 'P',
+          itens: [
+            {
+              codigoProduto: 10077,
+              quantidade: 1,
+              valorUnitario: 10,
+              unidade: 'UN',
+              [campo]: valor,
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: 'VALIDATION_ERROR', message: expect.stringMatching(campo) });
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
+
+    it('aceita as bordas validas: desconto 0 e 100, valorTotal 0', async () => {
+      for (const percentualDesconto of [0, 100]) {
+        const item = await itemDe({ percentualDesconto });
+        expect(item.PERCDESC).toEqual({ $: String(percentualDesconto) });
+      }
+      const item = await itemDe({ valorTotal: 0 });
+      expect(item.VLRTOT).toEqual({ $: '0' });
+    });
+
     it('percentualDesconto e valorTotal do input vencem os defaults', async () => {
       const http = createMockHttp();
       const pedidos = new PedidosResource(http);

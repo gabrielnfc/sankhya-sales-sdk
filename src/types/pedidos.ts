@@ -434,12 +434,23 @@ export interface ItemNotaGatewayInput {
    * `O campo 'Perc. desconto' deve ser informado.` (CORE_E03235) — medido na
    * lane da D4 em 2026-09-11, duas vezes. Por isso o SDK manda 0 quando o
    * chamador nao informa, em vez de omitir a chave.
+   *
+   * Precisa ser finito e estar em [0, 100]: fora disso o SDK recusa antes da
+   * rede, em vez de deixar o ERP ser o unico juiz.
    */
   percentualDesconto?: number;
   /**
-   * Valor total do item (`VLRTOT`). Default: `valorUnitario x quantidade`,
-   * multiplicado como veio — sem arredondamento inventado. Informe este campo
-   * quando o total precisar de outro arredondamento que nao o produto direto.
+   * Valor total do item (`VLRTOT`). Precisa ser finito e >= 0.
+   *
+   * Default: `valorUnitario x quantidade` calculado em CENTAVOS e devolvido com
+   * no maximo 2 casas (`'3.03'`, `'0.3'`, `'10'`). ~~Multiplicado como veio —
+   * sem arredondamento inventado~~ _(emenda 2026-09-11, review 4 da D4: o
+   * produto cru em ponto flutuante mandava `'3.0300000000000002'` num campo de
+   * dinheiro; 19,17% dos pares medidos passavam de 2 casas. A casa 17 e que era
+   * o valor inventado.)_
+   *
+   * Informe este campo quando o total nao for o produto direto — desconto ja
+   * embutido, rateio de frete, arredondamento proprio.
    */
   valorTotal?: number;
 }
