@@ -78,6 +78,23 @@ describe('FaturamentoResource', () => {
       expect(dbx.query.mock.calls[1][0]).toContain('TGFCAB');
     });
 
+    it.each([
+      ['linha ausente em TGFCAB (leitura vazia nao autoriza faturar — I4/G2)', []],
+      ['PENDENTE vazio', [{ PENDENTE: '', STATUSNOTA: 'L' }]],
+      ['PENDENTE com valor desconhecido', [{ PENDENTE: 'X', STATUSNOTA: 'L' }]],
+    ])('guard PENDENTE fecha em %s, nao so em N', async (_caso, cab) => {
+      const dbx = {
+        query: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce(cab),
+      } as unknown as DbExplorerResource & { query: ReturnType<typeof vi.fn> };
+      const http = createMockHttp();
+      const out = await new FaturamentoResource(http, dbx).faturar({
+        nunotaPedido: 1889309,
+        codigoTipoOperacao: 1101,
+      });
+      expect(out).toEqual({ faturado: false, nunotaNota: null, motivo: 'NAO_PENDENTE' });
+      expect(http.gatewayCall).not.toHaveBeenCalled();
+    });
+
     it('fatura e devolve a 1101 lida no read-back pos-chamada', async () => {
       const dbx = {
         query: vi
@@ -113,6 +130,35 @@ describe('FaturamentoResource', () => {
           codigoTipoOperacao: 1101,
         }),
       ).rejects.toMatchObject({ code: 'FATURAR_DESFECHO_INDETERMINADO' });
+    });
+
+    it('os dois read-backs sao SELECT puro e filtram pelo nunotaPedido recebido', async () => {
+      const dbx = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([{ PENDENTE: 'S', STATUSNOTA: 'L' }])
+          .mockResolvedValueOnce([varRow('1889311')]),
+      } as unknown as DbExplorerResource & { query: ReturnType<typeof vi.fn> };
+      const http = createMockHttp();
+      http.gatewayCall.mockResolvedValue({});
+      await new FaturamentoResource(http, dbx).faturar({
+        nunotaPedido: 1889309,
+        codigoTipoOperacao: 1101,
+      });
+      const sqlVar = dbx.query.mock.calls[0][0] as string;
+      const sqlCab = dbx.query.mock.calls[1][0] as string;
+      // SELECT puro e sem `;`: o chokepoint da D2.1 recusa o resto, mas o SQL
+      // montado aqui tambem tem de ser verificavel sem depender dele.
+      for (const sql of [sqlVar, sqlCab]) {
+        expect(sql).toMatch(/^SELECT\b/);
+        expect(sql).not.toContain(';');
+      }
+      // Sem o WHERE com o NUNOTA recebido, o guard decidiria pelo estado de
+      // OUTRO pedido — a primeira linha que a tabela devolvesse.
+      expect(sqlVar).toMatch(/\bWHERE\s+V\.NUNOTAORIG\s*=\s*1889309\s*$/);
+      expect(sqlCab).toMatch(/\bWHERE\s+NUNOTA\s*=\s*1889309\s*$/);
+      expect(dbx.query.mock.calls[2][0]).toBe(sqlVar);
     });
 
     it('o corpo do gateway vem de buildFaturarWizardPayload, nunca montado inline', async () => {
@@ -183,6 +229,61 @@ describe('FaturamentoResource', () => {
       expect(dbx.query).toHaveBeenCalledTimes(3);
     });
 
+    it.each([
+      [
+        'a recusa embutida numa frase maior (regex ancorada)',
+        new GatewayError(
+          'Erro ao faturar: o item X nao esta pendente. Estoque insuficiente.',
+          'SelecaoDocumentoSP.faturar',
+        ),
+      ],
+      [
+        'a mensagem certa vinda de OUTRO serviceName',
+        new GatewayError('O pedido 544437 nao esta pendente.', 'CACSP.confirmarNota'),
+      ],
+    ])('faturar NAO trata como JA_FATURADO: %s', async (_caso, erro) => {
+      const dbx = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([{ PENDENTE: 'S', STATUSNOTA: 'L' }])
+          .mockResolvedValueOnce([varRow('1889311')]),
+      } as unknown as DbExplorerResource & { query: ReturnType<typeof vi.fn> };
+      const http = createMockHttp();
+      http.gatewayCall.mockRejectedValue(erro);
+      await expect(
+        new FaturamentoResource(http, dbx).faturar({
+          nunotaPedido: 1889309,
+          codigoTipoOperacao: 1101,
+        }),
+      ).rejects.toBe(erro);
+      // Recusa de NEGOCIO fora da forma medida nao gasta read-back: o comando
+      // nao foi aceito, nao ha o que consultar.
+      expect(dbx.query).toHaveBeenCalledTimes(2);
+    });
+
+    it('a mensagem certa num TimeoutError segue o caminho TIMEOUT, nao vira JA_FATURADO', async () => {
+      const erro = new TimeoutError('O pedido 544437 nao esta pendente.', { timeoutMs: 30000 });
+      const dbx = {
+        query: vi
+          .fn()
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([{ PENDENTE: 'S', STATUSNOTA: 'L' }])
+          .mockResolvedValueOnce([]), // TGFVAR vazio: nada provado
+      } as unknown as DbExplorerResource & { query: ReturnType<typeof vi.fn> };
+      const http = createMockHttp();
+      http.gatewayCall.mockRejectedValue(erro);
+      // `instanceof GatewayError` e o que separa recusa (HTTP 200 com erro no
+      // corpo) de desfecho desconhecido — texto igual nao muda a camada.
+      await expect(
+        new FaturamentoResource(http, dbx).faturar({
+          nunotaPedido: 1889309,
+          codigoTipoOperacao: 1101,
+        }),
+      ).rejects.toBe(erro);
+      expect(dbx.query).toHaveBeenCalledTimes(3);
+    });
+
     it('TIMEOUT nao vira terminal: rele TGFVAR e propaga se ainda vazio', async () => {
       const dbx = {
         query: vi
@@ -243,6 +344,18 @@ describe('FaturamentoResource', () => {
       } as unknown as DbExplorerResource & { query: ReturnType<typeof vi.fn> };
       const out = await new FaturamentoResource(createMockHttp(), dbx).consultarVar(1889309);
       expect(out).toEqual([{ nunota: 1889311, sequencia: 1, sequenciaOrig: 2, qtdAtendida: 4 }]);
+    });
+
+    it.each([
+      ['NUNOTA fracionaria', { NUNOTA: '1.5' }],
+      ['SEQUENCIA vazia', { SEQUENCIA: '' }],
+    ])('coluna inteira invalida lanca: %s', async (_caso, override) => {
+      const dbx = {
+        query: vi.fn().mockResolvedValue([{ ...varRow('1889311'), ...override }]),
+      } as unknown as DbExplorerResource & { query: ReturnType<typeof vi.fn> };
+      await expect(
+        new FaturamentoResource(createMockHttp(), dbx).consultarVar(1889309),
+      ).rejects.toMatchObject({ code: 'FATURAR_VAR_INVALIDA' });
     });
 
     it('QTDATENDIDA nao numerica lanca, nunca vira 0 nem NaN', async () => {
