@@ -137,7 +137,11 @@ export interface Volume {
 }
 
 /**
- * Volume de um produto lido de `TGFVOA` (entidade `VolumeProduto` do Gateway).
+ * Volume de um produto lido de `TGFVOA` por SQL (`dbExplorer.query`).
+ *
+ * A rota de Gateway (`CRUDServiceProvider.loadRecords` com
+ * `rootEntity: 'VolumeProduto'`) era premissa e foi REFUTADA no sandbox em
+ * 2026-09-11: `Erro interno (NPE)`, 0 linhas (RD-7).
  *
  * `quantidade` e o fator de conversao un/volume; `lastro` x `camadas` da
  * caixas por palete. Cadastro incompleto e comum (M57: so 38,4% dos PA ativos

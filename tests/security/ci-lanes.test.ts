@@ -318,7 +318,11 @@ describe('lane WMS — travas estruturais', () => {
     // Na 1a execucao real a unica impressao vivia dentro do ramo de read-back e
     // a lane terminou sem o numero. Agora o `spent()` e lido fora de qualquer
     // template de log, e antes do teardown.
-    expect(codigo.indexOf('orcamento.spent()')).toBeLessThan(
+    // `indexOf` de algo APAGADO devolve -1, que e menor que tudo: a comparacao
+    // de ordem sozinha nao pega ausencia (mutacao e2 do review 3). A presenca
+    // vem primeiro, explicita.
+    expect(codigo).toMatch(/const gastas = orcamento\.spent\(\)/);
+    expect(codigo.indexOf('const gastas = orcamento.spent()')).toBeLessThan(
       codigo.indexOf('await teardownPorId()'),
     );
   });
@@ -344,20 +348,31 @@ describe('lane WMS — travas estruturais', () => {
     expect(cru).toContain('STATUSNOTA=AUSENTE');
   });
 
-  it('passo 8: so recusa de NEGOCIO vira skip; teto e transporte fazem throw', () => {
-    expect(codigo).toMatch(/classifyFailure\(falha\) !== 'NEGOCIO'/);
+  it('passo 3: erro pos-escrita recupera o id e FALHA a lane (nunca vira skip)', () => {
+    expect(codigo).toMatch(/falha = erro;/);
     expect(codigo).toMatch(/throw falha/);
-    // A assercao do passo 8 fica FORA do `try`: dentro dele, `expect` vermelho
-    // viraria SKIP verde. Prova pela posicao — `lastIndexOf` porque o passo 3
-    // usa a mesma assercao antes; a ULTIMA ocorrencia e a do passo 8.
+    // A assercao fica FORA do `try`: dentro dele, um `expect` vermelho seria
+    // engolido pelo `catch`. Prova pela posicao.
     expect(codigo.indexOf('falha = erro;')).toBeLessThan(
       codigo.lastIndexOf('expect(codigoPedido).toBeGreaterThan(0)'),
     );
+    // NEGATIVA, fonte cru: nenhum passo pode transformar recusa em skip verde.
+    expect(cru).not.toMatch(/ctx\.skip/);
   });
 
-  it('recupera por AD_NUMPEDIDO antes de dar veredito no passo 8 (I3/I11)', () => {
+  it('recupera por AD_NUMPEDIDO antes de propagar o erro (I3/I11)', () => {
     expect(codigo).toMatch(/SELECT NUNOTA FROM TGFCAB WHERE AD_NUMPEDIDO/);
-    expect(codigo.indexOf('WHERE AD_NUMPEDIDO')).toBeLessThan(codigo.lastIndexOf('ctx.skip('));
+    expect(codigo.indexOf('WHERE AD_NUMPEDIDO')).toBeLessThan(codigo.indexOf('throw falha'));
+  });
+
+  it('manda o cabecalho inteiro medido, com CODNAT e PERCDESC (D-14)', () => {
+    // As duas chaves que o ERP exigiu, uma por rodada: sem trava, apagar
+    // qualquer uma volta a reprovar a lane so na execucao real.
+    expect(codigo).toMatch(/CABECALHO_REFERENCIA_06_09/);
+    expect(codigo).toMatch(/CODNAT: '01010101'/);
+    expect(codigo).toMatch(/PERCDESC: '0'/);
+    // A lane nunca manda `L` — o cabecalho de referencia veio de um spike que usava.
+    expect(codigo).not.toMatch(/STATUSNOTA: 'L'/);
   });
 
   it('registra id so depois de validar inteiro positivo', () => {

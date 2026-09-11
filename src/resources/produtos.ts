@@ -86,9 +86,11 @@ type LinhaVolume = Record<string, string>;
 function parseCodProdEstrito(valor: string | undefined): number {
   const texto = (valor ?? '').trim();
   const numero = Number(texto);
-  if (texto === '' || !Number.isFinite(numero)) {
+  // `'0'` tambem lanca: passa pelo `Number.isFinite`, mas CODPROD 0 nao existe
+  // — aceita-lo seria justamente inventar o produto que a guarda evita.
+  if (texto === '' || !Number.isFinite(numero) || numero <= 0) {
     throw new SankhyaError(
-      'produtos.volumesProduto: coluna CODPROD veio vazia ou nao numerica em TGFVOA. Nenhum 0 foi inventado — 0 seria um produto que nao existe.',
+      'produtos.volumesProduto: coluna CODPROD veio vazia, nao numerica ou <= 0 em TGFVOA. Nenhum 0 foi inventado — 0 seria um produto que nao existe.',
       'PARSE_ERROR',
     );
   }
@@ -408,13 +410,18 @@ export class ProdutosResource {
    * sandbox: 2 de 2 chamadas devolveram `GatewayError: Erro interno (NPE)`
    * (`serviceName CRUDServiceProvider.loadRecords`, transactionId
    * `B13E2C8D39AEA4CE10EAE94BCF73F6FC`), com 0 linhas e 0 colunas. M54 sempre
-   * foi medido por SQL; e por SQL que se le.
+   * foi medido por SQL; e por SQL que se le. Medido verde na lane em 2026-09-11:
+   * 13609 devolve `{ quantidade: 72, lastro: 12, camadas: 4 }` (a), com o
+   * `ORDER BY CODVOL` desta consulta.
    *
-   * Uma chamada, sem paginacao: o `SELECT` devolve as linhas do produto de uma
-   * vez e `dbExplorer.query` nao expoe teto de linhas nem sinal de truncamento
-   * (`src/resources/db-explorer.ts:74-105`) — nao ha o que honrar, e por isso
-   * tambem nao ha `INCOMPLETE_READ` aqui. Volume por produto e da ordem de
-   * unidades.
+   * Uma chamada, sem paginacao — e aqui a afirmacao e do CLIENTE, nao do
+   * servidor: `dbExplorer.query` nao expoe teto de linhas nem flag de
+   * truncamento (`src/resources/db-explorer.ts:74-105`), e **nenhum spike mediu
+   * `DbExplorerSP.executeQuery` sem `OFFSET/FETCH`** — os censos sempre
+   * paginaram (`censos.ts:95,188`). O que torna o risco nulo na pratica e o
+   * tamanho do dado: `TGFVOA` tem **no maximo 2 linhas por produto** nos 513 PA
+   * do censo T0-3. Por isso nao ha `INCOMPLETE_READ` aqui; se um dia o servidor
+   * truncar, sera preciso medir e paginar.
    *
    * Cadastro incompleto e comum (M57: so 38,4% dos PA ativos com
    * `QUANTIDADE > 1`), entao produto sem volume devolve `[]` **sem lancar** — a

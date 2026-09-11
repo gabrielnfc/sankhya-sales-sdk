@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
-import { classifyFailure } from '../../src/core/failure-classification.js';
 import { datasetRecord } from '../../src/resources/dataset.js';
 import {
   type CallBudget,
@@ -82,12 +81,41 @@ const TIPMOV = 'P';
 const CODPROD_ITEM = 10051;
 const CODLOCALORIG = 30301;
 /**
- * Natureza da operacao. NAO e chave tipada do cabecalho — entra por
- * `camposExtras`. Sem ela o ERP recusa: `A Natureza deve ser informada.` +
- * `O parametro 'EXIGNATCFR' esta ligado.` (CORE_E00899), medido na 1a execucao
- * da lane. Valor do cabecalho aceito em `spike-raw/faturamento/ped.ts:8`.
+ * Cabecalho INTEIRO que o ERP aceitou em 2026-09-06, menos as 11 chaves que a
+ * D1.2 tipa — estas ficam nos campos tipados de `incluirNotaGateway` e citar
+ * qualquer uma aqui lanca (guarda de colisao, `src/resources/pedidos.ts:41-53`).
+ *
+ * Proveniencia: `spike-raw/faturamento/ped.ts:8`, valores literais. Decisao
+ * D-14: a lane para de descobrir o "minimo" campo a campo. Tres execucoes
+ * mediram que o ERP revela UMA exigencia por rodada — primeiro a natureza
+ * (`CORE_E00899`, `EXIGNATCFR`), depois o percentual de desconto
+ * (`CORE_E03235`) — e cada rodada custa ~6 chamadas. Com o cabecalho inteiro a
+ * lane volta a medir o que interessa: o caminho ponta a ponta.
+ *
+ * Duas diferencas deliberadas em relacao ao spike:
+ * - `STATUSNOTA` NAO vem daqui. O spike usou `'L'`; esta suite nunca libera —
+ *   objeto em `L` e residuo permanente (T0-4). O campo e tipado e vale `'A'`.
+ * - `DTPREVENT` usa a data corrente, nao a data fixa do spike.
  */
-const CODNAT = '01010101';
+const CABECALHO_REFERENCIA_06_09: Record<string, string | number> = {
+  CODCONTATO: '1',
+  VLRDESCTOT: 0.0,
+  VLRNOTA: 10.0,
+  AD_MARKET_PLACE: 'Shopify.EC.V1',
+  VLRFRETE: 0.0,
+  AD_FRETEECOMMERCE: 0.0,
+  CIF_FOB: 'C',
+  APROVADO: 'S',
+  PERCDESC: '0',
+  CODPARCTRANSP: '138422',
+  AD_CODRASTREIO: '',
+  AD_URLRASTREIO: '',
+  CODCONTATOENTREGA: '1',
+  VLRDESTAQUE: 0.0,
+  CODCENCUS: '0102002',
+  CODNAT: '01010101',
+  AD_STATUSPED: 'P',
+};
 /** Produto com volume cadastrado completo no sandbox (M54). */
 const CODPROD_VOLUME = 13609;
 
@@ -97,6 +125,7 @@ const hhmm = `${dois(agora.getHours())}${dois(agora.getMinutes())}`;
 /** Marca tudo que esta execucao criou: `AD_NUMPEDIDO`, `OBSERVACAO` e `CONTROLE`. */
 const PREFIXO = `SDK-T-${hhmm}`;
 const DTNEG = `${dois(agora.getDate())}/${dois(agora.getMonth() + 1)}/${agora.getFullYear()} ${dois(agora.getHours())}:${dois(agora.getMinutes())}:${dois(agora.getSeconds())}`;
+const DATA_HOJE = `${dois(agora.getDate())}/${dois(agora.getMonth() + 1)}/${agora.getFullYear()}`;
 
 /** Teto da lane. O numero vive em `_call-budget.ts` e e assertado no CI de PR. */
 const orcamento: CallBudget = callBudget(TETO_CHAMADAS);
@@ -286,31 +315,51 @@ describe.skipIf(!habilitada)('Lane WMS — sandbox Sankhya (opt-in duplo)', () =
   });
 
   it('3 — incluirNotaGateway abre pedido em A com AD_NUMPEDIDO prefixado', async () => {
-    const { codigoPedido } = await sankhya.pedidos.incluirNotaGateway({
-      codigoCliente: CODPARC,
-      dataNegociacao: DTNEG,
-      codigoTipoOperacao: CODTIPOPER,
-      codigoTipoNegociacao: CODTIPVENDA,
-      codigoVendedor: CODVEND,
-      codigoEmpresa: CODEMP,
-      tipoMovimento: TIPMOV,
-      statusNota: 'A',
-      numeroPedidoExterno: PREFIXO,
-      observacao: `${PREFIXO} lane WMS do SDK — descartavel`,
-      camposExtras: { CODNAT },
-      itens: [
-        {
-          codigoProduto: CODPROD_ITEM,
-          quantidade: 1,
-          valorUnitario: 10,
-          unidade: 'UN',
-          codigoLocalOrigem: CODLOCALORIG,
-        },
-      ],
-    });
+    // Erro NAO prova que nada foi criado (I3/I11): se a chamada falhar, o id e
+    // recuperado pelo NOSSO marcador antes de qualquer veredito, para entrar no
+    // teardown. Depois disso o erro sobe — este passo FALHA, nunca vira skip.
+    let codigoPedido: number | undefined;
+    let falha: unknown;
 
-    // Registra ANTES de qualquer assercao: id nao registrado e residuo eterno.
+    try {
+      codigoPedido = (
+        await sankhya.pedidos.incluirNotaGateway({
+          codigoCliente: CODPARC,
+          dataNegociacao: DTNEG,
+          codigoTipoOperacao: CODTIPOPER,
+          codigoTipoNegociacao: CODTIPVENDA,
+          codigoVendedor: CODVEND,
+          codigoEmpresa: CODEMP,
+          tipoMovimento: TIPMOV,
+          statusNota: 'A',
+          numeroPedidoExterno: PREFIXO,
+          observacao: `${PREFIXO} lane WMS do SDK — descartavel`,
+          camposExtras: { ...CABECALHO_REFERENCIA_06_09, DTPREVENT: DATA_HOJE },
+          itens: [
+            {
+              codigoProduto: CODPROD_ITEM,
+              quantidade: 1,
+              valorUnitario: 10,
+              unidade: 'UN',
+              codigoLocalOrigem: CODLOCALORIG,
+            },
+          ],
+        })
+      ).codigoPedido;
+    } catch (erro) {
+      falha = erro;
+    }
+
+    // Teto estourado nao gasta mais chamada com a recuperacao.
+    if (falha !== undefined && !ehErroDeTeto(falha)) {
+      const criados = await sankhya.dbExplorer.query<{ NUNOTA: string }>(
+        `SELECT NUNOTA FROM TGFCAB WHERE AD_NUMPEDIDO = '${PREFIXO}'`,
+      );
+      for (const linha of criados) registrarPedido(Number(linha.NUNOTA));
+    }
     registrarPedido(codigoPedido);
+
+    if (falha !== undefined) throw falha;
 
     expect(Number.isInteger(codigoPedido)).toBe(true);
     expect(codigoPedido).toBeGreaterThan(0);
@@ -360,77 +409,20 @@ describe.skipIf(!habilitada)('Lane WMS — sandbox Sankhya (opt-in duplo)', () =
   // volta e apagar este bloco e medir de novo.
   it.skip('7 — loadRecords rootEntity VolumeProduto: REFUTADA no sandbox (Erro interno (NPE), transactionId B13E2C8D39AEA4CE10EAE94BCF73F6FC)', () => {});
 
-  it('8 — cabecalho minimo (11 tipadas + CODNAT) aceito por CACSP.incluirNota (premissa (b) da D1.2)', async (ctx) => {
-    // As chaves TIPADAS + `CODNAT`, e nada mais: sem os outros 17 campos crus do
-    // payload do 4midware. O "minimo" ganhou CODNAT porque a 1a execucao da lane
-    // mediu a recusa `A Natureza deve ser informada.` / `O parametro
-    // 'EXIGNATCFR' esta ligado.` (CORE_E00899) com as 11 tipadas sozinhas — logo
-    // o minimo e >= 12, e e isso que este passo mede agora.
-    //
-    // Este passo NAO pode falhar em silencio nem "passar" por SKIP:
-    // - recusa de NEGOCIO (o ERP entendeu e disse nao) = premissa REFUTADA, e e
-    //   a unica saida que vira `ctx.skip`;
-    // - teto estourado, timeout, auth = FALHA da lane, nao medicao (I11: timeout
-    //   e desfecho DESCONHECIDO, nunca "refutada");
-    // - a assercao fica FORA do `try`, senao um `expect` vermelho viraria SKIP verde.
-    const numeroExterno = `${PREFIXO}-MIN`;
-    let codigoPedido: number | undefined;
-    let falha: unknown;
-
-    try {
-      codigoPedido = (
-        await sankhya.pedidos.incluirNotaGateway({
-          codigoCliente: CODPARC,
-          dataNegociacao: DTNEG,
-          codigoTipoOperacao: CODTIPOPER,
-          codigoTipoNegociacao: CODTIPVENDA,
-          codigoVendedor: CODVEND,
-          codigoEmpresa: CODEMP,
-          tipoMovimento: TIPMOV,
-          statusNota: 'A',
-          numeroPedidoExterno: numeroExterno,
-          camposExtras: { CODNAT },
-          itens: [
-            {
-              codigoProduto: CODPROD_ITEM,
-              quantidade: 1,
-              valorUnitario: 10,
-              unidade: 'UN',
-              codigoLocalOrigem: CODLOCALORIG,
-            },
-          ],
-        })
-      ).codigoPedido;
-    } catch (erro) {
-      falha = erro;
-    }
-
-    // Erro NAO prova que nada foi criado (I3/I11). A prova e ler pelo nosso
-    // proprio marcador: o que existir com este AD_NUMPEDIDO nasceu aqui e tem
-    // de entrar no teardown ANTES de qualquer veredito.
-    if (falha !== undefined && !ehErroDeTeto(falha)) {
-      const criados = await sankhya.dbExplorer.query<{ NUNOTA: string }>(
-        `SELECT NUNOTA FROM TGFCAB WHERE AD_NUMPEDIDO = '${numeroExterno}'`,
-      );
-      for (const linha of criados) registrarPedido(Number(linha.NUNOTA));
-    }
-    registrarPedido(codigoPedido);
-
-    if (falha !== undefined) {
-      const motivo = falha instanceof Error ? falha.message : String(falha);
-      // Teto e transporte nao sao medicao: a lane falha e alguem olha.
-      if (ehErroDeTeto(falha) || classifyFailure(falha) !== 'NEGOCIO') throw falha;
-
-      console.log(
-        `[wms-sandbox] (b) D1.2 REFUTADA — cabecalho minimo recusado pelo ERP: ${motivo}`,
-      );
-      ctx.skip(`cabecalho minimo recusado pelo ERP (recusa de negocio): ${motivo}`);
-      return;
-    }
-
-    console.log(
-      `[wms-sandbox] (b) D1.2 CONFIRMADA — cabecalho minimo (11 chaves tipadas) aceito, NUNOTA ${String(codigoPedido)}.`,
-    );
-    expect(codigoPedido).toBeGreaterThan(0);
-  });
+  // 8 — MEDIDO E REFUTADO DUAS VEZES; virou registro, nao chama nada.
+  //
+  // A pergunta era "qual o cabecalho MINIMO que `CACSP.incluirNota` aceita".
+  // Duas rodadas, duas recusas de negocio, uma exigencia revelada por vez:
+  //   1) com as 11 chaves tipadas: `Erro na nota. A Natureza deve ser
+  //      informada.` + `O parametro 'EXIGNATCFR' esta ligado.` (CORE_E00899);
+  //   2) com 12 (as 11 + CODNAT): `O campo 'Perc. desconto' deve ser
+  //      informado.` (CORE_E03235, transactionId
+  //      BF064C4FBAA7537C3DAB798E39B0B56B).
+  // Logo o minimo e >= 13 e inclui CODNAT e o percentual de desconto.
+  //
+  // Descobrir o resto campo a campo custa ~6 chamadas por rodada e revela UMA
+  // exigencia de cada vez (D-14): a lane passou a mandar o cabecalho inteiro ja
+  // aceito (ver CABECALHO_REFERENCIA_06_09) e deixou de medir o minimo. Quem
+  // quiser o numero exato faz um spike dedicado, com orcamento proprio.
+  it.skip("8 — cabecalho minimo de CACSP.incluirNota: REFUTADA 2x (>= 13 chaves; faltaram CODNAT por 'A Natureza deve ser informada.' e o percentual por \"O campo 'Perc. desconto' deve ser informado.\")", () => {});
 });

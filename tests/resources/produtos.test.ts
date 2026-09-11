@@ -429,6 +429,28 @@ describe('ProdutosResource', () => {
     expect(dbx.query).not.toHaveBeenCalled();
   });
 
+  it('recusa codigoProduto zero e negativo (o `> 0` do guard)', async () => {
+    const { produtos, dbx } = produtosComDbx([]);
+
+    await expect(produtos.volumesProduto(0)).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR',
+      message: expect.stringMatching(/positivo/i),
+    });
+    await expect(produtos.volumesProduto(-13609)).rejects.toThrow(/positivo/i);
+    expect(dbx.query).not.toHaveBeenCalled();
+  });
+
+  it("lanca PARSE_ERROR quando CODPROD da linha e '0' (0 nao e produto)", async () => {
+    const { produtos } = produtosComDbx([
+      { CODPROD: '0', CODVOL: 'CX', QUANTIDADE: '1', LASTRO: '0', CAMADAS: '0', ATIVO: 'S' },
+    ]);
+
+    await expect(produtos.volumesProduto(13609)).rejects.toMatchObject({
+      code: 'PARSE_ERROR',
+      message: expect.stringMatching(/CODPROD/),
+    });
+  });
+
   it('sem a dep dbExplorer lanca citando a dep faltante', async () => {
     await expect(new ProdutosResource(createMockHttp()).volumesProduto(13609)).rejects.toThrow(
       /dbExplorer/,
