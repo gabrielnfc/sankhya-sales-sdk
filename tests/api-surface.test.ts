@@ -30,7 +30,7 @@ describe('api-surface', () => {
       expect(sdk.isTimeoutError).toBeDefined();
     });
 
-    it('exports all 11 resource classes', () => {
+    it('exports all 12 resource classes', () => {
       expect(sdk.ClientesResource).toBeDefined();
       expect(sdk.VendedoresResource).toBeDefined();
       expect(sdk.ProdutosResource).toBeDefined();
@@ -42,6 +42,7 @@ describe('api-surface', () => {
       expect(sdk.FiscalResource).toBeDefined();
       expect(sdk.GatewayResource).toBeDefined();
       expect(sdk.MetadataResource).toBeDefined();
+      expect(sdk.DbExplorerResource).toBeDefined();
     });
 
     it('exports enum values', () => {

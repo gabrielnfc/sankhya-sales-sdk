@@ -9,3 +9,4 @@ export { CadastrosResource } from './cadastros.js';
 export { FiscalResource } from './fiscal.js';
 export { GatewayResource } from './gateway.js';
 export { MetadataResource } from './metadata.js';
+export { DbExplorerResource } from './db-explorer.js';
