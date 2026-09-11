@@ -12,6 +12,7 @@ import {
   FinanceirosResource,
   FiscalResource,
   GatewayResource,
+  LotesResource,
   MetadataResource,
   NotasResource,
   PedidosResource,
@@ -60,6 +61,7 @@ export class SankhyaClient {
   private _notas?: NotasResource;
   private _conferencia?: ConferenciaResource;
   private _faturamento?: FaturamentoResource;
+  private _lotes?: LotesResource;
 
   /**
    * Cria uma instancia do SDK Sankhya.
@@ -105,9 +107,17 @@ export class SankhyaClient {
     return this._vendedores;
   }
 
-  /** Acesso ao recurso de produtos. */
+  /**
+   * Acesso ao recurso de produtos.
+   *
+   * Recebe o `dataset` e o `dbExplorer` deste mesmo client: `setTipoControle`
+   * prova saldo e reserva zero por `SELECT` global antes de gravar (M103).
+   */
   get produtos(): ProdutosResource {
-    this._produtos ??= new ProdutosResource(this.http);
+    this._produtos ??= new ProdutosResource(this.http, {
+      dataset: this.dataset,
+      dbExplorer: this.dbExplorer,
+    });
     return this._produtos;
   }
 
@@ -117,9 +127,14 @@ export class SankhyaClient {
     return this._precos;
   }
 
-  /** Acesso ao recurso de estoque. */
+  /**
+   * Acesso ao recurso de estoque.
+   *
+   * Recebe o `dbExplorer` deste mesmo client: `porLote` le `TGFEST` direto, que
+   * a REST v1 nao expoe.
+   */
   get estoque(): EstoqueResource {
-    this._estoque ??= new EstoqueResource(this.http);
+    this._estoque ??= new EstoqueResource(this.http, { dbExplorer: this.dbExplorer });
     return this._estoque;
   }
 
@@ -205,6 +220,17 @@ export class SankhyaClient {
   get faturamento(): FaturamentoResource {
     this._faturamento ??= new FaturamentoResource(this.http, this.dbExplorer);
     return this._faturamento;
+  }
+
+  /**
+   * Entrada (TOP 1813) e baixa (TOP 1811) de estoque por lote.
+   *
+   * Recebe o `dataset` e o `notas` deste mesmo client: a escrita e toda
+   * Dataset, e a entrada so confirma **depois** de gravar as datas (M97).
+   */
+  get lotes(): LotesResource {
+    this._lotes ??= new LotesResource(this.dataset, this.notas);
+    return this._lotes;
   }
 
   /**

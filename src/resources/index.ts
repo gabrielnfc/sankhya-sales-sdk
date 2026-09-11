@@ -14,3 +14,4 @@ export { DatasetResource, datasetRecord } from './dataset.js';
 export { NotasResource } from './notas.js';
 export { ConferenciaResource } from './conferencia.js';
 export { FaturamentoResource } from './faturamento.js';
+export { LotesResource } from './lotes.js';
