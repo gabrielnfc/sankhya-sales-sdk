@@ -84,6 +84,23 @@ describe('DatasetResource', () => {
     expect(out).toEqual({ total: 1, result: [['1889349', '281956']] });
   });
 
+  // Item 2 do review (M10 sobreviveu): sem isto, um `false` fixo no payload
+  // passaria sem nenhum teste notar.
+  it('save leva standAlone: true explicito ao payload', async () => {
+    const http = createMockHttp();
+    http.gatewayCall.mockResolvedValue({ total: '1', result: [['1889349']] });
+
+    await new DatasetResource(http).save({
+      entityName: 'CabecalhoNota',
+      fields: ['NUNOTA'],
+      records: [datasetRecord(['NUNOTA'], { set: { NUNOTA: '1889349' } })],
+      standAlone: true,
+    });
+
+    const body = http.gatewayCall.mock.calls[0][2] as { standAlone: boolean };
+    expect(body.standAlone).toBe(true);
+  });
+
   it('save aceita insercao multi-record sem pk (entrada 1813 com 2 lotes, M88)', async () => {
     const http = createMockHttp();
     http.gatewayCall.mockResolvedValue({ total: '2', result: [['1'], ['2']] });
@@ -147,6 +164,92 @@ describe('DatasetResource', () => {
     ).rejects.toThrow(/total/);
   });
 
+  // Item 5 do review (MENOR): 0 records nao foi medido no Sankhya — recusa antes
+  // da rede em vez de deixar o ERP decidir (R2-adjacente).
+  it('save recusa records vazio antes da rede (efeito de 0 records nao medido)', async () => {
+    const http = createMockHttp();
+    await expect(
+      new DatasetResource(http).save({
+        entityName: 'CabecalhoNota',
+        fields: ['NUNOTA'],
+        records: [],
+      }),
+    ).rejects.toThrow(/records/);
+    expect(http.gatewayCall).not.toHaveBeenCalled();
+  });
+
+  // Item 6 do review (MENOR): `{}` e a forma medida de campo vazio do Gateway
+  // (src/core/parse-utils.ts:14-17) — virar `'[object Object]'` seria inventar valor.
+  it('save normaliza celula {} (campo vazio do Gateway) para string vazia', async () => {
+    const http = createMockHttp();
+    http.gatewayCall.mockResolvedValue({ total: '1', result: [['1889349', {}, null]] });
+
+    const out = await new DatasetResource(http).save({
+      entityName: 'CabecalhoNota',
+      fields: ['NUNOTA'],
+      records: [datasetRecord(['NUNOTA'], { set: { NUNOTA: '1889349' } })],
+    });
+
+    expect(out.result).toEqual([['1889349', '', '']]);
+  });
+
+  it('save lanca quando uma celula e objeto nao vazio (nunca "[object Object]")', async () => {
+    const http = createMockHttp();
+    http.gatewayCall.mockResolvedValue({ total: '1', result: [[{ $: '1889349' }]] });
+
+    await expect(
+      new DatasetResource(http).save({
+        entityName: 'CabecalhoNota',
+        fields: ['NUNOTA'],
+        records: [datasetRecord(['NUNOTA'], { set: { NUNOTA: '1889349' } })],
+      }),
+    ).rejects.toThrow(/result\[0\]\[0\]/);
+  });
+
+  // Item 4 do review (M11/M12 sobreviveram): os ramos que o JSDoc vende como
+  // decisao I11 nao tinham teste.
+  it.each([
+    ['total: null', { total: null, result: [['1889349']] }],
+    ['total: string vazia', { total: '', result: [['1889349']] }],
+  ])('save lanca quando %s (safeParseNumber daria 0)', async (_nome, resposta) => {
+    const http = createMockHttp();
+    http.gatewayCall.mockResolvedValue(resposta);
+
+    await expect(
+      new DatasetResource(http).save({
+        entityName: 'CabecalhoNota',
+        fields: ['NUNOTA'],
+        records: [datasetRecord(['NUNOTA'], { set: { NUNOTA: '1889349' } })],
+      }),
+    ).rejects.toThrow(/total/);
+  });
+
+  it('save lanca quando result esta ausente com total presente (nunca [] silencioso)', async () => {
+    const http = createMockHttp();
+    http.gatewayCall.mockResolvedValue({ total: '1' });
+
+    await expect(
+      new DatasetResource(http).save({
+        entityName: 'CabecalhoNota',
+        fields: ['NUNOTA'],
+        records: [datasetRecord(['NUNOTA'], { set: { NUNOTA: '1889349' } })],
+      }),
+    ).rejects.toThrow(/result/);
+  });
+
+  it('save lanca PARSE_ERROR quando total nao e numero', async () => {
+    const http = createMockHttp();
+    http.gatewayCall.mockResolvedValue({ total: 'abc', result: [] });
+
+    await expect(
+      new DatasetResource(http).save({
+        entityName: 'CabecalhoNota',
+        fields: ['NUNOTA'],
+        records: [datasetRecord(['NUNOTA'], { set: { NUNOTA: '1889349' } })],
+      }),
+    ).rejects.toMatchObject({ code: 'PARSE_ERROR' });
+  });
+
   it('removeRecord envia pks e devolve void', async () => {
     const http = createMockHttp();
     http.gatewayCall.mockResolvedValue({});
@@ -162,6 +265,20 @@ describe('DatasetResource', () => {
       { entityName: 'CabecalhoNota', standAlone: false, pks: [{ NUNOTA: '1889349' }] },
       undefined,
     );
+  });
+
+  it('removeRecord leva standAlone: true explicito ao payload', async () => {
+    const http = createMockHttp();
+    http.gatewayCall.mockResolvedValue({});
+
+    await new DatasetResource(http).removeRecord({
+      entityName: 'CabecalhoNota',
+      pks: [{ NUNOTA: '1889349' }],
+      standAlone: true,
+    });
+
+    const body = http.gatewayCall.mock.calls[0][2] as { standAlone: boolean };
+    expect(body.standAlone).toBe(true);
   });
 
   it('removeRecord recusa lista de pks vazia (guarda contra apagar tudo)', async () => {
@@ -180,6 +297,33 @@ describe('DatasetResource', () => {
         pks: [{ NUNOTA: '1889349' }, {}],
       }),
     ).rejects.toThrow(/pk/);
+    expect(http.gatewayCall).not.toHaveBeenCalled();
+  });
+
+  // Item 1 do review (BLOQUEANTE): contar chaves nao basta — `JSON.stringify`
+  // (src/core/http.ts:272) descarta chave com valor `undefined`, e o servidor
+  // receberia `pks: [{}]`, o filtro vazio do incidente de R2/G3.
+  it.each([
+    ['valor undefined', { NUNOTA: undefined as unknown as string }],
+    ['string vazia', { NUNOTA: '' }],
+    ['so espacos', { NUNOTA: '   ' }],
+    ['valor null', { NUNOTA: null as unknown as string }],
+  ])('removeRecord recusa pk com %s (JSON.stringify apagaria a chave)', async (_nome, pk) => {
+    const http = createMockHttp();
+    await expect(
+      new DatasetResource(http).removeRecord({ entityName: 'CabecalhoNota', pks: [pk] }),
+    ).rejects.toThrow(/NUNOTA/);
+    expect(http.gatewayCall).not.toHaveBeenCalled();
+  });
+
+  it('removeRecord recusa pk invalida mesmo quando a primeira pk da lista e valida', async () => {
+    const http = createMockHttp();
+    await expect(
+      new DatasetResource(http).removeRecord({
+        entityName: 'ItemNota',
+        pks: [{ NUNOTA: '1889280' }, { NUNOTA: undefined as unknown as string }],
+      }),
+    ).rejects.toThrow(/NUNOTA/);
     expect(http.gatewayCall).not.toHaveBeenCalled();
   });
 

@@ -12,9 +12,30 @@ import type {
 } from '../types/dataset.js';
 import { GatewayResource } from './gateway.js';
 
-/** Celula do Dataset como string: `null`/`undefined` viram string vazia. */
-function cellToString(cell: unknown): string {
-  return cell === null || cell === undefined ? '' : String(cell);
+/**
+ * Celula da resposta do Dataset como string.
+ *
+ * `null`, `undefined` e `{}` viram string vazia — `{}` e a forma medida de campo
+ * vazio do Gateway (`src/core/parse-utils.ts:14-17`), e `String({})` daria
+ * `'[object Object]'`, um valor inventado. Qualquer outro objeto ou array
+ * **lanca**: forma nao medida nao virou dado aqui (divergencia declarada de
+ * `db-explorer.ts` da D2.1, que converte qualquer celula com `String()`; este
+ * recurso e escrita e prefere falhar alto).
+ *
+ * @param cell - Celula crua.
+ * @param where - Posicao na resposta, para a mensagem de erro (ex: `result[0][2]`).
+ * @throws {SankhyaError} `DATASET_SAVE_MALFORMED_RESPONSE` em objeto/array nao vazio.
+ */
+function cellToString(cell: unknown, where: string): string {
+  if (cell === null || cell === undefined) return '';
+  if (typeof cell === 'object') {
+    if (!Array.isArray(cell) && Object.keys(cell).length === 0) return '';
+    throw new SankhyaError(
+      `dataset.save: ${where} veio como objeto/array nao vazio, forma nao prevista para uma celula. Nenhum valor foi convertido — '[object Object]' seria um dado inventado.`,
+      'DATASET_SAVE_MALFORMED_RESPONSE',
+    );
+  }
+  return String(cell);
 }
 
 /**
@@ -26,6 +47,54 @@ function cellToString(cell: unknown): string {
  */
 function hasUsableTotal(total: unknown): boolean {
   return total !== undefined && total !== null && total !== '';
+}
+
+/** Descreve a FORMA de um valor invalido sem ecoar o valor em si. */
+function kindOf(value: unknown): string {
+  if (value === undefined) return 'undefined';
+  if (value === null) return 'null';
+  if (typeof value === 'string') return 'string vazia';
+  return typeof value;
+}
+
+/**
+ * Uma pk utilizavel: ao menos uma chave, e **todo** valor uma string nao vazia.
+ *
+ * Contar chaves nao basta. `JSON.stringify` (`src/core/http.ts:272`) descarta
+ * par com valor `undefined`, entao `{ NUNOTA: undefined }` tem `Object.keys`
+ * igual a 1 e chega ao servidor como `{}` — o filtro vazio que apaga a entidade
+ * inteira (R2, e o `undefined` em qualquer profundidade que G3 manda recusar).
+ * String vazia ou so espacos tem o mesmo efeito pratico no filtro.
+ *
+ * @param pk - Chave candidata.
+ * @param index - Posicao na lista, para a mensagem de erro.
+ * @param entityName - Entidade alvo, para a mensagem de erro.
+ * @throws {SankhyaError} `VALIDATION_ERROR` citando a chave culpada.
+ */
+function assertPkUsable(pk: unknown, index: number, entityName: string): void {
+  if (pk === null || typeof pk !== 'object' || Array.isArray(pk)) {
+    throw new SankhyaError(
+      `dataset.removeRecord: pks[${index}] nao e um objeto de chaves (recebido: ${kindOf(pk)}). Nenhuma chamada foi feita.`,
+      'VALIDATION_ERROR',
+    );
+  }
+
+  const entries = Object.entries(pk);
+  if (entries.length === 0) {
+    throw new SankhyaError(
+      `dataset.removeRecord: pks[${index}] nao tem nenhuma chave. Um filtro vazio apagaria todos os registros de ${entityName}. Nenhuma chamada foi feita.`,
+      'VALIDATION_ERROR',
+    );
+  }
+
+  for (const [key, value] of entries) {
+    if (typeof value !== 'string' || value.trim() === '') {
+      throw new SankhyaError(
+        `dataset.removeRecord: pks[${index}].${key} nao e uma string preenchida (recebido: ${kindOf(value)}). A serializacao descartaria a chave e o servidor receberia um filtro vazio, apagando todos os registros de ${entityName}. Nenhuma chamada foi feita.`,
+        'VALIDATION_ERROR',
+      );
+    }
+  }
 }
 
 /**
@@ -102,7 +171,9 @@ export class DatasetResource {
    * @param params - Entidade, campos, registros e `standAlone` (default `false`).
    * @param options - Opcoes de requisicao (timeout, `signal`).
    * @returns `total` convertido para numero e `result` com toda celula em string.
-   * @throws {SankhyaError} `DATASET_SAVE_MALFORMED_RESPONSE` se a resposta nao
+   * @throws {SankhyaError} `VALIDATION_ERROR` se `records` vier vazio (efeito de
+   * 0 registros nao medido — nenhuma chamada e feita);
+   * `DATASET_SAVE_MALFORMED_RESPONSE` se a resposta nao
    * trouxer `total` ou `result` em forma utilizavel (I11 — ambiguidade nunca
    * vira estado terminal em silencio); `PARSE_ERROR` se `total` nao for numero.
    * @throws {GatewayError} Em erro de negocio Sankhya.
@@ -118,6 +189,13 @@ export class DatasetResource {
    * ```
    */
   async save(params: DatasetSaveParams, options?: RequestOptions): Promise<DatasetSaveResult> {
+    if (!Array.isArray(params.records) || params.records.length === 0) {
+      throw new SankhyaError(
+        'dataset.save: records vazio. O efeito de um save com 0 registros nao foi medido no Sankhya — nenhuma chamada foi feita.',
+        'VALIDATION_ERROR',
+      );
+    }
+
     const raw = await this.http.gatewayCall<DatasetSaveRawResponse>(
       'mge',
       'DatasetSP.save',
@@ -152,7 +230,7 @@ export class DatasetResource {
           'DATASET_SAVE_MALFORMED_RESPONSE',
         );
       }
-      return row.map(cellToString);
+      return row.map((cell, position) => cellToString(cell, `result[${index}][${position}]`));
     });
 
     return { total: safeParseNumber(raw.total, 'DatasetSP.save.total'), result };
@@ -162,15 +240,17 @@ export class DatasetResource {
    * Remove registros via `DatasetSP.removeRecord`.
    *
    * Guarda contra "apagar tudo" (R2), verificada **antes** de tocar a rede:
-   * `pks` vazia e recusada, e cada pk precisa de ao menos uma chave — um `{}` na
-   * lista e um filtro vazio, que o servidor poderia interpretar como toda a
-   * entidade.
+   * `pks` vazia e recusada, cada pk precisa de ao menos uma chave, e **todo**
+   * valor precisa ser string nao vazia — `{ NUNOTA: undefined }` ou
+   * `{ NUNOTA: '' }` chegariam ao servidor como filtro vazio e apagariam a
+   * entidade inteira (G3: `undefined` em qualquer profundidade).
    *
    * @param params - Entidade, chaves a remover e `standAlone` (default `false`).
    * @param options - Opcoes de requisicao (timeout, `signal`).
    * @returns Nada: o servico nao devolve corpo util.
-   * @throws {SankhyaError} `VALIDATION_ERROR` se `pks` estiver vazia ou se
-   * alguma pk nao tiver chave — nesse caso nenhuma chamada e feita.
+   * @throws {SankhyaError} `VALIDATION_ERROR` se `pks` estiver vazia, se alguma
+   * pk nao tiver chave ou se algum valor nao for string preenchida (citando a
+   * chave culpada) — nesse caso nenhuma chamada e feita.
    * @throws {GatewayError} Em erro de negocio Sankhya.
    * @throws {AuthError} Se autenticacao falhar.
    * @example
@@ -190,12 +270,7 @@ export class DatasetResource {
     }
 
     for (const [index, pk] of params.pks.entries()) {
-      if (pk === null || typeof pk !== 'object' || Object.keys(pk).length === 0) {
-        throw new SankhyaError(
-          `dataset.removeRecord: pks[${index}] nao tem nenhuma chave. Um filtro vazio apagaria todos os registros de ${params.entityName}. Nenhuma chamada foi feita.`,
-          'VALIDATION_ERROR',
-        );
-      }
+      assertPkUsable(pk, index, params.entityName);
     }
 
     await this.http.gatewayCall<unknown>(
