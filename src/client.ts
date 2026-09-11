@@ -9,6 +9,7 @@ import {
   DatasetResource,
   DbExplorerResource,
   EstoqueResource,
+  FaturamentoResource,
   FinanceirosResource,
   FiscalResource,
   GatewayResource,
@@ -66,6 +67,7 @@ export class SankhyaClient {
   private _dataset?: DatasetResource;
   private _notas?: NotasResource;
   private _conferencia?: ConferenciaResource;
+  private _faturamento?: FaturamentoResource;
   private _lotes?: LotesResource;
 
   /**
@@ -219,6 +221,19 @@ export class SankhyaClient {
   get conferencia(): ConferenciaResource {
     this._conferencia ??= new ConferenciaResource(this.dataset, this.dbExplorer);
     return this._conferencia;
+  }
+
+  /**
+   * Faturamento de pedido pelo wizard (`SelecaoDocumentoSP.faturar`), com guard
+   * de estado antes e prova por read-back depois.
+   *
+   * Recebe o `dbExplorer` deste mesmo client: o guard le `TGFVAR` e
+   * `TGFCAB.PENDENTE` antes de mandar, e a NUNOTA devolvida vem de `TGFVAR`,
+   * nunca do HTTP 200 (M79/M81).
+   */
+  get faturamento(): FaturamentoResource {
+    this._faturamento ??= new FaturamentoResource(this.http, this.dbExplorer);
+    return this._faturamento;
   }
 
   /**
