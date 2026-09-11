@@ -54,9 +54,13 @@ function cellToString(cell: unknown, where: string): string {
  * fronteira externa nao vira silencio.
  */
 function ehMetadataRmd(cell: unknown): boolean {
-  return (
-    typeof cell === 'object' && cell !== null && !Array.isArray(cell) && Object.hasOwn(cell, '_rmd')
-  );
+  if (typeof cell !== 'object' || cell === null || Array.isArray(cell)) return false;
+  // EXATAMENTE a forma medida: uma unica chave, `_rmd`. Objeto hibrido
+  // (`{ _rmd, VLRTOT }`) nao e a metadata conhecida — descarta-lo jogaria fora
+  // um valor de campo em silencio, que e o oposto do que esta guarda existe
+  // para fazer. Forma nao prevista reprova (I2).
+  const chaves = Object.keys(cell);
+  return chaves.length === 1 && chaves[0] === '_rmd';
 }
 
 /**

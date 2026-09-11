@@ -274,6 +274,23 @@ describe('DatasetResource', () => {
     ).rejects.toMatchObject({ code: 'DATASET_SAVE_MALFORMED_RESPONSE' });
   });
 
+  it('save lanca quando a celula excedente e HIBRIDA (_rmd + campo)', async () => {
+    const http = createMockHttp();
+    http.gatewayCall.mockResolvedValue({
+      total: '1',
+      result: [['1889306', { _rmd: { provider: 'PRODUTORMP' }, VLRTOT: '10' }]],
+    });
+
+    // Descartar isto jogaria fora um valor de campo em silencio.
+    await expect(
+      new DatasetResource(http).save({
+        entityName: 'ItemNota',
+        fields: ['NUNOTA'],
+        records: [datasetRecord(['NUNOTA'], { set: { NUNOTA: '1889306' } })],
+      }),
+    ).rejects.toMatchObject({ code: 'DATASET_SAVE_MALFORMED_RESPONSE' });
+  });
+
   it('save lanca quando ha mais de uma celula excedente, mesmo com _rmd', async () => {
     const http = createMockHttp();
     http.gatewayCall.mockResolvedValue({

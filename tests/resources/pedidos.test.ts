@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GatewayError } from '../../src/core/errors.js';
 import type { HttpClient } from '../../src/core/http.js';
 import { PedidosResource } from '../../src/resources/pedidos.js';
-import type { FaturarPedidoInput } from '../../src/types/pedidos.js';
+import type { FaturarPedidoInput, ItemNotaGatewayInput } from '../../src/types/pedidos.js';
 
 function createMockHttp() {
   return {
@@ -1052,6 +1052,40 @@ describe('PedidosResource', () => {
       ).rejects.toMatchObject({ code: 'VALIDATION_ERROR', message: expect.stringMatching(campo) });
       expect(http.gatewayCall).not.toHaveBeenCalled();
     });
+
+    // Ramo `undefined` dos obrigatorios: o tipo exige number, mas o consumidor
+    // em JS puro nao tem tipo — e `undefined` em conta vira `NaN`, que iria ao
+    // ERP como a string 'NaN' (R9/I11).
+    it.each(['valorUnitario', 'quantidade'])(
+      'recusa %s ausente (consumidor sem tipagem)',
+      async (campo) => {
+        const http = createMockHttp();
+        const item: Record<string, unknown> = {
+          codigoProduto: 10077,
+          quantidade: 1,
+          valorUnitario: 10,
+          unidade: 'UN',
+        };
+        delete item[campo];
+
+        await expect(
+          new PedidosResource(http).incluirNotaGateway({
+            codigoCliente: 1,
+            dataNegociacao: '06/09/2026',
+            codigoTipoOperacao: 1001,
+            codigoTipoNegociacao: 200,
+            codigoVendedor: 50,
+            codigoEmpresa: 2,
+            tipoMovimento: 'P',
+            itens: [item as ItemNotaGatewayInput],
+          }),
+        ).rejects.toMatchObject({
+          code: 'VALIDATION_ERROR',
+          message: expect.stringMatching(new RegExp(`${campo}.*obrigatorio`)),
+        });
+        expect(http.gatewayCall).not.toHaveBeenCalled();
+      },
+    );
 
     // Arredondamento declarado: half-up para +infinito no meio centavo, e preco
     // abaixo de meio centavo colapsa em '0' — nao e bug, e a consequencia de

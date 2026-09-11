@@ -81,48 +81,53 @@ function totalEmCentavos(valorUnitario: number, quantidade: number): number {
   return Math.round(centavos * quantidade) / 100;
 }
 
+/** Faixa aceita para um numero de item, e se a ausencia tambem reprova. */
+interface FaixaDoItem {
+  readonly minimo: number;
+  readonly maximo: number;
+  /** `true` quando o minimo NAO e aceito (quantidade tem de ser > 0). */
+  readonly minimoExclusivo?: boolean;
+  /** `true` quando `undefined` tambem reprova (campo obrigatorio). */
+  readonly obrigatorio?: boolean;
+}
+
 /**
  * Recusa numero de item invalido ANTES da rede (R9/I11).
  *
- * `undefined` passa: quem e opcional cai no default do chamador. Campo
- * obrigatorio usa {@link assertNumeroObrigatorioDoItem}, que nao perdoa a
- * ausencia — em JS puro ela chega, e `undefined` em conta vira `NaN`.
+ * Um helper so, sem delegacao interna: a versao com duas funcoes tinha uma
+ * chamada a dois espacos de indentacao e o comando de contagem de metodos
+ * publicos (B5) a contava como metodo, inflando a superficie medida para 104.
+ * Regra que so vale se ninguem escrever a linha errada nao e regra — juntar os
+ * dois casos num lugar e mais simples e ainda mata o falso positivo.
+ *
+ * `undefined` passa quando o campo e opcional: quem nao informa cai no default
+ * do chamador. Em campo obrigatorio ele reprova — em JS puro a ausencia chega, e
+ * `undefined` em conta vira `NaN`.
  */
 function assertNumeroDoItem(
   valor: number | undefined,
   campo: string,
-  minimo: number,
-  maximo: number,
+  faixa: FaixaDoItem,
   indice: number,
-  minimoExclusivo = false,
 ): void {
-  if (valor === undefined) return;
-  const abaixo = minimoExclusivo ? valor <= minimo : valor < minimo;
-  if (!Number.isFinite(valor) || abaixo || valor > maximo) {
-    const faixa = `${minimoExclusivo ? 'maior que' : 'a partir de'} ${minimo} e ate ${maximo}`;
-    throw new SankhyaError(
-      `incluirNotaGateway: itens[${indice}].${campo} precisa ser um numero finito ${faixa}; recebido: ${String(valor)}. Nenhuma chamada foi feita.`,
-      'VALIDATION_ERROR',
-    );
-  }
-}
+  const { minimo, maximo, minimoExclusivo = false, obrigatorio = false } = faixa;
 
-/** Como {@link assertNumeroDoItem}, mas `undefined` tambem reprova. */
-function assertNumeroObrigatorioDoItem(
-  valor: number | undefined,
-  campo: string,
-  minimo: number,
-  maximo: number,
-  indice: number,
-  minimoExclusivo = false,
-): void {
   if (valor === undefined) {
+    if (!obrigatorio) return;
     throw new SankhyaError(
       `incluirNotaGateway: itens[${indice}].${campo} e obrigatorio. Nenhuma chamada foi feita.`,
       'VALIDATION_ERROR',
     );
   }
-  assertNumeroDoItem(valor, campo, minimo, maximo, indice, minimoExclusivo);
+
+  const abaixo = minimoExclusivo ? valor <= minimo : valor < minimo;
+  if (!Number.isFinite(valor) || abaixo || valor > maximo) {
+    const limite = `${minimoExclusivo ? 'maior que' : 'a partir de'} ${minimo} e ate ${maximo}`;
+    throw new SankhyaError(
+      `incluirNotaGateway: itens[${indice}].${campo} precisa ser um numero finito ${limite}; recebido: ${String(valor)}. Nenhuma chamada foi feita.`,
+      'VALIDATION_ERROR',
+    );
+  }
 }
 
 /** Estreita para objeto simples sem usar `any`. */
@@ -521,23 +526,26 @@ export class PedidosResource {
       // Lixo nao cruza a fronteira: o juiz e local, nao o ERP (R9/I11). Os dois
       // obrigatorios vem PRIMEIRO porque alimentam o VLRTOT default: `NaN`
       // sairia como a string 'NaN' e `-5` inverteria o sinal do total.
-      assertNumeroObrigatorioDoItem(
+      const DINHEIRO = { minimo: 0, maximo: Number.MAX_SAFE_INTEGER } as const;
+      assertNumeroDoItem(
         item.valorUnitario,
         'valorUnitario',
-        0,
-        Number.MAX_SAFE_INTEGER,
+        { ...DINHEIRO, obrigatorio: true },
         indice,
       );
-      assertNumeroObrigatorioDoItem(
+      assertNumeroDoItem(
         item.quantidade,
         'quantidade',
-        0,
-        Number.MAX_SAFE_INTEGER,
+        { ...DINHEIRO, minimoExclusivo: true, obrigatorio: true }, // quantidade zero nao e item
         indice,
-        true, // quantidade zero nao e item
       );
-      assertNumeroDoItem(item.percentualDesconto, 'percentualDesconto', 0, 100, indice);
-      assertNumeroDoItem(item.valorTotal, 'valorTotal', 0, Number.MAX_SAFE_INTEGER, indice);
+      assertNumeroDoItem(
+        item.percentualDesconto,
+        'percentualDesconto',
+        { minimo: 0, maximo: 100 },
+        indice,
+      );
+      assertNumeroDoItem(item.valorTotal, 'valorTotal', DINHEIRO, indice);
 
       return {
         NUNOTA: {},
