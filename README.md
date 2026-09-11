@@ -388,16 +388,25 @@ SDK_INTEGRATION_WMS=1 npm run test:integration
 ```
 
 Sem as credenciais **ou** sem `SDK_INTEGRATION_WMS=1` a suíte é SKIP e imprime o motivo — nunca
-faz rede por acidente. Garantias, todas travadas por `tests/security/ci-lanes.test.ts` (que roda
-no CI de PR, sem rede):
+faz rede por acidente.
 
-- **sandbox ou nada** — `assertSandbox` no `beforeAll`; o log cita só o *hostname*;
-- **teto de 40 chamadas HTTP** — estourou, a suíte aborta (`tests/integration/_call-budget.ts`);
-- **nunca libera nem fatura** — objeto que vira `L` é resíduo permanente no sandbox;
-- **teardown por id** — só os `NUNOTA` que a execução criou (prefixo `SDK-T-<hhmm>`), com guarda
-  contra lista vazia e *read-back* em `TGFCAB` provando a ausência;
-- **nunca em CI de PR** — o workflow de integração não tem gatilho `pull_request`; a lane WMS só
-  liga em `workflow_dispatch` com a caixa `run_wms_lane` marcada.
+**Travado por teste, no CI de PR e sem rede** (`tests/security/ci-lanes.test.ts`):
+
+| Garantia | Como é verificada |
+|---|---|
+| opt-in duplo: credencial sozinha não autoriza | comportamento — `optInSatisfeito()` é chamada com cada combinação de ambiente |
+| teto de **40** chamadas HTTP, que lança antes do request | comportamento — `callBudget` e `interceptarFetch` são exercitados de verdade |
+| a suíte usa esse opt-in e esse teto, prova o sandbox antes de construir o client, intercepta e restaura o `fetch`, lê `STATUSNOTA` antes de excluir, guarda contra lista de ids vazia, nunca libera nem fatura | presença no **código** da suíte (comentários e texto de log são removidos antes do match) |
+| o workflow de integração não dispara em `pull_request` e `npm test` exclui `tests/integration/**` | leitura do `integration.yml` e do `package.json` |
+
+**Não travado por teste — só a execução real da lane prova** (o dono roda e cola o resultado no
+ledger): que o sandbox aceite cada passo, os números do `volumesProduto`, e o *read-back* em
+`TGFCAB` provando que o teardown apagou. A lane só liga em `workflow_dispatch` com a caixa
+`run_wms_lane` marcada; em `push`/`schedule` ela é SKIP.
+
+Tudo que a execução cria nasce e morre em `A`, marcado com o prefixo `SDK-T-<hhmm>` em
+`AD_NUMPEDIDO`, `OBSERVACAO` e `CONTROLE`. Nota que não estiver mais em `A` na hora do teardown
+**não é apagada**: é impressa como resíduo e derruba a lane.
 
 ## Contribuindo
 

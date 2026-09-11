@@ -4,6 +4,12 @@
     "noEmit": true,
     "rootDir": "."
   },
-  "include": ["src", "tests/types"],
+  "include": [
+    "src",
+    "tests/types",
+    "tests/integration/_call-budget.ts",
+    "tests/integration/wms-sandbox.test.ts",
+    "tests/security/ci-lanes.test.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

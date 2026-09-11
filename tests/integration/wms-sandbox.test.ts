@@ -1,7 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SankhyaClient } from '../../src/client.js';
+import { classifyFailure } from '../../src/core/failure-classification.js';
 import { datasetRecord } from '../../src/resources/dataset.js';
-import { callBudget } from './_call-budget.js';
+import {
+  type CallBudget,
+  type FetchInterceptado,
+  TETO_CHAMADAS,
+  callBudget,
+  ehErroDeTeto,
+  interceptarFetch,
+  motivoDoSkip,
+  optInSatisfeito,
+} from './_call-budget.js';
 // A decisao de "o que e host de sandbox" vem de `src/core/environment-guard.ts`
 // (D3); este modulo so reexporta. Nenhum host literal mora aqui (RD-2).
 import { assertSandbox } from './_write-guard.js';
@@ -43,18 +53,14 @@ const config = {
   logger: { level: 'silent' as const },
 };
 
-const temCredenciais = Boolean(
-  config.baseUrl && config.clientId && config.clientSecret && config.xToken,
-);
-const temOptIn = process.env.SDK_INTEGRATION_WMS === '1';
-const habilitada = temCredenciais && temOptIn;
+// A decisao do opt-in duplo mora em `_call-budget.ts` e e testada la, direto,
+// por `tests/security/ci-lanes.test.ts` — nao por grep de prosa.
+const habilitada = optInSatisfeito(process.env);
 
 if (!habilitada) {
-  const faltando = [
-    temCredenciais ? '' : 'credenciais SANKHYA_* (baseUrl/clientId/clientSecret/xToken)',
-    temOptIn ? '' : 'SDK_INTEGRATION_WMS=1 (opt-in explicito, escreve no sandbox)',
-  ].filter(Boolean);
-  console.log(`[wms-sandbox] SKIP — falta: ${faltando.join(' + ')}. Nenhuma chamada foi feita.`);
+  console.log(
+    `[wms-sandbox] SKIP — falta: ${motivoDoSkip(process.env)}. Nenhuma chamada foi feita.`,
+  );
 }
 
 /**
@@ -81,8 +87,8 @@ const hhmm = `${dois(agora.getHours())}${dois(agora.getMinutes())}`;
 const PREFIXO = `SDK-T-${hhmm}`;
 const DTNEG = `${dois(agora.getDate())}/${dois(agora.getMonth() + 1)}/${agora.getFullYear()} ${dois(agora.getHours())}:${dois(agora.getMinutes())}:${dois(agora.getSeconds())}`;
 
-/** Teto da lane. Mudar este numero sem mudar `tests/security/ci-lanes.test.ts` reprova. */
-const orcamento = callBudget(40);
+/** Teto da lane. O numero vive em `_call-budget.ts` e e assertado no CI de PR. */
+const orcamento: CallBudget = callBudget(TETO_CHAMADAS);
 
 /** Residuo desta execucao, por id. Nada aqui vem de leitura do ERP — so do que criamos. */
 const residuo = {
@@ -95,15 +101,56 @@ const residuo = {
 };
 
 let sankhya: SankhyaClient;
-let fetchOriginal: typeof globalThis.fetch;
+let fetchDaLane: FetchInterceptado | undefined;
 
 /**
- * Exclui, por id, o que ESTA execucao criou.
+ * Registra um NUNOTA criado por ESTA execucao.
+ *
+ * Valida antes de guardar: o id e interpolado em SQL no teardown e entregue a
+ * `notas.excluir`. `0`, fracionario, negativo ou `undefined` nao entram — e o
+ * caso e gritado, porque id perdido e residuo permanente no sandbox.
+ */
+function registrarPedido(nunota: number | undefined): void {
+  if (typeof nunota !== 'number' || !Number.isInteger(nunota) || nunota <= 0) {
+    console.log(`[wms-sandbox] ATENCAO: NUNOTA invalido (${String(nunota)}) — nao registrado.`);
+    return;
+  }
+  if (!residuo.pedidos.includes(nunota)) residuo.pedidos.push(nunota);
+}
+
+/** O pedido do passo 3. Lanca se ele nao existe — passo seguinte nunca chama com `undefined`. */
+function pedidoDoPasso3(): number {
+  const nunota = residuo.pedidos[0];
+  if (nunota === undefined) {
+    throw new Error('[wms-sandbox] passo 3 nao registrou NUNOTA — passos dependentes abortados.');
+  }
+  return nunota;
+}
+
+/**
+ * Le `NUNOTA`/`STATUSNOTA` no ERP para os ids informados.
+ *
+ * "Criado em `A`" nao e "esta em `A`" na hora do teardown (I10): entre a criacao
+ * e o `afterAll` alguem pode ter liberado a nota. Por isso o status vem do ERP,
+ * nunca da memoria da suite.
+ */
+async function lerStatus(ids: readonly number[]): Promise<Map<number, string>> {
+  const linhas = await sankhya.dbExplorer.query<{ NUNOTA: string; STATUSNOTA: string }>(
+    `SELECT NUNOTA, STATUSNOTA FROM TGFCAB WHERE NUNOTA IN (${ids.join(', ')})`,
+  );
+  return new Map(linhas.map((l) => [Number(l.NUNOTA), String(l.STATUSNOTA).trim()]));
+}
+
+/**
+ * Exclui, por id, o que ESTA execucao criou — e SO o que continua em `A`.
  *
  * Ordem obrigatoria (M113): conferencia -> 1101 -> pedido. Aqui so o pedido
  * existe — a suite nunca libera nem fatura — mas as duas primeiras fases ficam
  * escritas, guardadas por lista vazia, porque quem copiar este teardown vai
  * copiar tambem o caso em que elas existem, e a ordem inversa falha no ERP.
+ *
+ * Nota fora de `A` NAO e apagada: e impressa como residuo e derruba o `afterAll`.
+ * Residuo e achado, nunca silencio.
  */
 async function teardownPorId(): Promise<void> {
   const ids = [...residuo.conferencias, ...residuo.notas1101, ...residuo.pedidos];
@@ -121,7 +168,7 @@ async function teardownPorId(): Promise<void> {
     await sankhya.dataset.save({
       entityName: 'CabecalhoNota',
       fields: campos,
-      records: residuo.pedidos.map((nunota) =>
+      records: residuo.conferencias.map((nunota) =>
         datasetRecord(campos, { pk: { NUNOTA: String(nunota) }, set: { NUCONFATUAL: '' } }),
       ),
     });
@@ -136,17 +183,33 @@ async function teardownPorId(): Promise<void> {
     await sankhya.notas.excluir(residuo.notas1101);
   }
 
-  // Fase 3 — pedido.
-  if (residuo.pedidos.length > 0) {
-    await sankhya.notas.excluir(residuo.pedidos);
+  // Fase 3 — pedido, so o que o ERP confirma estar em `A`.
+  if (residuo.pedidos.length === 0) return;
+
+  const status = await lerStatus(residuo.pedidos);
+  const emA = residuo.pedidos.filter((nunota) => status.get(nunota) === 'A');
+  const foraDeA = residuo.pedidos.filter(
+    (nunota) => status.has(nunota) && status.get(nunota) !== 'A',
+  );
+
+  for (const nunota of foraDeA) {
+    console.log(`[wms-sandbox] RESIDUO NUNOTA=${nunota} STATUSNOTA=${status.get(nunota)}`);
+  }
+
+  if (emA.length > 0) {
+    await sankhya.notas.excluir(emA);
 
     // Read-back (I3): resposta do ERP nao prova efeito. A prova e a ausencia em TGFCAB.
-    const sobrando = await sankhya.dbExplorer.query<{ NUNOTA: string }>(
-      `SELECT NUNOTA FROM TGFCAB WHERE NUNOTA IN (${residuo.pedidos.join(', ')})`,
-    );
-    expect(sobrando).toEqual([]);
+    const sobrando = await lerStatus(emA);
+    expect([...sobrando.keys()]).toEqual([]);
     console.log(
-      `[wms-sandbox] read-back: 0 linhas em TGFCAB. Chamadas gastas: ${orcamento.spent()}.`,
+      `[wms-sandbox] read-back: 0 linhas em TGFCAB para ${emA.join(', ')}. Chamadas gastas: ${orcamento.spent()}.`,
+    );
+  }
+
+  if (foraDeA.length > 0) {
+    throw new Error(
+      `[wms-sandbox] residuo NAO apagado (fora de 'A'): ${foraDeA.join(', ')}. Apague a mao e investigue quem liberou a nota.`,
     );
   }
 }
@@ -158,14 +221,7 @@ describe.skipIf(!habilitada)('Lane WMS — sandbox Sankhya (opt-in duplo)', () =
     console.log(`[wms-sandbox] host=${new URL(config.baseUrl).hostname}`);
 
     // Teto por interceptacao do fetch global: toda requisicao HTTP do SDK paga.
-    fetchOriginal = globalThis.fetch;
-    const contado: typeof globalThis.fetch = (entrada, init) => {
-      const alvo = entrada instanceof Request ? entrada.url : String(entrada);
-      // So o pathname: querystring e header podem carregar credencial.
-      orcamento.spend(new URL(alvo).pathname);
-      return fetchOriginal(entrada, init);
-    };
-    globalThis.fetch = contado;
+    fetchDaLane = interceptarFetch(orcamento);
 
     sankhya = new SankhyaClient(config);
     await sankhya.authenticate();
@@ -175,7 +231,7 @@ describe.skipIf(!habilitada)('Lane WMS — sandbox Sankhya (opt-in duplo)', () =
     try {
       await teardownPorId();
     } finally {
-      if (fetchOriginal) globalThis.fetch = fetchOriginal;
+      fetchDaLane?.restaurar();
     }
   });
 
@@ -187,7 +243,11 @@ describe.skipIf(!habilitada)('Lane WMS — sandbox Sankhya (opt-in duplo)', () =
     }>('SELECT CODPROD, CODLOCAL, ESTOQUE FROM TGFEST WHERE ROWNUM = 1');
 
     expect(linhas).toHaveLength(1);
-    expect(Object.keys(linhas[0]).sort()).toEqual(['CODLOCAL', 'CODPROD', 'ESTOQUE']);
+    const primeira = linhas[0];
+    if (primeira === undefined) {
+      throw new Error('[wms-sandbox] TGFEST devolveu 0 linhas para ROWNUM = 1.');
+    }
+    expect(Object.keys(primeira).sort()).toEqual(['CODLOCAL', 'CODPROD', 'ESTOQUE']);
   });
 
   it('2 — volumesProduto(13609) devolve quantidade/lastro/camadas (M54)', async () => {
@@ -220,15 +280,15 @@ describe.skipIf(!habilitada)('Lane WMS — sandbox Sankhya (opt-in duplo)', () =
       ],
     });
 
+    // Registra ANTES de qualquer assercao: id nao registrado e residuo eterno.
+    registrarPedido(codigoPedido);
+
     expect(Number.isInteger(codigoPedido)).toBe(true);
     expect(codigoPedido).toBeGreaterThan(0);
-    // Registra ANTES de qualquer assercao seguinte: id nao registrado e residuo eterno.
-    residuo.pedidos.push(codigoPedido);
   });
 
   it('4 — dataset.save grava ItemNota com CONTROLE prefixado', async () => {
-    const nunota = residuo.pedidos[0];
-    expect(nunota).toBeGreaterThan(0);
+    const nunota = pedidoDoPasso3();
 
     const campos = ['NUNOTA', 'CODPROD', 'QTDNEG', 'VLRUNIT', 'CODVOL', 'CODLOCALORIG', 'CONTROLE'];
     const out = await sankhya.dataset.save({
@@ -253,7 +313,7 @@ describe.skipIf(!habilitada)('Lane WMS — sandbox Sankhya (opt-in duplo)', () =
   });
 
   it('5 — consultarVar do pedido em A devolve lista vazia', async () => {
-    const linhas = await sankhya.faturamento.consultarVar(residuo.pedidos[0]);
+    const linhas = await sankhya.faturamento.consultarVar(pedidoDoPasso3());
     expect(linhas).toEqual([]);
   });
 
@@ -292,38 +352,71 @@ describe.skipIf(!habilitada)('Lane WMS — sandbox Sankhya (opt-in duplo)', () =
 
   it('8 — cabecalho minimo aceito por CACSP.incluirNota (premissa (b) da D1.2)', async (ctx) => {
     // So as chaves TIPADAS obrigatorias + `statusNota` + prefixo. Sem
-    // `camposExtras`, sem os 18 campos crus do payload do 4midware. Aceito ou
-    // recusado, o resultado e a medicao — e o que nascer e apagado no teardown.
+    // `camposExtras`, sem os 18 campos crus do payload do 4midware.
+    //
+    // Este passo NAO pode falhar em silencio nem "passar" por SKIP:
+    // - recusa de NEGOCIO (o ERP entendeu e disse nao) = premissa REFUTADA, e e
+    //   a unica saida que vira `ctx.skip`;
+    // - teto estourado, timeout, auth = FALHA da lane, nao medicao (I11: timeout
+    //   e desfecho DESCONHECIDO, nunca "refutada");
+    // - a assercao fica FORA do `try`, senao um `expect` vermelho viraria SKIP verde.
+    const numeroExterno = `${PREFIXO}-MIN`;
+    let codigoPedido: number | undefined;
+    let falha: unknown;
+
     try {
-      const { codigoPedido } = await sankhya.pedidos.incluirNotaGateway({
-        codigoCliente: CODPARC,
-        dataNegociacao: DTNEG,
-        codigoTipoOperacao: CODTIPOPER,
-        codigoTipoNegociacao: CODTIPVENDA,
-        codigoVendedor: CODVEND,
-        codigoEmpresa: CODEMP,
-        tipoMovimento: TIPMOV,
-        statusNota: 'A',
-        numeroPedidoExterno: `${PREFIXO}-MIN`,
-        itens: [
-          {
-            codigoProduto: CODPROD_ITEM,
-            quantidade: 1,
-            valorUnitario: 10,
-            unidade: 'UN',
-            codigoLocalOrigem: CODLOCALORIG,
-          },
-        ],
-      });
-      residuo.pedidos.push(codigoPedido);
-      console.log(
-        `[wms-sandbox] (b) D1.2 CONFIRMADA — cabecalho minimo (11 chaves tipadas) aceito, NUNOTA ${codigoPedido}.`,
-      );
-      expect(codigoPedido).toBeGreaterThan(0);
+      codigoPedido = (
+        await sankhya.pedidos.incluirNotaGateway({
+          codigoCliente: CODPARC,
+          dataNegociacao: DTNEG,
+          codigoTipoOperacao: CODTIPOPER,
+          codigoTipoNegociacao: CODTIPVENDA,
+          codigoVendedor: CODVEND,
+          codigoEmpresa: CODEMP,
+          tipoMovimento: TIPMOV,
+          statusNota: 'A',
+          numeroPedidoExterno: numeroExterno,
+          itens: [
+            {
+              codigoProduto: CODPROD_ITEM,
+              quantidade: 1,
+              valorUnitario: 10,
+              unidade: 'UN',
+              codigoLocalOrigem: CODLOCALORIG,
+            },
+          ],
+        })
+      ).codigoPedido;
     } catch (erro) {
-      const motivo = erro instanceof Error ? erro.message : String(erro);
-      console.log(`[wms-sandbox] (b) D1.2 REFUTADA — cabecalho minimo recusado: ${motivo}`);
-      ctx.skip(`cabecalho minimo recusado pelo ERP: ${motivo}`);
+      falha = erro;
     }
+
+    // Erro NAO prova que nada foi criado (I3/I11). A prova e ler pelo nosso
+    // proprio marcador: o que existir com este AD_NUMPEDIDO nasceu aqui e tem
+    // de entrar no teardown ANTES de qualquer veredito.
+    if (falha !== undefined && !ehErroDeTeto(falha)) {
+      const criados = await sankhya.dbExplorer.query<{ NUNOTA: string }>(
+        `SELECT NUNOTA FROM TGFCAB WHERE AD_NUMPEDIDO = '${numeroExterno}'`,
+      );
+      for (const linha of criados) registrarPedido(Number(linha.NUNOTA));
+    }
+    registrarPedido(codigoPedido);
+
+    if (falha !== undefined) {
+      const motivo = falha instanceof Error ? falha.message : String(falha);
+      // Teto e transporte nao sao medicao: a lane falha e alguem olha.
+      if (ehErroDeTeto(falha) || classifyFailure(falha) !== 'NEGOCIO') throw falha;
+
+      console.log(
+        `[wms-sandbox] (b) D1.2 REFUTADA — cabecalho minimo recusado pelo ERP: ${motivo}`,
+      );
+      ctx.skip(`cabecalho minimo recusado pelo ERP (recusa de negocio): ${motivo}`);
+      return;
+    }
+
+    console.log(
+      `[wms-sandbox] (b) D1.2 CONFIRMADA — cabecalho minimo (11 chaves tipadas) aceito, NUNOTA ${String(codigoPedido)}.`,
+    );
+    expect(codigoPedido).toBeGreaterThan(0);
   });
 });
