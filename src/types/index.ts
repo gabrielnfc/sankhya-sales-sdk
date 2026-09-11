@@ -44,6 +44,7 @@ export type {
   ComponenteProduto,
   ProdutoAlternativo,
   Volume,
+  VolumeProduto,
   GrupoProduto,
   ListarProdutosParams,
 } from './produtos.js';
