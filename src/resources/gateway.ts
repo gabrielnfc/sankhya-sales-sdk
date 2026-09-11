@@ -2,10 +2,29 @@ import { SankhyaError } from '../core/errors.js';
 import { deserializeRows, serialize } from '../core/gateway-serializer.js';
 import type { HttpClient } from '../core/http.js';
 import { validateLoadRecordsParams, validateSaveRecordParams } from '../core/validators.js';
+import type { RequestOptions } from '../types/config.js';
 import type { LoadRecordParams, LoadRecordsParams, SaveRecordParams } from '../types/gateway.js';
 
 const VALID_FIELD_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const BLOCKED_FIELD_NAMES = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Recusa nomes de campo fora de `[A-Za-z_][A-Za-z0-9_]*` e nomes que poluem o prototipo.
+ *
+ * @param record - Pares campo-valor a validar.
+ * @param contexto - Nome do parametro para a mensagem de erro (ex: `'primaryKey'`).
+ * @throws {SankhyaError} Com codigo `VALIDATION_ERROR` no primeiro nome invalido.
+ */
+function assertFieldNames(record: Record<string, string>, contexto: string): void {
+  for (const key of Object.keys(record)) {
+    if (!VALID_FIELD_NAME.test(key) || BLOCKED_FIELD_NAMES.has(key)) {
+      throw new SankhyaError(
+        `Nome de campo invalido na ${contexto}: '${key}'. Apenas letras, numeros e underscore sao permitidos.`,
+        'VALIDATION_ERROR',
+      );
+    }
+  }
+}
 
 /**
  * Acesso direto ao Gateway Sankhya para operacoes genericas (CRUD).
@@ -72,14 +91,7 @@ export class GatewayResource {
    * ```
    */
   async loadRecord(params: LoadRecordParams): Promise<Record<string, string> | null> {
-    for (const key of Object.keys(params.primaryKey)) {
-      if (!VALID_FIELD_NAME.test(key) || BLOCKED_FIELD_NAMES.has(key)) {
-        throw new SankhyaError(
-          `Nome de campo invalido na primaryKey: '${key}'. Apenas letras, numeros e underscore sao permitidos.`,
-          'VALIDATION_ERROR',
-        );
-      }
-    }
+    assertFieldNames(params.primaryKey, 'primaryKey');
 
     const pkEntries = Object.entries(params.primaryKey);
     const expression = pkEntries
@@ -111,10 +123,17 @@ export class GatewayResource {
   }
 
   /**
-   * Salva (cria ou atualiza) um registro via Gateway.
+   * Envia um registro para `CRUDServiceProvider.saveRecord`.
    *
-   * @param params - Entidade, campos e dados a salvar.
-   * @returns Registro salvo como dicionario chave-valor.
+   * O SDK monta `dataSet.dataRow.localFields` com `params.data` e acrescenta
+   * `dataSet.dataRow.key` quando `params.primaryKey` vem preenchida. Qual efeito
+   * (insercao ou atualizacao) cada forma produz no ERP e premissa nao medida ate
+   * a lane de integracao. `primaryKey: {}` e recusada: a escolha e do chamador.
+   *
+   * @param params - Entidade, campos, dados e (opcional) chave primaria.
+   * @returns Registro devolvido pelo Gateway como dicionario chave-valor.
+   * @throws {SankhyaError} `VALIDATION_ERROR` se `primaryKey` vier vazia ou se
+   * algum nome de campo de `data`/`primaryKey` for invalido.
    * @throws {GatewayError} Em erro de negocio Sankhya.
    * @throws {AuthError} Se autenticacao falhar.
    * @example
@@ -128,8 +147,20 @@ export class GatewayResource {
    */
   async saveRecord(params: SaveRecordParams): Promise<Record<string, string>> {
     validateSaveRecordParams(params, 'SaveRecordParams');
-    const serializedFields = serialize(params.data);
-    const fieldsList = params.fields;
+    assertFieldNames(params.primaryKey ?? {}, 'primaryKey');
+    assertFieldNames(params.data, 'data');
+
+    if (params.primaryKey && Object.keys(params.primaryKey).length === 0) {
+      throw new SankhyaError(
+        'SaveRecordParams.primaryKey vazia: omita o campo para inserir ou informe a chave do registro.',
+        'VALIDATION_ERROR',
+      );
+    }
+
+    const dataRow: Record<string, unknown> = { localFields: serialize(params.data) };
+    if (params.primaryKey) {
+      dataRow.key = serialize(params.primaryKey);
+    }
 
     const result = await this.http.gatewayCall<Record<string, unknown>>(
       'mge',
@@ -138,15 +169,42 @@ export class GatewayResource {
         dataSet: {
           rootEntity: params.entity,
           includePresentationFields: 'N',
-          entity: {
-            fieldset: { list: fieldsList },
-            ...serializedFields,
-          },
+          dataRow,
+          entity: { fieldset: { list: params.fields } },
         },
       },
     );
 
     const { rows } = deserializeRows(result, this.http.getLogger());
     return rows[0] ?? {};
+  }
+
+  /**
+   * Chama um servico arbitrario do Gateway e devolve o `responseBody` cru.
+   *
+   * Escape hatch para servicos sem metodo dedicado no SDK. A escrita nunca e
+   * retentada automaticamente.
+   *
+   * @param modulo - Modulo do Gateway (`'mge'` ou `'mgecom'`).
+   * @param serviceName - Nome do servico (ex: `'CACSP.confirmarNota'`).
+   * @param body - Corpo do `requestBody`, ja no formato do servico.
+   * @param options - Opcoes de requisicao (timeout, `idempotencyKey`).
+   * @returns O `responseBody` da resposta, sem transformacao.
+   * @throws {GatewayError} Em erro de negocio Sankhya.
+   * @throws {AuthError} Se autenticacao falhar.
+   * @example
+   * ```ts
+   * const out = await sankhya.gateway.call('mgecom', 'CACSP.confirmarNota', {
+   *   nota: { NUNOTA: { $: '1378934' } },
+   * });
+   * ```
+   */
+  async call<T>(
+    modulo: 'mge' | 'mgecom',
+    serviceName: string,
+    body: Record<string, unknown>,
+    options?: RequestOptions,
+  ): Promise<T> {
+    return this.http.gatewayCall<T>(modulo, serviceName, body, options);
   }
 }
