@@ -136,6 +136,28 @@ export interface Volume {
   nome: string;
 }
 
+/**
+ * Volume de um produto lido de `TGFVOA` (entidade `VolumeProduto` do Gateway).
+ *
+ * `quantidade` e o fator de conversao un/volume; `lastro` x `camadas` da
+ * caixas por palete. Cadastro incompleto e comum (M57: so 38,4% dos PA ativos
+ * tinham `QUANTIDADE > 1`), por isso os campos vem 0 em vez de erro.
+ */
+export interface VolumeProduto {
+  /** Codigo do produto (`TGFVOA.CODPROD`). */
+  codProd: number;
+  /** Codigo do volume (`TGFVOA.CODVOL`, ex: `'UN'`, `'CX'`). */
+  codVol: string;
+  /** Unidades por volume (`TGFVOA.QUANTIDADE`). 0 quando nao cadastrado. */
+  quantidade: number;
+  /** Caixas por camada no palete (`TGFVOA.LASTRO`). 0 quando nao cadastrado. */
+  lastro: number;
+  /** Camadas por palete (`TGFVOA.CAMADAS`). 0 quando nao cadastrado. */
+  camadas: number;
+  /** `TGFVOA.ATIVO === 'S'`. */
+  ativo: boolean;
+}
+
 /** Grupo de produto no Sankhya ERP. */
 export interface GrupoProduto {
   /** Codigo do grupo. */

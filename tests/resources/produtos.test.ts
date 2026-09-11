@@ -1,8 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HttpClient } from '../../src/core/http.js';
 import type { DatasetResource } from '../../src/resources/dataset.js';
 import type { DbExplorerResource } from '../../src/resources/db-explorer.js';
 import { ProdutosResource } from '../../src/resources/produtos.js';
+
+/** Logger estavel: `getLogger()` novo por chamada nao daria para asserir. */
+const mockLogger = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 
 function createMockHttp(overrides?: Partial<HttpClient>) {
   return {
@@ -13,12 +16,53 @@ function createMockHttp(overrides?: Partial<HttpClient>) {
     restPost: vi.fn(),
     restPut: vi.fn(),
     gatewayCall: vi.fn(),
-    getLogger: vi.fn(() => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })),
+    getLogger: vi.fn(() => mockLogger),
     ...overrides,
-  } as unknown as HttpClient;
+  } as unknown as HttpClient & {
+    restGet: ReturnType<typeof vi.fn>;
+    restPost: ReturnType<typeof vi.fn>;
+    restPut: ReturnType<typeof vi.fn>;
+    gatewayCall: ReturnType<typeof vi.fn>;
+    getLogger: ReturnType<typeof vi.fn>;
+  };
+}
+
+/** Copiado de tests/resources/gateway.test.ts:23-36 — nao criar variante. */
+function makeGatewayResponse(fieldNames: string[], entities: Array<Record<string, unknown>>) {
+  return {
+    entities: {
+      total: String(entities.length),
+      hasMoreResult: 'false',
+      offsetPage: '0',
+      metadata: {
+        fields: {
+          field: fieldNames.map((name) => ({ name })),
+        },
+      },
+      entity: entities,
+    },
+  };
+}
+
+const CAMPOS_VOA = ['CODPROD', 'CODVOL', 'QUANTIDADE', 'LASTRO', 'CAMADAS', 'ATIVO'];
+
+/** Uma pagina de `TGFVOA` com `hasMoreResult`/`offsetPage` sob controle do teste. */
+function paginaVoa(
+  entities: Array<Record<string, unknown>>,
+  hasMore: 'true' | 'false',
+  offsetPage: string,
+) {
+  const resposta = makeGatewayResponse(CAMPOS_VOA, entities);
+  resposta.entities.hasMoreResult = hasMore;
+  resposta.entities.offsetPage = offsetPage;
+  return resposta;
 }
 
 describe('ProdutosResource', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('listar() calls restGet with /produtos and default page 0', async () => {
     const http = createMockHttp();
     const resource = new ProdutosResource(http);
@@ -269,5 +313,189 @@ describe('ProdutosResource', () => {
         usaLoteDtVal: true,
       }),
     ).rejects.toThrow(/dbExplorer/);
+  });
+
+  it('le volumes do gateway (TGFVOA) e converte os numericos', async () => {
+    const http = createMockHttp();
+    const produtos = new ProdutosResource(http);
+    http.gatewayCall.mockResolvedValue(
+      makeGatewayResponse(
+        ['CODPROD', 'CODVOL', 'QUANTIDADE', 'LASTRO', 'CAMADAS', 'ATIVO'],
+        [
+          {
+            f0: { $: '13609' },
+            f1: { $: 'CX' },
+            f2: { $: '72' },
+            f3: { $: '12' },
+            f4: { $: '4' },
+            f5: { $: 'S' },
+          },
+        ],
+      ),
+    ); // M54: 13609 = 72 un/cx, 12x4
+    const vols = await produtos.volumesProduto(13609);
+
+    expect(http.gatewayCall.mock.calls[0][1]).toBe('CRUDServiceProvider.loadRecords');
+    expect(vols).toEqual([
+      { codProd: 13609, codVol: 'CX', quantidade: 72, lastro: 12, camadas: 4, ativo: true },
+    ]);
+
+    // Payload medido preso inteiro: modulo, dataSet e flag de idempotencia.
+    const [modulo, , body, options, idempotent] = http.gatewayCall.mock.calls[0];
+    expect(modulo).toBe('mge');
+    expect(body).toEqual({
+      dataSet: {
+        rootEntity: 'VolumeProduto',
+        includePresentationFields: 'N',
+        offsetPage: '0',
+        criteria: { expression: { $: "this.CODPROD = '13609'" } },
+        entity: { fieldset: { list: 'CODPROD,CODVOL,QUANTIDADE,LASTRO,CAMADAS,ATIVO' } },
+      },
+    });
+    expect(options).toBeUndefined();
+    expect(idempotent).toBe(true);
+  });
+
+  it('concatena duas paginas e avanca o offsetPage', async () => {
+    const http = createMockHttp();
+    const produtos = new ProdutosResource(http);
+    http.gatewayCall
+      .mockResolvedValueOnce(
+        paginaVoa(
+          [
+            {
+              f0: { $: '13609' },
+              f1: { $: 'CX' },
+              f2: { $: '72' },
+              f3: { $: '12' },
+              f4: { $: '4' },
+              f5: { $: 'S' },
+            },
+          ],
+          'true',
+          '0',
+        ),
+      )
+      .mockResolvedValueOnce(
+        paginaVoa(
+          [
+            {
+              f0: { $: '13609' },
+              f1: { $: 'UN' },
+              f2: { $: '1' },
+              f3: { $: '0' },
+              f4: { $: '0' },
+              f5: { $: 'S' },
+            },
+          ],
+          'false',
+          '1',
+        ),
+      );
+
+    const vols = await produtos.volumesProduto(13609);
+
+    expect(http.gatewayCall).toHaveBeenCalledTimes(2);
+    expect(vols.map((v) => v.codVol)).toEqual(['CX', 'UN']);
+    expect(http.gatewayCall.mock.calls[0][2].dataSet.offsetPage).toBe('0');
+    expect(http.gatewayCall.mock.calls[1][2].dataSet.offsetPage).toBe('1');
+  });
+
+  it('lanca INCOMPLETE_READ quando hasMoreResult e true com pagina vazia (nao devolve [])', async () => {
+    const http = createMockHttp();
+    const produtos = new ProdutosResource(http);
+    http.gatewayCall.mockResolvedValue(paginaVoa([], 'true', '0'));
+
+    // `[]` aqui significaria "sem cadastro" (REQ-CNT-5) — varredura truncada
+    // nao pode se disfarcar disso. I11/G1.
+    // Prende mensagem **e** `code`: a mensagem sozinha nao distingue truncamento
+    // de erro de validacao (M9 do re-review sobrevivia sem o `code`).
+    await expect(produtos.volumesProduto(13609)).rejects.toMatchObject({
+      code: 'INCOMPLETE_READ',
+      message: expect.stringMatching(/incompleta/i),
+    });
+    expect(http.gatewayCall).toHaveBeenCalledTimes(1);
+    expect(mockLogger.error).toHaveBeenCalledTimes(1);
+  });
+
+  it('numerico ausente, nulo ou {} vira 0; CODVOL nulo vira string vazia', async () => {
+    const http = createMockHttp();
+    const produtos = new ProdutosResource(http);
+    http.gatewayCall.mockResolvedValue(
+      paginaVoa(
+        [
+          // f1 = {} (NULL do gateway), f2 = { $: {} }, f3 = { $: null }, f4 ausente
+          { f0: { $: '13609' }, f1: {}, f2: { $: {} }, f3: { $: null }, f5: { $: 'S' } },
+        ],
+        'false',
+        '0',
+      ),
+    );
+
+    const [vol] = await produtos.volumesProduto(13609);
+
+    expect(vol).toEqual({
+      codProd: 13609,
+      codVol: '',
+      quantidade: 0,
+      lastro: 0,
+      camadas: 0,
+      ativo: true,
+    });
+  });
+
+  it('lanca PARSE_ERROR quando QUANTIDADE nao e numero', async () => {
+    const http = createMockHttp();
+    const produtos = new ProdutosResource(http);
+    http.gatewayCall.mockResolvedValue(
+      paginaVoa(
+        [{ f0: { $: '13609' }, f1: { $: 'CX' }, f2: { $: 'ABC' }, f5: { $: 'S' } }],
+        'false',
+        '0',
+      ),
+    );
+
+    await expect(produtos.volumesProduto(13609)).rejects.toThrow(/QUANTIDADE/);
+  });
+
+  it('devolve [] quando o produto nao tem volume cadastrado (M57) — sem lancar', async () => {
+    const http = createMockHttp();
+    const produtos = new ProdutosResource(http);
+    http.gatewayCall.mockResolvedValue(makeGatewayResponse(['CODPROD'], []));
+
+    await expect(produtos.volumesProduto(10077)).resolves.toEqual([]);
+  });
+
+  // Adicao a §D1.4 do anexo: a mutacao prescrita no Step 5 (`ATIVO === 'S'` ->
+  // `Boolean(ATIVO)`) SOBREVIVIA com a fixture do anexo, que so tem ATIVO='S'.
+  // Este caso e o que a mata.
+  it('ativo e false quando ATIVO nao e S (mata Boolean(ATIVO))', async () => {
+    const http = createMockHttp();
+    const produtos = new ProdutosResource(http);
+    http.gatewayCall.mockResolvedValue(
+      makeGatewayResponse(
+        ['CODPROD', 'CODVOL', 'QUANTIDADE', 'LASTRO', 'CAMADAS', 'ATIVO'],
+        [
+          {
+            f0: { $: '13609' },
+            f1: { $: 'UN' },
+            f2: { $: '1' },
+            f3: { $: '0' },
+            f4: { $: '0' },
+            f5: { $: 'N' },
+          },
+        ],
+      ),
+    );
+    const [vol] = await produtos.volumesProduto(13609);
+
+    expect(vol?.ativo).toBe(false);
+  });
+
+  it('recusa codigoProduto que nao e inteiro (guarda de injecao no criteria)', async () => {
+    const http = createMockHttp();
+
+    await expect(new ProdutosResource(http).volumesProduto(1.5)).rejects.toThrow(/inteiro/i);
+    expect(http.gatewayCall).not.toHaveBeenCalled();
   });
 });

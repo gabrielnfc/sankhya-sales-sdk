@@ -33,6 +33,15 @@ export {
 } from './core/errors.js';
 export type { SankhyaErrorCode } from './core/errors.js';
 
+// Guarda de ambiente (allowlist de host, fail-closed)
+export {
+  assertAllowedHost,
+  isAllowedHost,
+  isProductionHost,
+  SANDBOX_MARKER,
+  PRODUCTION_HOSTS,
+} from './core/environment-guard.js';
+
 // Classificacao de falha (3 camadas)
 export { classifyFailure } from './core/failure-classification.js';
 export type { SankhyaFailureKind } from './core/failure-classification.js';
@@ -90,6 +99,7 @@ export type {
   ComponenteProduto,
   ProdutoAlternativo,
   Volume,
+  VolumeProduto,
   GrupoProduto,
   ListarProdutosParams,
   Preco,
