@@ -36,6 +36,16 @@ export interface CancelarNotaResult {
   readonly confirmadoPorReadBack: boolean;
   /** `TGFCAB.STATUSNFE` da linha do read-back; `null` se ausente ou vazio. */
   readonly statusNfe: string | null;
+  /**
+   * Presente **somente** quando a resposta do gateway nao chegou (camada
+   * `TIMEOUT`) e o estado foi derivado do read-back.
+   *
+   * Nesse caso `totalNotasCanceladas` e `gerouRecebimento` valem `0`/`false`
+   * por **ausencia de resposta**, nao por medicao — e so
+   * `confirmadoPorReadBack` e afirmacao sobre o banco (I11). A chave e omitida
+   * no caminho normal, para que o formato comum continue com 4 campos.
+   */
+  readonly avisoRespostaGateway?: string;
 }
 
 /**
@@ -53,7 +63,23 @@ export interface CancelarNotaRawResponse {
   };
 }
 
-/** Linha do read-back de cancelamento (`TGFCAN` + `TGFCAB.STATUSNFE`). */
+/**
+ * Linha do read-back de cancelamento (`TGFCAN` + `TGFCAB.STATUSNFE`), **depois**
+ * da normalizacao do `dbExplorer.query`.
+ *
+ * Descreve a linha NORMALIZADA, nao a resposta crua do DbExplorer. O
+ * DbExplorer devolve tipos mistos — medido em
+ * `spike-raw/cancelamento/C1_RB_PA_1.json`, a mesma consulta trouxe
+ * `"NUNOTA": 1889304` (number) e `"STATUSNFE": null` — e `query()` passa toda
+ * celula por `cellToString` (`src/resources/db-explorer.ts:25-27`), que
+ * converte number para string e `null`/`undefined` para `''`. Por isso os
+ * campos sao `string`: e o que este resource realmente recebe.
+ *
+ * Consequencia no consumo: `STATUSNFE` vazio (`''`) **nao e um status**, e
+ * ausencia — `cancelar` o traduz para `statusNfe: null`, nunca para `''`. A
+ * coluna tambem pode nao vir na linha (consulta sem `fieldsMetadata` para ela),
+ * e o tratamento e o mesmo.
+ */
 export interface CancelamentoReadBackRow {
   readonly NUNOTA: string;
   readonly STATUSNFE: string;
