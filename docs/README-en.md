@@ -14,7 +14,7 @@ TypeScript SDK for integration with the **Sankhya ERP commercial APIs**. Full ty
 
 ## Scope
 
-Covers Sankhya Om (v4.34+) commercial operations: **sales, customers, products, prices, inventory, orders, financial, and tax**. 67 total operations (55 REST v1 + 12 Gateway).
+Covers Sankhya Om (v4.34+) commercial operations: **sales, customers, products, prices, inventory, orders, financial, and tax**, plus the WMS shipping path (native checking, invoicing with proof, batches). **103 public methods across 17 resources** — static count measured 2026-09-11, see [Modules](#modules).
 
 ## Installation
 
@@ -27,7 +27,7 @@ npm install sankhya-sales-sdk
 ### Environment variables
 
 ```bash
-export SANKHYA_BASE_URL=https://api.sankhya.com.br
+export SANKHYA_BASE_URL=https://api.sandbox.sankhya.com.br
 export SANKHYA_CLIENT_ID=your-client-id
 export SANKHYA_CLIENT_SECRET=your-client-secret
 export SANKHYA_X_TOKEN=your-x-token
@@ -189,19 +189,34 @@ await sankhya.financeiros.baixarReceita({
 
 ## Modules
 
+**103 public methods** across 17 resources, in the static count the repository uses as a gate
+(`grep -hE '^  (async )?[a-zA-Z][a-zA-Z0-9]*(<[^>]*>)?\(' src/resources/*.ts | grep -vc constructor`,
+measured 2026-09-11). The count includes the `listarTodos*` scan helpers.
+
 | Module | Methods | Description | Docs |
 |--------|---------|-------------|------|
-| `sankhya.clientes` | 5 | Customers and contacts | [clientes](./api-reference/clientes.md) |
-| `sankhya.vendedores` | 2 | Sales representatives | [vendedores](./api-reference/vendedores.md) |
-| `sankhya.produtos` | 9 | Product catalog, components, volumes, groups | [produtos](./api-reference/produtos.md) |
-| `sankhya.precos` | 4 | Price tables and contextualized pricing | [precos](./api-reference/precos.md) |
-| `sankhya.estoque` | 5 | Inventory and storage locations | [estoque](./api-reference/estoque.md) |
-| `sankhya.pedidos` | 9 | Create, query, confirm, invoice orders | [pedidos](./api-reference/pedidos.md) |
-| `sankhya.financeiros` | 13 | Customer debt, revenue, expenses, settlements | [financeiros](./api-reference/financeiros.md) |
-| `sankhya.cadastros` | 11 | Operations, natures, companies, negotiation types | [cadastros](./api-reference/cadastros.md) |
+| `sankhya.clientes` | 6 | Customers and contacts | [clientes](./api-reference/clientes.md) |
+| `sankhya.vendedores` | 3 | Sales representatives | [vendedores](./api-reference/vendedores.md) |
+| `sankhya.produtos` | 12 | Catalog, components, volumes (`TGFVOA`), groups, batch-control switch | [produtos](./api-reference/produtos.md) |
+| `sankhya.precos` | 5 | Price tables and contextualized pricing | [precos](./api-reference/precos.md) |
+| `sankhya.estoque` | 6 | Inventory, locations and **per-batch** balance (`TGFEST`) | [estoque](./api-reference/estoque.md) |
+| `sankhya.pedidos` | 10 | Create, query, confirm, invoice orders | [pedidos](./api-reference/pedidos.md) |
+| `sankhya.financeiros` | 18 | Customer debt, revenue, expenses, settlements | [financeiros](./api-reference/financeiros.md) |
+| `sankhya.cadastros` | 18 | Operations, natures, companies, negotiation types | [cadastros](./api-reference/cadastros.md) |
 | `sankhya.fiscal` | 2 | Tax calculation, NFS-e import | [fiscal](./api-reference/fiscal.md) |
 | `sankhya.metadata` | 1 | Field discovery (incl. `AD_*`) per entity | [metadata](./api-reference/metadata.md) |
-| `sankhya.gateway` | 3 | Generic CRUD (any entity) | [gateway](./api-reference/gateway-crud.md) |
+| `sankhya.gateway` | 4 | Generic CRUD + `call()` for any service | [gateway](./api-reference/gateway-crud.md) |
+| **`sankhya.dbExplorer`** | 1 | **New.** Read-only pure `SELECT` | [db-explorer](./api-reference/db-explorer.md) |
+| **`sankhya.dataset`** | 3 | **New.** Typed writes/reads over `DatasetSP` | [dataset](./api-reference/dataset.md) |
+| **`sankhya.notas`** | 3 | **New.** Confirm (idempotent), delete, cancel with read-back | [notas](./api-reference/notas.md) |
+| **`sankhya.faturamento`** | 2 | **New.** Invoice with `TGFVAR`+`PENDENTE` guard and read-back proof | [faturamento](./api-reference/faturamento.md) |
+| **`sankhya.conferencia`** | 7 | **New.** Native checking (`TGFCON2`/`TGFCOI2`) | [conferencia](./api-reference/conferencia.md) |
+| **`sankhya.lotes`** | 2 | **New.** Batch stock entry (TOP 1813) and write-off (TOP 1811) | [lotes](./api-reference/lotes.md) |
+
+> **Upgrading from 1.5?** Three breaking changes — host allowlist, integer-only `faturar`
+> input, and injected dependencies for `porLote`/`setTipoControle`/`volumesProduto`.
+> See [Migrando de 1.5 para 1.6](../README.md#migrando-de-15-para-16) and the
+> [CHANGELOG](../CHANGELOG.md).
 
 ## Features
 
@@ -294,6 +309,13 @@ open docs/api/index.html
 | **API Reference** | [docs/api-reference/](./api-reference/) |
 | **Architecture** | [docs/projeto/arquitetura.md](./projeto/arquitetura.md) |
 | **Types** | [docs/api-reference/tipos.md](./api-reference/tipos.md) |
+| **DbExplorer** (pure SELECT) | [docs/api-reference/db-explorer.md](./api-reference/db-explorer.md) |
+| **Dataset** (typed writes) | [docs/api-reference/dataset.md](./api-reference/dataset.md) |
+| **Notas** (confirm/delete/cancel) | [docs/api-reference/notas.md](./api-reference/notas.md) |
+| **Faturamento** (guard + read-back) | [docs/api-reference/faturamento.md](./api-reference/faturamento.md) |
+| **Conferência** (TGFCON2/TGFCOI2) | [docs/api-reference/conferencia.md](./api-reference/conferencia.md) |
+| **Lotes** (entry 1813 / write-off 1811) | [docs/api-reference/lotes.md](./api-reference/lotes.md) |
+| **Changelog** | [CHANGELOG.md](../CHANGELOG.md) |
 
 > Note: Guide documentation is primarily in Portuguese (PT-BR) to align with the Sankhya ERP API naming conventions. Code examples use the SDK's Portuguese method names. The error handling guide is available in [English](./en/error-handling.md).
 

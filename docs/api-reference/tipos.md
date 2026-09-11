@@ -12,14 +12,19 @@ Configuração principal do SDK.
 
 ```typescript
 interface SankhyaConfig {
-  baseUrl: string;                          // URL base (ex: 'https://api.sankhya.com.br')
+  baseUrl: string;                          // URL base (use o host de sandbox nos exemplos)
   clientId: string;                         // OAuth 2.0 client_id
   clientSecret: string;                     // OAuth 2.0 client_secret
   xToken: string;                           // Token do Gateway Sankhya (header X-Token)
   timeout?: number;                         // Timeout em ms (default: 30000)
   retries?: number;                         // Número de retentativas (default: 3)
-  tokenCacheProvider?: TokenCacheProvider;   // Provider customizado para cache de token
+  authRetry?: AuthRetryConfig;              // Retry do OAuth (só falha transiente)
+  circuitBreaker?: CircuitBreakerConfig;    // Breaker local de autenticação
+  tokenCacheProvider?: TokenCacheProvider;  // Provider customizado para cache de token
   logger?: LoggerOptions;                   // Configuração do logger
+  allowProduction?: boolean;                // 1.6.0 — libera host de produção (default: false)
+  allowedHosts?: readonly string[];         // 1.6.0 — hosts extras na allowlist
+  onDegradedResponse?: 'flag';              // hoje sem efeito; default passa a 'throw' na 2.0.0
 }
 ```
 
@@ -394,6 +399,37 @@ interface Volume {
 }
 ```
 
+### `VolumeProduto`
+
+Lido de `TGFVOA` por SQL (`produtos.volumesProduto`). **Novo em 1.6.0.**
+
+```typescript
+interface VolumeProduto {
+  codProd: number;    // TGFVOA.CODPROD — vazio/não numérico/<=0 LANÇA (PARSE_ERROR)
+  codVol: string;     // TGFVOA.CODVOL ('UN', 'CX', ...)
+  quantidade: number; // unidades por volume. 0 quando não cadastrado (M57)
+  lastro: number;     // caixas por camada no palete. 0 quando não cadastrado
+  camadas: number;    // camadas por palete. 0 quando não cadastrado
+  ativo: boolean;     // TGFVOA.ATIVO === 'S'
+}
+```
+
+> `quantidade: 0` é **indistinguível** de "sem cadastro" (D-05) — trate como sem cadastro.
+> A rota de Gateway (`loadRecords` com `rootEntity: 'VolumeProduto'`) foi REFUTADA no
+> sandbox em 2026-09-11: `Erro interno (NPE)`, 0 linhas (RD-7).
+
+### `SetTipoControleInput`
+
+**Novo em 1.6.0.**
+
+```typescript
+interface SetTipoControleInput {
+  readonly codProd: number;        // CODPROD
+  readonly tipo: 'L' | 'N';        // TIPCONTEST: 'L' liga lote, 'N' desliga
+  readonly usaLoteDtVal: boolean;  // USALOTEDTVAL: true grava 'S', false grava 'N'
+}
+```
+
 ### `GrupoProduto`
 
 ```typescript
@@ -487,6 +523,26 @@ interface Estoque {
   codigoLocal: number;
   controle?: string;
   estoque: number;
+}
+```
+
+### `EstoqueLote`
+
+Linha de `TGFEST` lida por `estoque.porLote`. **Novo em 1.6.0.**
+
+```typescript
+interface EstoqueLote {
+  readonly codEmp: number;
+  readonly codLocal: number;
+  readonly codProd: number;
+  readonly controle: string;        // ' ' é a linha FLUTUANTE, de reserva sem lote (M92)
+  readonly tipo: string;            // medido: 'P'
+  readonly codParc: number;         // medido: 0
+  readonly estoque: number;         // coluna vazia/não numérica LANÇA — nunca vira 0
+  readonly reservado: number;       // disponível = estoque - reservado (M102)
+  readonly dtVal: string | null;    // forma CRUA do ERP ('05092027 00:00:00'), não dd/MM/yyyy
+  readonly dtFab: string | null;
+  readonly statusLote: string;      // domínio fechado ('A','Q','P','N','R') — M89
 }
 ```
 
@@ -657,11 +713,15 @@ interface ConfirmarPedidoInput {
 
 ```typescript
 interface FaturarPedidoInput {
-  codigoPedido: number;                    // NUNOTA
-  codigoTipoOperacao: number;
-  dataFaturamento: string;                 // dd/mm/aaaa
-  tipoFaturamento?: TipoFaturamento;
-  faturarTodosItens?: boolean;
+  codigoPedido: number;                    // NUNOTA. INTEIRO desde a 1.6.0 (D-11)
+  codigoTipoOperacao: number;              // INTEIRO desde a 1.6.0 (D-11)
+  dataFaturamento?: string;                // dd/MM/yyyy — OPCIONAL: vazia, o wizard usa a
+                                           // data corrente do ERP (dtFaturamento: '', M51)
+  tipoFaturamento?: TipoFaturamento;       // default FaturamentoNormal
+  faturarTodosItens?: boolean;             // default true. `false` LANÇA (M82)
+  serie?: string;                          // 1.6.0 — default '1' (M49)
+  codigoLocalDestino?: string;             // 1.6.0 — default '' = o do cadastro
+  umaNotaParaCada?: boolean;               // 1.6.0 — default false
 }
 ```
 
@@ -692,13 +752,19 @@ Input para inclusão via Gateway.
 ```typescript
 interface IncluirNotaGatewayInput {
   codigoCliente: number;                   // CODPARC
-  dataNegociacao: string;                  // dd/mm/aaaa
+  dataNegociacao: string;                  // DTNEG
   codigoTipoOperacao: number;              // CODTIPOPER
   codigoTipoNegociacao: number;            // CODTIPVENDA
   codigoVendedor: number;                  // CODVEND
   codigoEmpresa: number;                   // CODEMP
   tipoMovimento: string;                   // TIPMOV (ex: 'P' para Pedido)
-  observacao?: string;
+  observacao?: string;                     // OBSERVACAO
+  statusNota?: 'A' | 'L';                  // 1.6.0 — STATUSNOTA
+  numeroPedidoExterno?: string;            // 1.6.0 — AD_NUMPEDIDO
+  informarPreco?: boolean;                 // 1.6.0 — itens.INFORMARPRECO, default true,
+                                           // serializado como STRING 'True'/'False' (M46)
+  camposExtras?: Record<string, string | number>; // 1.6.0 — cabeçalho cru.
+                                           // Citar chave tipada LANÇA (11 chaves)
   itens: ItemNotaGatewayInput[];
 }
 ```
@@ -708,10 +774,14 @@ interface IncluirNotaGatewayInput {
 ```typescript
 interface ItemNotaGatewayInput {
   codigoProduto: number;                   // CODPROD
-  quantidade: number;                      // QTDNEG
-  valorUnitario: number;                   // VLRUNIT
+  quantidade: number;                      // QTDNEG — finita, > 0
+  valorUnitario: number;                   // VLRUNIT — finito, >= 0. Vai CRU
   unidade: string;                         // CODVOL
   codigoLocalOrigem?: number;              // CODLOCALORIG
+  percentualDesconto?: number;             // 1.6.0 — PERCDESC, default 0, em [0, 100].
+                                           // O ERP EXIGE (CORE_E03235) — D-14
+  valorTotal?: number;                     // 1.6.0 — VLRTOT, finito e >= 0.
+                                           // Default: valorUnitario x quantidade EM CENTAVOS
 }
 ```
 
@@ -1026,11 +1096,16 @@ interface LoadRecordParams {
 interface SaveRecordParams {
   entity: string;
   fields: string;
-  data: Record<string, string>;            // Campos e valores
-  // Se a PK estiver presente em data → UPDATE
-  // Se a PK estiver ausente → INSERT
+  data: Record<string, string>;            // -> dataSet.dataRow.localFields
+  primaryKey?: Record<string, string>;     // 1.6.0 — presente: dataSet.dataRow.key
+                                           // ausente: a chave é omitida
+                                           // {}: recusado com VALIDATION_ERROR
 }
 ```
+
+> **Mudou na 1.6.0 (M34).** Até a 1.5.0 a documentação dizia "PK dentro de `data`" e o SDK
+> mandava os campos em `dataSet.entity`. O formato aceito é `dataSet.dataRow.{key,
+> localFields}`. Ver [gateway-crud.md](./gateway-crud.md#saverecordparams).
 
 ### `GatewayDataRow`
 
@@ -1040,6 +1115,199 @@ interface GatewayDataRow {
   fields: Record<string, string>;
 }
 ```
+
+> **Tipo legado, exportado para compatibilidade.** `loadRecords`, `loadRecord` e
+> `saveRecord` **não** o devolvem: o retorno é `Record<string, string>` plano.
+
+---
+
+## DbExplorer
+
+### `DbExplorerRow`
+
+```typescript
+type DbExplorerRow = Record<string, string>;
+```
+
+Linha do DbExplorer normalizada: toda célula como string.
+
+### `DbExplorerRawResponse`
+
+```typescript
+interface DbExplorerRawResponse {
+  fieldsMetadata?: { name: string }[];  // nomes das colunas, na ordem das células
+  rows?: unknown[][];                   // linhas POSICIONAIS: rows[i][j] <-> fieldsMetadata[j]
+}
+```
+
+Os dois campos são opcionais porque é fronteira externa: consulta sem resultado existe e
+não pode derrubar o processo. As células **não** chegam sempre como string — `CODLOCAL`
+veio `number` no spike — por isso `unknown[][]` e conversão explícita no resource.
+
+---
+
+## Dataset
+
+### `DatasetEntity`
+
+```typescript
+type DatasetEntity =
+  | 'CabecalhoNota' | 'ItemNota' | 'Estoque' | 'Produto'
+  | 'CabecalhoConferencia' | 'DetalhesConferencia'
+  | 'ContagemEstoque';  // SOMENTE leitura/histórico — gravar NÃO move estoque (M105)
+```
+
+União fechada de propósito: `save` escreve no ERP, e uma string livre abriria a porta para
+qualquer entidade.
+
+### `DatasetRecord`
+
+```typescript
+interface DatasetRecord {
+  readonly pk?: Readonly<Record<string, string>>;  // ausente = inserção (M88)
+  readonly values: Readonly<Record<string, string>>; // chave = índice POSICIONAL em fields
+}
+```
+
+Construa com `datasetRecord(fields, { pk?, set })` — escrever o índice à mão é a fonte de
+bug mais provável desta API.
+
+### `DatasetSaveParams` · `DatasetSaveResult` · `DatasetRemoveParams` · `DatasetLoadParams`
+
+```typescript
+interface DatasetSaveParams {
+  readonly entityName: DatasetEntity;
+  readonly fields: readonly string[];
+  readonly records: readonly DatasetRecord[];
+  readonly standAlone?: boolean;          // default false — true desliga regras/gatilhos
+}
+
+interface DatasetSaveResult {
+  readonly total: number;
+  readonly result: readonly (readonly string[])[];  // a célula `_rmd` é descartada (RD-8)
+}
+
+interface DatasetRemoveParams {
+  readonly entityName: DatasetEntity;
+  readonly pks: ReadonlyArray<Record<string, string>>;  // vazia/pk vazia recusadas (R2)
+  readonly standAlone?: boolean;
+}
+
+interface DatasetLoadParams {
+  readonly entityName: DatasetEntity;
+  readonly fields: readonly string[];
+  readonly criteria?: string;
+  readonly page?: number;
+}
+```
+
+---
+
+## Notas
+
+```typescript
+interface ConfirmarNotaResult {
+  readonly confirmada: true;              // sempre true: o método resolve ou lança
+  readonly jaEstavaConfirmada: boolean;   // true quando o ERP disse "já foi confirmada" (M80)
+}
+
+interface CancelarNotaInput {
+  readonly nunota: number;                // inteiro positivo
+  readonly justificativa: string;         // não vazia — vai para TGFCAN.MOTCANCEL
+}
+
+interface CancelarNotaResult {
+  readonly totalNotasCanceladas: number;  // o que o GATEWAY disse
+  readonly gerouRecebimento: boolean;     // o que o GATEWAY disse
+  readonly confirmadoPorReadBack: boolean; // o que o BANCO mostra — a única prova
+  readonly statusNfe: string | null;
+  readonly avisoRespostaGateway?: string; // só quando o estado veio do read-back
+}
+```
+
+---
+
+## Faturamento
+
+```typescript
+interface FaturarInput {
+  readonly nunotaPedido: number;          // NUNOTA do PEDIDO, inteiro positivo
+  readonly codigoTipoOperacao: number;    // TOP (ex.: 1101), inteiro positivo
+  readonly serie?: string;                // default '1' (M49)
+}
+
+type FaturarMotivo = 'FATURADO' | 'JA_FATURADO' | 'NAO_PENDENTE';
+
+interface FaturarResult {
+  readonly faturado: boolean;             // true SÓ quando esta chamada gerou a nota
+  readonly nunotaNota: number | null;     // lida em TGFVAR, nunca no HTTP 200
+  readonly motivo: FaturarMotivo;
+}
+
+interface VarLinha {
+  readonly nunota: number;                // a 1101 gerada
+  readonly sequencia: number;
+  readonly sequenciaOrig: number;
+  readonly qtdAtendida: number;           // pode ser fracionária
+}
+```
+
+---
+
+## Conferencia
+
+```typescript
+interface CarimbarSeparacaoInput { nunota: number; dataHora: string; nomeSeparador: string }
+interface AbrirConferenciaInput  { nunota: number; codUsuConf: number; dataHora: string }
+interface AbrirConferenciaResult { nuconf: number }
+interface BiparInput {
+  nuconf: number; seqConf: number; codProd: number;
+  codVol: string; qtdConf: number; codBarra: string;
+  controle: string;                       // string vazia é aceita (produto sem lote)
+}
+interface FecharConferenciaInput { nuconf: number; dataHora: string }
+interface ApontarNaNotaInput    { nunota: number; nuconf: number }   // E1 (M107)
+interface ReapontarOrigemInput  { nuconf: number; nunota: number }   // E2 (M108)
+interface ConferenciaDaNota     { nuconf: number; status: string }   // 'A' | 'F' | 'D' | ...
+```
+
+Toda `dataHora` é `dd/MM/yyyy HH:mm:ss` **já formatada** — o SDK não formata data.
+
+---
+
+## Lotes
+
+```typescript
+interface EntradaLoteItem {
+  readonly controle: string;   // TGFEST.CONTROLE, preenchido
+  readonly quantidade: number; // > 0
+  readonly vlrUnit: number;    // >= 0
+  readonly dtVal: string;      // dd/MM/yyyy — OBRIGATÓRIA (M97)
+  readonly dtFab: string;      // dd/MM/yyyy — OBRIGATÓRIA (M97)
+}
+
+interface EntradaLoteInput {
+  readonly codEmp: number; readonly codLocal: number; readonly codProd: number;
+  readonly dtNeg: string; readonly observacao: string;
+  readonly itens: ReadonlyArray<EntradaLoteItem>;
+}
+
+interface BaixaLoteItem {
+  readonly codLocal: number;
+  readonly quantidade: number;
+  readonly controle?: string;  // ou TODOS informam, ou NENHUM (M92)
+}
+
+interface BaixaLoteInput {
+  readonly codEmp: number; readonly codProd: number;
+  readonly dtNeg: string; readonly observacao: string;
+  readonly itens: ReadonlyArray<BaixaLoteItem>;
+}
+
+interface NotaDeLoteResult { readonly nunota: number }  // nunca inventado: ausente lança
+```
+
+---
 
 ---
 
@@ -1101,3 +1369,70 @@ class TimeoutError extends SankhyaError {
   readonly code = 'TIMEOUT_ERROR';
 }
 ```
+
+### `CircuitOpenError`
+
+Breaker local aberto — o servidor **não** foi contatado nesta chamada.
+
+```typescript
+class CircuitOpenError extends AuthError {
+  readonly code = 'CIRCUIT_OPEN';
+  readonly retryAfterMs: number;   // ms estimados até o breaker reabrir
+}
+```
+
+> `isAuthError()` também devolve `true` para `CircuitOpenError` (retrocompat) — cheque
+> `isCircuitOpenError()` **antes**.
+
+### `SankhyaErrorCode` — e por que ela NÃO é exaustiva
+
+```typescript
+type SankhyaErrorCode =
+  | 'AUTH_ERROR' | 'API_ERROR' | 'GATEWAY_ERROR' | 'TIMEOUT_ERROR' | 'CIRCUIT_OPEN';
+```
+
+Estes são os códigos das **classes** de erro. Mas `SankhyaError` aceita qualquer string em
+`code`, e o SDK lança hoje **17** valores diferentes. Os 12 abaixo estão **fora da união
+tipada** — consolidação prevista, ainda não feita (D-07/D-09):
+
+| Código | Onde nasce | Significa |
+|---|---|---|
+| `VALIDATION_ERROR` | todos os resources | entrada recusada **antes da rede** |
+| `PARSE_ERROR` | `estoque`, `produtos`, `dataset`, `notas` | coluna numérica vazia ou não numérica — `0` seria conclusão errada |
+| `NOT_FOUND` | REST v1 | recurso inexistente |
+| `PRODUCTION_BLOCKED` | `assertAllowedHost` | host de produção sem `allowProduction: true` |
+| `METADATA_INVALID_INPUT`, `METADATA_EMPTY` | `metadata` | entrada inválida / metadata vazia |
+| `DB_EXPLORER_ROW_MISMATCH` | `dbExplorer.query` | linha com nº de colunas ≠ `fieldsMetadata` |
+| `DATASET_SAVE_MALFORMED_RESPONSE` | `dataset.save` | resposta sem `total`/`result` utilizável, ou célula em forma não prevista |
+| `CANCELAR_NOTA_READ_BACK_INDISPONIVEL` | `notas.cancelar` | o read-back falhou **depois** do comando enviado |
+| `CANCELAR_NOTA_DESFECHO_INDETERMINADO` | `notas.cancelar` | sem resposta do gateway **e** sem linha em `TGFCAN` |
+| `FATURAR_DESFECHO_INDETERMINADO` | `faturamento.faturar` | o ERP aceitou/recusou e `TGFVAR` não mostra nota |
+| `FATURAR_VAR_INVALIDA` | `faturamento.consultarVar` | coluna de `TGFVAR` não utilizável |
+| `CONFERENCIA_SEM_CARIMBO` | `conferencia.abrir` | nota sem `AD_DTHRSEPARACAO` (M76) |
+| `CONFERENCIA_DUPLICADA` | `conferencia.abrir` | a nota já tem conferência (M110) |
+| `CONFERENCIA_NUCONF_AUSENTE` | `conferencia.abrir` | o `save` não devolveu NUCONF utilizável |
+| `CONFERENCIA_NUCONF_INVALIDO` | `conferencia.listarPorNota` | `TGFCON2` devolveu NUCONF não utilizável |
+| `LOTES_NUNOTA_AUSENTE` | `lotes.entrada1813` / `baixa1811` | o `save` não devolveu o NUNOTA |
+
+> **Compare `err.code` como string.** Um `switch` exaustivo sobre `SankhyaErrorCode` não
+> cobre nada disso, e o TypeScript não vai avisar.
+
+> **`INCOMPLETE_READ` não existe.** RD-5 previu o código para leitura paginada truncada,
+> mas a paginação que o motivava (`produtos.volumesProduto`) deixou de existir com RD-7.
+> Nenhum caminho do SDK o emite hoje.
+
+### `SankhyaFailureKind`
+
+Não é código de erro: é a **camada** da falha, devolvida por `classifyFailure(err)`.
+
+```typescript
+type SankhyaFailureKind = 'AUTH_FAIL' | 'NEGOCIO' | 'TIMEOUT';
+```
+
+- `AUTH_FAIL` — credencial/breaker; o passo não chegou a ser aceito, retry é seguro.
+- `NEGOCIO` — o ERP entendeu e recusou; **TERMINAL**, nunca retry.
+- `TIMEOUT` — desfecho **desconhecido**; decide por read-back, jamais por suposição (R8).
+  HTTP **408**, 429 e 5xx caem aqui, e falha que não se sabe classificar também:
+  desconhecido nunca é terminal.
+
+Tabela completa em [cliente-sdk.md](./cliente-sdk.md#classificar-uma-falha--classifyfailure).

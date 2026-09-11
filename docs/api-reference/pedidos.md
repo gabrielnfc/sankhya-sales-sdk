@@ -146,6 +146,14 @@ for (const pedido of pedidos.data) {
 
 **Endpoint REST:** `GET /v1/vendas/pedidos?page={page}&codigoEmpresa={codigoEmpresa}&...`
 
+**Paginação automática:**
+
+```typescript
+for await (const page of sankhya.pedidos.consultarTodos({ codigoEmpresa: 1 })) {
+  for (const pedido of page.data) { /* ... */ }
+}
+```
+
 ---
 
 ## Métodos Gateway
@@ -155,7 +163,7 @@ for (const pedido of pedidos.data) {
 Confirma um pedido no ERP. **Obrigatório** após criação via REST v1.
 
 ```typescript
-sankhya.pedidos.confirmar(input: ConfirmarPedidoInput): Promise<void>
+sankhya.pedidos.confirmar(input: ConfirmarPedidoInput): Promise<ConfirmarPedidoResult>
 ```
 
 | Campo | Tipo | Obrigatório | Descrição |
@@ -163,16 +171,24 @@ sankhya.pedidos.confirmar(input: ConfirmarPedidoInput): Promise<void>
 | `codigoPedido` | `number` | Sim | NUNOTA |
 | `compensarAutomaticamente` | `boolean` | Não | Compensar automaticamente (default: false) |
 
-> **Não existe endpoint REST v1** para confirmação. O SDK usa internamente o Gateway `CACSP.confirmarNota` com body `ServicosNfeSP.confirmarNota` (divergência URL/body é comportamento esperado).
+> **Não existe endpoint REST v1** para confirmação. O SDK usa o Gateway
+> `CACSP.confirmarNota`.
+
+**Retorno (desde a 1.4.0):** `{ responseBody? }` normalizado — `liberacoes.liberacao`,
+objeto ou array, vira SEMPRE `liberacoes: ConfirmarPedidoLiberacao[]`; corpo vazio/ausente
+vira `responseBody: undefined`. `status "0"` continua lançando `GatewayError`. Quem
+ignorava o retorno `void` anterior segue funcionando.
 
 **Exemplo:**
 
 ```typescript
-await sankhya.pedidos.confirmar({ codigoPedido: 98765 });
+const { responseBody } = await sankhya.pedidos.confirmar({ codigoPedido: 98765 });
+if (responseBody?.liberacoes?.length) {
+  // a nota ficou STATUSNOTA='A' aguardando liberação de crédito
+}
 ```
 
 **Endpoint Gateway:** `CACSP.confirmarNota` (MGECOM)
-**Body serviceName:** `ServicosNfeSP.confirmarNota`
 
 **O que a confirmação faz:**
 - Gera financeiro no ERP
@@ -180,11 +196,16 @@ await sankhya.pedidos.confirmar({ codigoPedido: 98765 });
 - Permite faturamento posterior
 - Permite cancelamento via ERP
 
+> **Precisa de idempotência?** Use [`notas.confirmar`](./notas.md#confirmarnunota-options):
+> nota já confirmada resolve `{ confirmada: true, jaEstavaConfirmada: true }` em vez de
+> lançar (M80). As duas portas coexistem nesta versão — veja
+> [`notas.confirmar` × `pedidos.confirmar`](./notas.md#qual-confirmar-usar).
+
 ---
 
 ### `faturar(input)`
 
-Fatura um pedido confirmado.
+Fatura um pedido confirmado. Dispara o wizard **sem consultar o banco**.
 
 ```typescript
 sankhya.pedidos.faturar(input: FaturarPedidoInput): Promise<void>
@@ -192,11 +213,18 @@ sankhya.pedidos.faturar(input: FaturarPedidoInput): Promise<void>
 
 | Campo | Tipo | Obrigatório | Descrição |
 |-------|------|-------------|-----------|
-| `codigoPedido` | `number` | Sim | NUNOTA |
-| `codigoTipoOperacao` | `number` | Sim | CODTIPOPER para faturamento |
-| `dataFaturamento` | `string` | Sim | `dd/mm/aaaa` |
-| `tipoFaturamento` | `TipoFaturamento` | Não | Default: `Normal` |
-| `faturarTodosItens` | `boolean` | Não | Default: `true` |
+| `codigoPedido` | `number` | Sim | NUNOTA. **Inteiro** — mudou na 1.6.0 |
+| `codigoTipoOperacao` | `number` | Sim | CODTIPOPER para faturamento. **Inteiro** — mudou na 1.6.0 |
+| `dataFaturamento` | `string` | Não | `dd/MM/yyyy`. Omitida ou vazia, o wizard usa a data corrente do ERP (`dtFaturamento: ''` medido em M51) |
+| `tipoFaturamento` | `TipoFaturamento` | Não | Default: `FaturamentoNormal` |
+| `faturarTodosItens` | `boolean` | Não | Default: `true`. **`false` lança** (M82) |
+| `serie` | `string` | Não | Default `'1'` (medida em M49) |
+| `codigoLocalDestino` | `string` | Não | `CODLOCALDEST`; default `''` = o do cadastro |
+| `umaNotaParaCada` | `boolean` | Não | Default `false` |
+
+> **Aperto de contrato na 1.6.0 (D-11).** `validateFaturarPedidoInput` — que é export
+> público — passou a exigir **inteiro** em `codigoPedido` e `codigoTipoOperacao`. Antes
+> qualquer número finito passava e `'1.5'` chegava ao payload do ERP.
 
 **Tipos de faturamento:**
 
@@ -207,7 +235,11 @@ sankhya.pedidos.faturar(input: FaturarPedidoInput): Promise<void>
 | `TipoFaturamento.EstoqueDeixandoPendente` | `FaturamentoEstoqueDeixandoPendente` | Fatura estoque, pendencia o resto |
 | `TipoFaturamento.Direto` | `FaturamentoDireto` | Faturamento direto |
 
-> **Pré-requisito:** O pedido **deve estar confirmado**.
+> **Pré-requisito:** o pedido **deve estar confirmado**.
+>
+> **Faturamento parcial não existe (M82).** `faturarTodosItens: false` lança
+> `VALIDATION_ERROR` antes de qualquer chamada — 0 de 4 formas testadas geraram a 1101.
+> Ajuste as quantidades do pedido antes de faturar.
 
 **Exemplo:**
 
@@ -216,25 +248,124 @@ import { TipoFaturamento } from 'sankhya-sales-sdk';
 
 await sankhya.pedidos.faturar({
   codigoPedido: 98765,
-  codigoTipoOperacao: 167,
-  dataFaturamento: '01/04/2026',
+  codigoTipoOperacao: 1101,
   tipoFaturamento: TipoFaturamento.Normal,
 });
 ```
 
 **Endpoint Gateway:** `SelecaoDocumentoSP.faturar` (MGECOM)
 
+O corpo vem inteiro de `buildFaturarWizardPayload` — as **16 chaves** medidas em
+`spike-raw/faturamento/S2_FATURAR_1.json`, com os booleanos em **string** e `nota` como
+**array**. A lista está em [faturamento.md](./faturamento.md#o-payload-do-wizard-16-chaves-com-booleano-em-string).
+
+> **Quer guard e prova?** [`faturamento.faturar`](./faturamento.md#faturarinput-options)
+> lê `TGFVAR` e `TGFCAB.PENDENTE` **antes** de mandar e devolve a NUNOTA da 1101 lida no
+> banco **depois** — o HTTP 200 do Gateway não prova que a nota nasceu (M79/M81).
+
 ---
 
 ### `incluirNotaGateway(input)`
 
-Inclui pedido via Gateway (alternativa ao REST v1).
+Inclui pedido/nota via Gateway, no formato aceito pelo 4midware (M34/M46).
 
 ```typescript
-sankhya.pedidos.incluirNotaGateway(input: IncluirNotaGatewayInput): Promise<{ codigoPedido: number }>
+sankhya.pedidos.incluirNotaGateway(
+  input: IncluirNotaGatewayInput,
+): Promise<{ codigoPedido: number }>
+```
+
+**Cabeçalho — campos tipados:**
+
+| Campo | Sankhya | Obrigatório | Descrição |
+|-------|---------|-------------|-----------|
+| `codigoCliente` | `CODPARC` | Sim | — |
+| `dataNegociacao` | `DTNEG` | Sim | — |
+| `codigoTipoOperacao` | `CODTIPOPER` | Sim | — |
+| `codigoTipoNegociacao` | `CODTIPVENDA` | Sim | — |
+| `codigoVendedor` | `CODVEND` | Sim | — |
+| `codigoEmpresa` | `CODEMP` | Sim | — |
+| `tipoMovimento` | `TIPMOV` | Sim | — |
+| `observacao` | `OBSERVACAO` | Não | Omitido, o campo não vai no cabeçalho |
+| `statusNota` | `STATUSNOTA` | Não | **Novo em 1.6.0.** `'A'` aberta, `'L'` liberada. Omitido, o ERP aplica o default do TOP |
+| `numeroPedidoExterno` | `AD_NUMPEDIDO` | Não | **Novo em 1.6.0.** Número do pedido no sistema de origem (marketplace/e-commerce) |
+| `informarPreco` | `itens.INFORMARPRECO` | Não (default `true`) | **Novo em 1.6.0.** Serializado como a STRING `'True'`/`'False'` (M46) |
+| `camposExtras` | — | Não | **Novo em 1.6.0.** Campos crus do cabeçalho (`AD_MARKET_PLACE`, `CIF_FOB`, `CODCENCUS`, …) |
+
+**Itens (`ItemNotaGatewayInput`):**
+
+| Campo | Sankhya | Obrigatório | Descrição |
+|-------|---------|-------------|-----------|
+| `codigoProduto` | `CODPROD` | Sim | — |
+| `quantidade` | `QTDNEG` | Sim | Finita, **> 0** |
+| `valorUnitario` | `VLRUNIT` | Sim | Finito, >= 0. Vai **cru**, sem arredondamento |
+| `unidade` | `CODVOL` | Sim | — |
+| `codigoLocalOrigem` | `CODLOCALORIG` | Não | — |
+| `percentualDesconto` | `PERCDESC` | Não (default **0**) | **Novo em 1.6.0.** Finito, em `[0, 100]` |
+| `valorTotal` | `VLRTOT` | Não (default `valorUnitario × quantidade` **em centavos**) | **Novo em 1.6.0.** Finito, >= 0 |
+
+**Exemplo:**
+
+```typescript
+const { codigoPedido } = await sankhya.pedidos.incluirNotaGateway({
+  codigoCliente: 312984,
+  dataNegociacao: '06/09/2026',
+  codigoTipoOperacao: 1001,
+  codigoTipoNegociacao: 1,
+  codigoVendedor: 0,
+  codigoEmpresa: 2,
+  tipoMovimento: 'P',
+  statusNota: 'A',
+  numeroPedidoExterno: 'SDK-T-1200',
+  camposExtras: { CODNAT: '01010101', CODCENCUS: '204004', CIF_FOB: 'C' },
+  itens: [
+    { codigoProduto: 10077, quantidade: 1, valorUnitario: 10, unidade: 'UN', codigoLocalOrigem: 30301 },
+  ],
+});
 ```
 
 **Endpoint Gateway:** `CACSP.incluirNota` (MGECOM)
+
+#### O que o ERP exige
+
+**`NUNOTA: {}` — objeto vazio, não `{ $: '' }` — no cabeçalho E em cada item** (M34/M46).
+`itens.INFORMARPRECO` é a STRING `'True'`/`'False'`, fora do serializador. Não
+"simplificar".
+
+**`PERCDESC` e `VLRTOT` são do ITEM, e não são decorativos.** Sem o percentual,
+`CACSP.incluirNota` recusa com `O campo 'Perc. desconto' deve ser informado.`
+(`CORE_E03235`) — medido duas vezes na lane em 2026-09-11, e a recusa **sobreviveu** a
+`PERCDESC` no cabeçalho. O item aceito em 06/09 (`spike-raw/faturamento/ped.ts:6`,
+`S2_INCLUIR_P1.json`) tem 8 chaves, com os dois. O SDK manda `PERCDESC: 0` quando o
+chamador não informa, em vez de omitir a chave.
+
+**`VLRTOT` default é calculado em CENTAVOS.** `1.01 × 3` em ponto flutuante serializa como
+`'3.0300000000000002'`, e 19,17% dos pares medidos (preço de 2 casas entre R$1 e R$500 ×
+quantidade 1–20) passavam de 2 casas — e a reação do ERP a uma 17ª casa num campo de
+dinheiro é **desconhecida**. Implicações declaradas: meio centavo sobe (`0.005 × 1` →
+`'0.01'`), preço abaixo de meio centavo colapsa em `'0'`, e `VLRUNIT` vai **cru** — logo
+`VLRUNIT × QTDNEG` pode diferir do `VLRTOT` em até 1 centavo. Informe `valorTotal`
+explicitamente quando o total não for o produto direto (desconto embutido, rateio de
+frete, arredondamento próprio).
+
+**`camposExtras` é obrigatório na prática (D-14).** O SDK tipa **11** chaves de cabeçalho;
+o cabeçalho que o ERP aceitou em 06/09 tem **29** (`spike-raw/faturamento/ped.ts:8`, o
+cabeçalho de referência). A lane mediu que pelo menos `CODNAT` é exigido — `CORE_E00899`,
+parâmetro `EXIGNATCFR` ligado, valor aceito medido `01010101` —, 2 de 2 chamadas
+recusadas. Use `camposExtras` para o resto.
+
+**`camposExtras` não pode escrever em campo tipado.** Citar qualquer uma das 11 chaves
+(`NUNOTA`, `CODPARC`, `DTNEG`, `CODTIPOPER`, `CODTIPVENDA`, `CODVEND`, `CODEMP`, `TIPMOV`,
+`OBSERVACAO`, `STATUSNOTA`, `AD_NUMPEDIDO`) **lança** `VALIDATION_ERROR`, sem rede —
+inclusive quando o campo tipado correspondente foi omitido nesta chamada. Nada é
+sobrescrito nem contrabandeado em silêncio.
+
+> Semântica **oposta** à de `pedidos.criar()`, cujo `camposExtras` faz `Object.assign` sem
+> guarda de colisão (D-02).
+
+**O NUNOTA de retorno é lido em `pk.NUNOTA.$` → `nota.NUNOTA.$` → raiz `NUNOTA`**, nessa
+ordem. Ausente nos três, o método **lança** `API_ERROR` em vez de devolver `0`: NUNOTA `0`
+não existe, e um id silencioso seria levado para `confirmar`/`faturar`.
 
 ---
 
@@ -265,18 +396,6 @@ sankhya.pedidos.excluirItem(codigoPedido: number, sequencia: number): Promise<vo
 
 ---
 
-### `simularImpostos(codigoPedido)`
-
-Simula impostos e valores de um pedido.
-
-```typescript
-sankhya.pedidos.simularImpostos(codigoPedido: number): Promise<unknown>
-```
-
-**Endpoint Gateway:** `CentralVendaRapidaSP.simularValoresNota` (MGECOM)
-
----
-
 ## Fluxo Completo
 
 ```
@@ -287,11 +406,17 @@ sankhya.pedidos.simularImpostos(codigoPedido: number): Promise<unknown>
 
 Veja o [Guia: Fluxo de Venda Completo](../guia/fluxo-venda-completo.md) para código detalhado.
 
+No caminho do WMS (expedição), os passos 2 e 3 ganham guards e prova por read-back:
+[`notas.confirmar`](./notas.md), [`faturamento.faturar`](./faturamento.md) e
+[`conferencia.*`](./conferencia.md).
+
 ---
 
 ## Links
 
 - [Tipos: PedidoVendaInput, PedidoVenda, ConfirmarPedidoInput, FaturarPedidoInput](./tipos.md#pedidos)
 - [Preços Contextualizados](./precos.md#contextualizadoinput--crítico)
+- [Faturamento com guard e read-back](./faturamento.md)
+- [Notas: confirmar idempotente, excluir, cancelar](./notas.md)
 - [Fluxo de Venda Completo](../guia/fluxo-venda-completo.md)
 - [SankhyaClient](./cliente-sdk.md)

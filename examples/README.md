@@ -7,11 +7,18 @@ Scripts executaveis demonstrando as principais funcionalidades do SDK.
 Configure as variaveis de ambiente:
 
 ```bash
-export SANKHYA_BASE_URL=https://api.sankhya.com.br
+export SANKHYA_BASE_URL=https://api.sandbox.sankhya.com.br
 export SANKHYA_CLIENT_ID=seu-client-id
 export SANKHYA_CLIENT_SECRET=seu-client-secret
 export SANKHYA_X_TOKEN=seu-x-token
 ```
+
+> **Use o sandbox.** Desde a 1.6.0 o `SankhyaClient` tem allowlist de host fail-closed:
+> host de sandbox sobe sem flag; host de produção exige `allowProduction: true` e emite
+> um `logger.warn`; qualquer outro host precisa constar de `allowedHosts`, senão o
+> construtor **aborta**. Todos os scripts desta pasta leem `SANKHYA_BASE_URL` do ambiente
+> — aponte-a para o sandbox. Ver
+> [SankhyaClient — Guarda de ambiente](../docs/api-reference/cliente-sdk.md#guarda-de-ambiente-allowlist-de-host-fail-closed).
 
 ## Executando
 

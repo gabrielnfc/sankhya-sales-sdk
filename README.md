@@ -14,7 +14,7 @@ SDK TypeScript para integração com as **APIs comerciais do Sankhya ERP**. Tipa
 
 ## Escopo
 
-Cobre operações comerciais do Sankhya Om (v4.34+): **vendas, clientes, produtos, preços, estoque, pedidos, financeiro e fiscal**. Total de 67 operações (55 REST v1 + 12 Gateway).
+Cobre operações comerciais do Sankhya Om (v4.34+): **vendas, clientes, produtos, preços, estoque, pedidos, financeiro e fiscal**, mais o caminho de expedição do WMS (conferência nativa, faturamento com prova, lotes). **103 métodos públicos em 17 recursos** — contagem estática de 2026-09-11, ver [Módulos](#módulos).
 
 ## Instalação
 
@@ -234,19 +234,131 @@ await sankhya.financeiros.baixarReceita({
 
 ## Módulos
 
+**103 métodos públicos** em 17 recursos, na contagem estática que o repositório usa como gate
+(`grep -hE '^  (async )?[a-zA-Z][a-zA-Z0-9]*(<[^>]*>)?\(' src/resources/*.ts | grep -vc constructor`,
+medida em 2026-09-11). A contagem inclui os helpers de varredura `listarTodos*`.
+
 | Módulo | Métodos | Descrição | Docs |
 |--------|---------|-----------|------|
-| `sankhya.clientes` | 5 | Clientes e contatos | [clientes](./docs/api-reference/clientes.md) |
-| `sankhya.vendedores` | 2 | Consulta de vendedores | [vendedores](./docs/api-reference/vendedores.md) |
-| `sankhya.produtos` | 9 | Catálogo, componentes, volumes, grupos | [produtos](./docs/api-reference/produtos.md) |
-| `sankhya.precos` | 4 | Tabelas de preço e preço contextualizado | [precos](./docs/api-reference/precos.md) |
-| `sankhya.estoque` | 5 | Estoque e locais de armazenamento | [estoque](./docs/api-reference/estoque.md) |
-| `sankhya.pedidos` | 9 | Criar, consultar, confirmar, faturar | [pedidos](./docs/api-reference/pedidos.md) |
-| `sankhya.financeiros` | 13 | Débitos do cliente, receitas, despesas, baixas | [financeiros](./docs/api-reference/financeiros.md) |
-| `sankhya.cadastros` | 11 | TOPs, naturezas, empresas, tipos negociação | [cadastros](./docs/api-reference/cadastros.md) |
+| `sankhya.clientes` | 6 | Clientes e contatos | [clientes](./docs/api-reference/clientes.md) |
+| `sankhya.vendedores` | 3 | Consulta de vendedores | [vendedores](./docs/api-reference/vendedores.md) |
+| `sankhya.produtos` | 12 | Catálogo, componentes, volumes (`TGFVOA`), grupos, virada de controle de lote | [produtos](./docs/api-reference/produtos.md) |
+| `sankhya.precos` | 5 | Tabelas de preço e preço contextualizado | [precos](./docs/api-reference/precos.md) |
+| `sankhya.estoque` | 6 | Estoque, locais e saldo **por lote** (`TGFEST`) | [estoque](./docs/api-reference/estoque.md) |
+| `sankhya.pedidos` | 10 | Criar, consultar, confirmar, faturar | [pedidos](./docs/api-reference/pedidos.md) |
+| `sankhya.financeiros` | 18 | Débitos do cliente, receitas, despesas, baixas | [financeiros](./docs/api-reference/financeiros.md) |
+| `sankhya.cadastros` | 18 | TOPs, naturezas, empresas, tipos negociação | [cadastros](./docs/api-reference/cadastros.md) |
 | `sankhya.fiscal` | 2 | Cálculo de impostos, NFS-e | [fiscal](./docs/api-reference/fiscal.md) |
 | `sankhya.metadata` | 1 | Descoberta de campos (incl. `AD_*`) por entidade | [metadata](./docs/api-reference/metadata.md) |
-| `sankhya.gateway` | 3 | CRUD genérico (qualquer entidade) | [gateway](./docs/api-reference/gateway-crud.md) |
+| `sankhya.gateway` | 4 | CRUD genérico + `call()` para qualquer serviço | [gateway](./docs/api-reference/gateway-crud.md) |
+| **`sankhya.dbExplorer`** | 1 | **Novo.** `SELECT` puro somente-leitura | [db-explorer](./docs/api-reference/db-explorer.md) |
+| **`sankhya.dataset`** | 3 | **Novo.** Escrita/leitura tipada sobre o `DatasetSP` | [dataset](./docs/api-reference/dataset.md) |
+| **`sankhya.notas`** | 3 | **Novo.** Confirmar (idempotente), excluir, cancelar com read-back | [notas](./docs/api-reference/notas.md) |
+| **`sankhya.faturamento`** | 2 | **Novo.** Faturar com guard `TGFVAR`+`PENDENTE` e prova por read-back | [faturamento](./docs/api-reference/faturamento.md) |
+| **`sankhya.conferencia`** | 7 | **Novo.** Conferência nativa `TGFCON2`/`TGFCOI2` | [conferencia](./docs/api-reference/conferencia.md) |
+| **`sankhya.lotes`** | 2 | **Novo.** Entrada (TOP 1813) e baixa (TOP 1811) de estoque por lote | [lotes](./docs/api-reference/lotes.md) |
+
+### Os módulos novos em uma chamada cada
+
+Todos os exemplos assumem um `sankhya` construído contra o **sandbox**
+(`https://api.sandbox.sankhya.com.br`), como na seção [Configuração](#configuracao).
+
+```typescript
+// gateway.call — serviço arbitrário do Gateway, responseBody cru
+const out = await sankhya.gateway.call('mgecom', 'CACSP.confirmarNota', {
+  nota: { NUNOTA: { $: '1378934' } },
+});
+
+// dbExplorer.query — SELECT puro; qualquer outra coisa é recusada antes da rede
+const linhas = await sankhya.dbExplorer.query<{ NUNOTA: string; STATUSNOTA: string }>(
+  'SELECT NUNOTA, STATUSNOTA FROM TGFCAB WHERE NUNOTA = 1889309',
+);
+
+// dataset — values é indexado pela POSIÇÃO em fields; use datasetRecord()
+import { datasetRecord } from 'sankhya-sales-sdk';
+const fields = ['NUNOTA', 'NUCONFATUAL'];
+await sankhya.dataset.save({
+  entityName: 'CabecalhoNota',
+  fields,
+  records: [datasetRecord(fields, { pk: { NUNOTA: '1889349' }, set: { NUCONFATUAL: '281956' } })],
+});
+
+// notas — confirmar é idempotente: nota já confirmada não é falha
+const r = await sankhya.notas.confirmar(1889309);
+if (r.jaEstavaConfirmada) console.log('nada a fazer');
+
+// faturamento — a NUNOTA da 1101 vem de TGFVAR, nunca do HTTP 200
+const fat = await sankhya.faturamento.faturar({ nunotaPedido: 1889309, codigoTipoOperacao: 1101 });
+if (fat.nunotaNota === null) console.log('nada foi faturado:', fat.motivo);
+
+// conferencia — o ciclo é carimbar → abrir → bipar (n×) → fechar
+await sankhya.conferencia.carimbarSeparacao({
+  nunota: 1889338, dataHora: '06/09/2026 12:55:34', nomeSeparador: 'JOAO',
+});
+const { nuconf } = await sankhya.conferencia.abrir({
+  nunota: 1889338, codUsuConf: 69, dataHora: '06/09/2026 12:55:34',
+});
+
+// lotes — entrada com validade (TOP 1813); as datas vão ANTES de confirmar
+const { nunota } = await sankhya.lotes.entrada1813({
+  codEmp: 2, codLocal: 30301, codProd: 10077,
+  dtNeg: '06/09/2026', observacao: 'entrada lote',
+  itens: [{ controle: 'L-A', quantidade: 10, vlrUnit: 1, dtVal: '06/09/2027', dtFab: '06/09/2026' }],
+});
+
+// estoque.porLote — saldo por CONTROLE, que a REST v1 não expõe
+const lotes = await sankhya.estoque.porLote({ codProd: 10077, codEmp: 2 });
+```
+
+## Migrando de 1.5 para 1.6
+
+Três mudanças quebram código que funcionava. Nenhuma delas é silenciosa: todas
+lançam com a causa na mensagem.
+
+**1. O host precisa passar pela allowlist.** Antes o cliente subia contra qualquer
+host. Agora, host de **sandbox** continua passando sozinho (o marcador `sandbox`
+basta — não precisa de `allowedHosts`); qualquer outro host precisa constar de
+`allowedHosts`; e host de **produção** exige `allowProduction: true`, que emite um
+`logger.warn` citando só o host. Detalhes e tabela de decisão em
+[Guarda de ambiente](#guarda-de-ambiente-allowlist-de-host-fail-closed).
+
+```typescript
+// não é sandbox nem produção → declare o host
+new SankhyaClient({
+  baseUrl: 'https://erp.interno.example.local',
+  allowedHosts: ['erp.interno.example.local'],
+  // ...credenciais...
+});
+```
+
+**2. `faturar` exige inteiro.** `validateFaturarPedidoInput` (export público) passou
+a recusar `codigoPedido` e `codigoTipoOperacao` não inteiros — antes qualquer número
+finito passava e `'1.5'` chegava ao payload do ERP. Se você deriva o NUNOTA de um
+cálculo, arredonde antes.
+
+**3. `estoque.porLote`, `produtos.setTipoControle` e `produtos.volumesProduto`
+precisam de dependências injetadas.** Elas leem `TGFEST`/`TGFVOA` por
+`dbExplorer` e escrevem por `dataset`. Quem usa `sankhya.estoque` / `sankhya.produtos`
+**não muda nada** — o `SankhyaClient` injeta tudo. Quem instancia o resource à mão
+precisa passar as deps:
+
+```typescript
+// continua válido, e todos os métodos antigos funcionam
+const produtos = new ProdutosResource(http);
+await produtos.listar();            // ok
+await produtos.volumesProduto(13609); // lança VALIDATION_ERROR nomeando `dbExplorer`
+
+// com as deps
+const produtos = new ProdutosResource(http, { dataset, dbExplorer });
+```
+
+> `produtos.volumesProduto` também **trocou de caminho**: lê `TGFVOA` por
+> `dbExplorer.query` (SQL). A rota de Gateway que ele usava antes
+> (`CRUDServiceProvider.loadRecords` com `rootEntity: 'VolumeProduto'`) foi medida
+> no sandbox em 2026-09-11 e devolveu `Erro interno (NPE)` nas duas tentativas. A
+> assinatura e o retorno não mudaram.
+
+O [CHANGELOG](./CHANGELOG.md) tem a lista completa, com a medição de origem de cada linha.
 
 ## Features
 
@@ -263,6 +375,10 @@ await sankhya.financeiros.baixarReceita({
 - **Retry com backoff** — leituras (REST e Gateway) retentadas em erro transiente (429, 5xx, timeout), com jitter e respeito a `Retry-After`; escritas nunca
 - **Auth resiliente** — retry com backoff exponencial no OAuth (só transiente) + circuit breaker configurável com erro tipado (`CircuitOpenError`)
 - **AsyncGenerator** — paginação automática com `for await...of`
+- **Allowlist de host, fail-closed** — o cliente não sobe contra host que ninguém declarou; produção exige flag explícita e sai no log
+- **Prova por read-back** — `notas.cancelar` e `faturamento.faturar` decidem pelo banco, nunca pelo HTTP 200
+- **Falha em 3 camadas** — `classifyFailure()` separa `AUTH_FAIL` (retry seguro), `NEGOCIO` (terminal) e `TIMEOUT` (decide por read-back)
+- **Guarda contra "apagar tudo"** — `dataset.removeRecord` recusa filtro vazio, chave vazia e `undefined` em qualquer profundidade
 
 ## Tratamento de Erros
 
@@ -300,6 +416,15 @@ try {
   }
 }
 ```
+
+Para decidir **se dá para repetir**, use `classifyFailure(err)`: `AUTH_FAIL` (o passo não foi
+aceito, retry é seguro), `NEGOCIO` (o ERP entendeu e recusou — terminal) e `TIMEOUT` (desfecho
+desconhecido: decida por read-back, nunca por suposição). HTTP 408, 429 e 5xx entram em `TIMEOUT`.
+
+> **`SankhyaErrorCode` não é exaustivo.** A união tipada tem 5 códigos, mas o SDK lança hoje 17
+> valores diferentes em `err.code` (`VALIDATION_ERROR`, `PARSE_ERROR`, `PRODUCTION_BLOCKED`,
+> `FATURAR_DESFECHO_INDETERMINADO`, …). Compare `err.code` como string; não faça `switch`
+> exaustivo sobre o tipo. A lista completa está em [tipos.md](./docs/api-reference/tipos.md#errors).
 
 Veja o [guia completo de tratamento de erros](./docs/guia/tratamento-erros.md).
 
@@ -342,6 +467,13 @@ open docs/api/index.html
 | **API Reference** | [docs/api-reference/](./docs/api-reference/) |
 | **Arquitetura** | [docs/projeto/arquitetura.md](./docs/projeto/arquitetura.md) |
 | **Tipos** | [docs/api-reference/tipos.md](./docs/api-reference/tipos.md) |
+| **DbExplorer** (SELECT puro) | [docs/api-reference/db-explorer.md](./docs/api-reference/db-explorer.md) |
+| **Dataset** (escrita tipada) | [docs/api-reference/dataset.md](./docs/api-reference/dataset.md) |
+| **Notas** (confirmar/excluir/cancelar) | [docs/api-reference/notas.md](./docs/api-reference/notas.md) |
+| **Faturamento** (guard + read-back) | [docs/api-reference/faturamento.md](./docs/api-reference/faturamento.md) |
+| **Conferência** (TGFCON2/TGFCOI2) | [docs/api-reference/conferencia.md](./docs/api-reference/conferencia.md) |
+| **Lotes** (entrada 1813 / baixa 1811) | [docs/api-reference/lotes.md](./docs/api-reference/lotes.md) |
+| **Changelog** | [CHANGELOG.md](./CHANGELOG.md) |
 
 ## Suporte via MCP (documentação Sankhya)
 

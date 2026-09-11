@@ -1,5 +1,12 @@
 # Módulo de Autenticação (Interno)
 
+> **Allowlist de host (desde a 1.6.0).** Os exemplos usam o **sandbox**, que sobe sem
+> nenhuma flag. Host de produção exige `allowProduction: true` e emite um `logger.warn`
+> citando só o host; qualquer outro host precisa constar de `allowedHosts`, senão o
+> cliente **aborta**. Ver
+> [SankhyaClient — Guarda de ambiente](./cliente-sdk.md#guarda-de-ambiente-allowlist-de-host-fail-closed).
+
+
 O módulo de autenticação é **interno** ao SDK — o usuário não interage diretamente com ele na maioria dos casos. O SDK gerencia tokens automaticamente.
 
 ## Como Funciona
@@ -26,7 +33,7 @@ O módulo de autenticação é **interno** ao SDK — o usuário não interage d
 ### Endpoint
 
 ```
-POST https://api.sankhya.com.br/authenticate
+POST https://api.sandbox.sankhya.com.br/authenticate
 Content-Type: application/x-www-form-urlencoded
 X-Token: {xToken}
 
