@@ -9,6 +9,7 @@ import { EstoqueResource } from '../../src/resources/estoque.js';
 import { FinanceirosResource } from '../../src/resources/financeiros.js';
 import { FiscalResource } from '../../src/resources/fiscal.js';
 import { GatewayResource } from '../../src/resources/gateway.js';
+import { NotasResource } from '../../src/resources/notas.js';
 import { PedidosResource } from '../../src/resources/pedidos.js';
 import { PrecosResource } from '../../src/resources/precos.js';
 import { ProdutosResource } from '../../src/resources/produtos.js';
@@ -179,6 +180,12 @@ describe('SankhyaClient', () => {
       const client = new SankhyaClient(validConfig);
       expect(client.dataset).toBeInstanceOf(DatasetResource);
       expect(client.dataset).toBe(client.dataset);
+    });
+
+    it('client.notas returns NotasResource instance (lazy, mesma instancia)', () => {
+      const client = new SankhyaClient(validConfig);
+      expect(client.notas).toBeInstanceOf(NotasResource);
+      expect(client.notas).toBe(client.notas);
     });
   });
 

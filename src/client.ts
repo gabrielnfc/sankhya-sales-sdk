@@ -11,6 +11,7 @@ import {
   FiscalResource,
   GatewayResource,
   MetadataResource,
+  NotasResource,
   PedidosResource,
   PrecosResource,
   ProdutosResource,
@@ -54,6 +55,7 @@ export class SankhyaClient {
   private _metadata?: MetadataResource;
   private _dbExplorer?: DbExplorerResource;
   private _dataset?: DatasetResource;
+  private _notas?: NotasResource;
 
   /**
    * Cria uma instancia do SDK Sankhya.
@@ -163,6 +165,17 @@ export class SankhyaClient {
   get dataset(): DatasetResource {
     this._dataset ??= new DatasetResource(this.http);
     return this._dataset;
+  }
+
+  /**
+   * Confirmacao idempotente, exclusao e cancelamento de notas (`CACSP`).
+   *
+   * Recebe o `dbExplorer` deste mesmo client: `cancelar` prova o efeito por
+   * read-back em `TGFCAN`, nunca pelo HTTP 200 (M75/M94).
+   */
+  get notas(): NotasResource {
+    this._notas ??= new NotasResource(this.http, this.dbExplorer);
+    return this._notas;
   }
 
   /**

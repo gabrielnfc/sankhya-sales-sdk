@@ -11,3 +11,4 @@ export { GatewayResource } from './gateway.js';
 export { MetadataResource } from './metadata.js';
 export { DbExplorerResource } from './db-explorer.js';
 export { DatasetResource, datasetRecord } from './dataset.js';
+export { NotasResource } from './notas.js';
