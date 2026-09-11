@@ -23,9 +23,10 @@ import type { Logger, SankhyaConfig } from './types/config.js';
  * Facade que expoe todos os recursos da API via propriedades lazy-loaded.
  * Cada recurso e instanciado apenas no primeiro acesso.
  *
- * O host passa por uma allowlist fail-closed: sandbox sobe direto, host interno
- * precisa constar de `allowedHosts`, producao exige `allowProduction` explicito
- * (e e logada). Qualquer outro host aborta a construcao.
+ * O host passa por uma allowlist fail-closed: producao e avaliada PRIMEIRO e
+ * exige `allowProduction` explicito (e e logada) — nem `allowedHosts` nem o
+ * marcador de sandbox num subdominio a liberam. Fora de producao, sobe host de
+ * sandbox ou host declarado em `allowedHosts`; qualquer outro aborta.
  *
  * @example
  * ```ts
@@ -70,7 +71,8 @@ export class SankhyaClient {
     this.logger = createLogger(config.logger);
     // Allowlist fail-closed: roda depois da validacao de tipos e ANTES de
     // instanciar AuthManager/HttpClient — nenhum recurso de rede e criado
-    // para um host que a guarda recusaria.
+    // para um host que a guarda recusaria. Ordem travada em
+    // tests/core/environment-guard-order.test.ts (dubla os dois construtores).
     assertAllowedHost(config.baseUrl, config, this.logger);
     this.auth = new AuthManager(
       config.baseUrl,

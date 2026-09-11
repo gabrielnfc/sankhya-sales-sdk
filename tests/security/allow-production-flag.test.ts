@@ -25,9 +25,14 @@ const PADRAO = 'allowProduction[[:space:]]*:[[:space:]]*true';
 function arquivosQueLigamAFlag(): readonly string[] {
   let saida: string;
   try {
-    saida = execFileSync('git', ['grep', '-lnE', PADRAO, '--', 'src', 'tests', '.github'], {
-      encoding: 'utf8',
-    });
+    // `--untracked`: arquivo novo, ainda nao adicionado ao indice, tambem conta —
+    // sem isso a flag entra no repo por um arquivo que `git grep` nao olha.
+    // `-I` ignora binario.
+    saida = execFileSync(
+      'git',
+      ['grep', '-lnE', '-I', '--untracked', PADRAO, '--', 'src', 'tests', '.github'],
+      { encoding: 'utf8' },
+    );
   } catch (erro) {
     const status = (erro as { status?: number }).status;
     if (status !== 1) throw erro;

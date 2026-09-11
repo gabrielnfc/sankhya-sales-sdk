@@ -30,19 +30,47 @@ export const PRODUCTION_HOSTS = ['api.sankhya.com.br'] as const;
 const DICA =
   'Allowlist: use o host de sandbox (api.sandbox.sankhya.com.br). Producao exige allowProduction=true explicito (D5).';
 
-/** `true` quando o host e sandbox ou consta da allowlist declarada pelo chamador. */
+/**
+ * `true` quando o host e sandbox ou consta da allowlist declarada pelo chamador.
+ *
+ * NAO diz nada sobre producao: host de producao pode satisfazer este predicado
+ * (via `allowedHosts`, ou por carregar o marcador num subdominio) e ainda assim
+ * ser recusado — quem decide isso e `assertAllowedHost`, que testa
+ * `isProductionHost` PRIMEIRO.
+ *
+ * Comparacao case-insensitive: estes predicados sao publicos, e quem decide
+ * antes de construir o cliente nao passa pela normalizacao da WHATWG `URL`.
+ */
 export function isAllowedHost(host: string, allowedHosts: readonly string[] = []): boolean {
-  return host.includes(SANDBOX_MARKER) || allowedHosts.includes(host);
-}
-
-/** `true` quando o host e de producao — o proprio host ou um subdominio dele. */
-export function isProductionHost(host: string): boolean {
-  return PRODUCTION_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
+  const alvo = host.toLowerCase();
+  return (
+    alvo.includes(SANDBOX_MARKER) ||
+    allowedHosts.some((permitido) => permitido.toLowerCase() === alvo)
+  );
 }
 
 /**
- * Allowlist fail-closed: so passa host de sandbox, host da allowlist explicita,
- * ou producao com `allowProduction=true` (que emite `logger.warn` citando SO o host).
+ * `true` quando o host e de producao — o proprio host ou um subdominio dele.
+ *
+ * Sufixo falso nao conta: `<prod>.evil.com` e `evil-<prod>` sao `false` (e, por
+ * nao estarem na allowlist, tambem nao sobem).
+ */
+export function isProductionHost(host: string): boolean {
+  const alvo = host.toLowerCase();
+  return PRODUCTION_HOSTS.some((h) => alvo === h || alvo.endsWith(`.${h}`));
+}
+
+/**
+ * Allowlist fail-closed, em duas decisoes e nesta ordem:
+ *
+ * 1. **Producao primeiro.** Host de producao (ou subdominio) exige
+ *    `allowProduction=true` e SEMPRE emite `logger.warn` citando so o host.
+ *    Nem `allowedHosts`, nem o marcador de sandbox num subdominio liberam
+ *    producao — se liberassem, producao subiria sem flag e sem rastro em log.
+ * 2. **Allowlist.** Fora de producao, passa host de sandbox ou host declarado em
+ *    `allowedHosts`. Qualquer outro host aborta.
+ *
+ * Nenhuma mensagem de erro ecoa a `baseUrl` crua: ela pode carregar `user:senha@`.
  *
  * @param baseUrl - URL base que o cliente vai usar.
  * @param opts - `allowProduction` libera producao; `allowedHosts` amplia a allowlist.
@@ -57,13 +85,16 @@ export function assertAllowedHost(
 ): void {
   let host: string;
   try {
-    host = new URL(baseUrl).hostname;
+    host = new URL(baseUrl).hostname.toLowerCase();
   } catch {
-    throw new SankhyaError(`baseUrl invalida: "${baseUrl}". ${DICA}`, 'VALIDATION_ERROR');
+    // Sem host nao ha o que citar — e a string crua pode conter credencial.
+    throw new SankhyaError(
+      `baseUrl nao parseia como URL (valor omitido: pode conter credencial). ${DICA}`,
+      'VALIDATION_ERROR',
+    );
   }
 
-  if (isAllowedHost(host, opts.allowedHosts)) return;
-
+  // Producao decide PRIMEIRO — antes de qualquer forma de allowlist.
   if (isProductionHost(host)) {
     if (opts.allowProduction !== true) {
       throw new SankhyaError(
@@ -74,6 +105,8 @@ export function assertAllowedHost(
     logger.warn(`[sankhya-sales-sdk] PRODUCAO LIBERADA EXPLICITAMENTE — host=${host}`);
     return;
   }
+
+  if (isAllowedHost(host, opts.allowedHosts)) return;
 
   throw new SankhyaError(`Host "${host}" nao esta na allowlist. ${DICA}`, 'VALIDATION_ERROR');
 }

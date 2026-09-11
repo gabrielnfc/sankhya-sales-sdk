@@ -48,14 +48,18 @@ const sankhya = new SankhyaClient({
 
 ### Guarda de ambiente (allowlist de host, fail-closed)
 
-O cliente só sobe contra host que a allowlist aceita — **o default é recusar**:
+O cliente só sobe contra host que a allowlist aceita — **o default é recusar**.
+**Produção é avaliada primeiro**, na ordem abaixo:
 
 | Host | Sobe? |
 |---|---|
+| produção (`PRODUCTION_HOSTS` e subdomínios) | só com a flag `allowProduction` ligada — e sai um `logger.warn` citando **só o host**. Nem `allowedHosts`, nem um subdomínio com `sandbox` no nome liberam produção |
 | contém `sandbox` (ex.: `api.sandbox.sankhya.com.br`) | sim, sem aviso |
-| consta de `allowedHosts` (host exato) | sim, sem aviso |
-| produção (`PRODUCTION_HOSTS` e subdomínios) | só com a flag `allowProduction` ligada — e sai um `logger.warn` citando **só o host** |
-| qualquer outro host, ou `baseUrl` que não parseia | **aborta** (`SankhyaError`) |
+| consta de `allowedHosts` (host exato, sem subdomínio implícito) | sim, sem aviso |
+| qualquer outro host — incluindo sufixo falso de produção, e `baseUrl` que não parseia | **aborta** (`SankhyaError`) |
+
+Comparação de host é case-insensitive, e nenhuma mensagem de erro ecoa a `baseUrl`
+crua — ela pode carregar `user:senha@`; o erro cita apenas o host.
 
 ```typescript
 // ERP interno de homologação: amplie a allowlist, não a flag de produção.
