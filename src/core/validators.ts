@@ -304,13 +304,18 @@ export function validateConfirmarPedidoInput(input: unknown, name: string): void
 /**
  * Valida dados de entrada para faturamento de pedido.
  *
- * Campos obrigatorios: codigoPedido, codigoTipoOperacao, dataFaturamento.
+ * Campos obrigatorios: codigoPedido, codigoTipoOperacao.
  */
 export function validateFaturarPedidoInput(input: unknown, name: string): void {
   const o = assertObject(input, name);
   requireNumber(o, 'codigoPedido', name);
   requireNumber(o, 'codigoTipoOperacao', name);
-  requireString(o, 'dataFaturamento', name);
+  // `dataFaturamento` e opcional: o payload medido manda `dtFaturamento: ''` e o
+  // ERP usa a data corrente (M51). Exigir string aqui obrigaria o chamador a
+  // inventar uma data que o wizard ignora.
+  optionalString(o, 'dataFaturamento', name);
+  optionalString(o, 'serie', name);
+  optionalString(o, 'codigoLocalDestino', name);
 }
 
 /**
