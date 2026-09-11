@@ -140,14 +140,16 @@ export class ProdutosResource {
    * negocio sobre pedidos e fica FORA do SDK** (passo 1 da §4.2.3 do design);
    * aqui o SDK apenas recusa.
    *
-   * Fail-closed declarado (G9): `SELECT` com **0 linhas** tambem e recusado.
-   * Ausencia de dado nao e dado ausente (I4) — a linha de `TGFEST` some quando
-   * zera (M91), entao 0 linhas pode ser "zerado" ou "nunca teve", e as duas
-   * hipoteses nao se separam por esta leitura. Consequencia medida e declarada:
-   * a receita de M104 fez a virada com o read-back devolvendo `rows: []`
-   * (`spike-raw/virada/T05E_RB_EST_ZERO_GLOBAL.json`), logo **este metodo recusa
-   * um caminho que o ERP aceita**; falso positivo de guarda, custo de uma linha
-   * (I9), contra um falso negativo que viraria controle com saldo vivo.
+   * `SELECT` com **0 linhas prossegue** para o `save` — **(a) medido**: a linha
+   * de `TGFEST` some quando zera (M91), e a receita de M104 fez a virada
+   * justamente com o read-back devolvendo `rows: []`
+   * (`spike-raw/virada/T05E_RB_EST_ZERO_GLOBAL.json`). Zero linhas **e** saldo
+   * zero. Produto inexistente nao e assunto desta guarda: o `save` com `CODPROD`
+   * invalido falha no proprio ERP.
+   *
+   * O que a guarda exige e que o `SELECT` tenha **executado**: falha de rede ou
+   * do DbExplorer **propaga** e nunca e lida como "0 linhas" (I4 continua
+   * valendo para a leitura que nao aconteceu).
    *
    * @param input - Produto, tipo alvo e `USALOTEDTVAL`.
    * @param input.codProd - `CODPROD` (inteiro positivo).
@@ -156,9 +158,9 @@ export class ProdutosResource {
    * @returns Nada: o `result` do `save` so devolve o que foi mandado gravar.
    * @throws {SankhyaError} `VALIDATION_ERROR` se faltar `dbExplorer`/`dataset`
    * (nomeando a dep), se `codProd` nao for inteiro positivo, se `tipo` nao for
-   * `'L'`/`'N'`, se o `SELECT` nao devolver linha alguma, ou se houver saldo
-   * (`/saldo/`) ou reserva (`/reserva/`) em qualquer linha — em todos os casos
-   * **nada e gravado**; `PARSE_ERROR` em coluna vazia ou nao-numerica.
+   * `'L'`/`'N'`, ou se houver saldo (`/saldo/`) ou reserva (`/reserva/`) em
+   * qualquer linha — em todos os casos **nada e gravado**; `PARSE_ERROR` em
+   * coluna vazia ou nao-numerica. O erro do `dbExplorer` propaga inalterado.
    * @throws {GatewayError} Em erro de negocio Sankhya.
    * @throws {AuthError} Se autenticacao falhar.
    * @example
@@ -204,13 +206,6 @@ export class ProdutosResource {
     const linhas = await dbExplorer.query<LinhaSaldo>(
       `SELECT CODEMP, CODLOCAL, CONTROLE, ESTOQUE, RESERVADO FROM TGFEST WHERE CODPROD = ${input.codProd} ORDER BY CODEMP, CODLOCAL`,
     );
-
-    if (linhas.length === 0) {
-      throw new SankhyaError(
-        `produtos.setTipoControle: o SELECT global nao devolveu nenhuma linha em TGFEST para o CODPROD ${input.codProd}. Sem linhas em TGFEST nao ha prova de saldo zero — a linha zerada some da tabela (M91), entao 0 linhas nao distingue "zerado" de "nunca teve" (I4). Nada foi gravado.`,
-        'VALIDATION_ERROR',
-      );
-    }
 
     for (const linha of linhas) {
       const onde = `CODEMP ${linha.CODEMP ?? '?'}, CODLOCAL ${linha.CODLOCAL ?? '?'}`;

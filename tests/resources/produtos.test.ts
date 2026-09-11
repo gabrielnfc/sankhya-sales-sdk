@@ -225,9 +225,30 @@ describe('ProdutosResource', () => {
     });
   });
 
-  it('setTipoControle recusa quando o SELECT nao devolve nenhuma linha de TGFEST (I4)', async () => {
+  it('setTipoControle grava quando o SELECT global nao devolve nenhuma linha de TGFEST (M104/M91, RD-6)', async () => {
     const http = createMockHttp();
     const dbx = createMockDbx([]);
+    const ds = createMockDs();
+
+    await new ProdutosResource(http, { dataset: ds, dbExplorer: dbx }).setTipoControle({
+      codProd: 10015,
+      tipo: 'N',
+      usaLoteDtVal: false,
+    });
+
+    expect(dbx.query).toHaveBeenCalledTimes(1); // o SELECT EXECUTOU: 0 linhas e resposta, nao ausencia
+    expect(ds.save).toHaveBeenCalledWith({
+      entityName: 'Produto',
+      fields: ['CODPROD', 'TIPCONTEST', 'USALOTEDTVAL'],
+      records: [{ pk: { CODPROD: '10015' }, values: { '1': 'N', '2': 'N' } }],
+    });
+  });
+
+  it('setTipoControle propaga a falha do SELECT em vez de tratar como 0 linhas (RD-6)', async () => {
+    const http = createMockHttp();
+    const dbx = {
+      query: vi.fn().mockRejectedValue(new Error('DbExplorer fora do ar')),
+    } as unknown as DbExplorerResource & { query: ReturnType<typeof vi.fn> };
     const ds = createMockDs();
 
     await expect(
@@ -236,7 +257,7 @@ describe('ProdutosResource', () => {
         tipo: 'N',
         usaLoteDtVal: false,
       }),
-    ).rejects.toThrow(/sem linhas em TGFEST/i);
+    ).rejects.toThrow(/DbExplorer fora do ar/);
     expect(ds.save).not.toHaveBeenCalled();
   });
 
