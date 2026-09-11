@@ -232,10 +232,14 @@ describe('GatewayResource', () => {
         dataSet: {
           rootEntity: 'Produto',
           includePresentationFields: 'N',
+          dataRow: {
+            localFields: {
+              CODPROD: { $: '100' },
+              DESCRPROD: { $: 'Novo Produto' },
+            },
+          },
           entity: {
             fieldset: { list: 'CODPROD,DESCRPROD' },
-            CODPROD: { $: '100' },
-            DESCRPROD: { $: 'Novo Produto' },
           },
         },
       });
@@ -255,6 +259,62 @@ describe('GatewayResource', () => {
       });
 
       expect(result).toEqual({});
+    });
+
+    // Regressao M34: os campos vao em dataSet.dataRow.{key,localFields}.
+    // Soltos em dataSet.entity, o Sankhya responde 200 e nao grava nada.
+    it('envia dataRow.localFields (e key quando ha primaryKey) — nunca campos soltos em dataSet.entity', async () => {
+      const http = createMockHttp();
+      const gw = new GatewayResource(http);
+      http.gatewayCall.mockResolvedValue(
+        makeGatewayResponse(['CODPROD', 'TIPCONTEST'], [{ f0: { $: '10015' }, f1: { $: 'L' } }]),
+      );
+
+      await gw.saveRecord({
+        entity: 'Produto',
+        fields: 'CODPROD,TIPCONTEST',
+        primaryKey: { CODPROD: '10015' },
+        data: { TIPCONTEST: 'L' },
+      });
+
+      const body = http.gatewayCall.mock.calls[0][2] as { dataSet: Record<string, unknown> };
+      expect(http.gatewayCall.mock.calls[0][1]).toBe('CRUDServiceProvider.saveRecord');
+      expect(body.dataSet.dataRow).toEqual({
+        key: { CODPROD: { $: '10015' } },
+        localFields: { TIPCONTEST: { $: 'L' } },
+      });
+      expect(body.dataSet).not.toHaveProperty('entity.CODPROD');
+    });
+
+    it('omite key quando nao ha primaryKey (insercao)', async () => {
+      const http = createMockHttp();
+      const gw = new GatewayResource(http);
+      http.gatewayCall.mockResolvedValue(makeGatewayResponse(['CODPARC'], [{ f0: { $: '1' } }]));
+      await gw.saveRecord({
+        entity: 'Parceiro',
+        fields: 'CODPARC,NOMEPARC',
+        data: { NOMEPARC: 'X' },
+      });
+      const body = http.gatewayCall.mock.calls[0][2] as {
+        dataSet: { dataRow: Record<string, unknown> };
+      };
+      expect(body.dataSet.dataRow).not.toHaveProperty('key');
+    });
+  });
+
+  describe('call()', () => {
+    it('call() repassa modulo, serviceName e body e devolve o responseBody cru', async () => {
+      const http = createMockHttp();
+      const gw = new GatewayResource(http);
+      http.gatewayCall.mockResolvedValue({ status: 'ok' });
+      const out = await gw.call('mgecom', 'CACSP.confirmarNota', { nota: { NUNOTA: { $: '1' } } });
+      expect(http.gatewayCall).toHaveBeenCalledWith(
+        'mgecom',
+        'CACSP.confirmarNota',
+        { nota: { NUNOTA: { $: '1' } } },
+        undefined,
+      );
+      expect(out).toEqual({ status: 'ok' });
     });
   });
 

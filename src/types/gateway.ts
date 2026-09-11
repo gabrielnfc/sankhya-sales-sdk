@@ -30,6 +30,12 @@ export interface SaveRecordParams {
   fields: string;
   /** Dados a salvar como pares campo-valor. */
   data: Record<string, string>;
+  /**
+   * Chave primaria do registro a atualizar, como pares campo-valor.
+   *
+   * Ausente ou vazia, o Gateway trata a chamada como insercao.
+   */
+  primaryKey?: Record<string, string>;
 }
 
 /** Registro do Gateway com ID e campos. */
