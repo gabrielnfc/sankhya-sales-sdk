@@ -29,6 +29,34 @@ import type {
   PedidoVendaInput,
 } from '../types/pedidos.js';
 
+/** Estreita para objeto simples sem usar `any`. */
+function ehRegistro(valor: unknown): valor is Record<string, unknown> {
+  return typeof valor === 'object' && valor !== null && !Array.isArray(valor);
+}
+
+/** Le `NUNOTA` de um envelope `{ NUNOTA: { $: x } }` ou `{ NUNOTA: x }`. */
+function nunotaDoEnvelope(envelope: unknown): unknown {
+  if (!ehRegistro(envelope)) return undefined;
+  const nunota = envelope.NUNOTA;
+  return ehRegistro(nunota) ? nunota.$ : nunota;
+}
+
+/**
+ * Le o NUNOTA da resposta do `CACSP.incluirNota` na ordem medida:
+ * `pk.NUNOTA.$` -> `nota.NUNOTA.$` -> raiz `NUNOTA`.
+ *
+ * A resposta aceita no sandbox traz a chave em `pk` (M34); ler apenas a raiz
+ * devolvia `undefined` e o `codigoPedido` saia 0.
+ */
+function readNunota(raw: unknown): unknown {
+  if (!ehRegistro(raw)) return undefined;
+  const viaPk = nunotaDoEnvelope(raw.pk);
+  if (viaPk !== undefined) return viaPk;
+  const viaNota = nunotaDoEnvelope(raw.nota);
+  if (viaNota !== undefined) return viaNota;
+  return nunotaDoEnvelope(raw);
+}
+
 // resourceKey 'pedido' no singular — medido (ver §3.2 do design). O plural
 // 'pedidos' quebra o metodo inteiro; nao "corrigir" por semelhanca ao path.
 const DESCRITOR_CONSULTAR: ResourceDescriptor = {
@@ -376,39 +404,67 @@ export class PedidosResource {
     input: IncluirNotaGatewayInput,
     options?: RequestOptions,
   ): Promise<{ codigoPedido: number }> {
-    const itens = input.itens.map((item) =>
-      serialize({
+    // Formato aceito pelo 4midware (M34/M46): `NUNOTA: {}` (objeto vazio, NAO
+    // `{ $: '' }`) no cabecalho e em CADA item; `itens.INFORMARPRECO` e a
+    // STRING 'True'/'False', fora do serializador. Nao "simplificar".
+    const itens = input.itens.map((item) => ({
+      NUNOTA: {},
+      ...serialize({
         CODPROD: item.codigoProduto,
         QTDNEG: item.quantidade,
         VLRUNIT: item.valorUnitario,
         CODVOL: item.unidade,
         ...(item.codigoLocalOrigem ? { CODLOCALORIG: item.codigoLocalOrigem } : {}),
       }),
-    );
+    }));
+
+    const cabecalho: Record<string, unknown> = {
+      NUNOTA: {},
+      ...serialize({
+        CODPARC: input.codigoCliente,
+        DTNEG: input.dataNegociacao,
+        CODTIPOPER: input.codigoTipoOperacao,
+        CODTIPVENDA: input.codigoTipoNegociacao,
+        CODVEND: input.codigoVendedor,
+        CODEMP: input.codigoEmpresa,
+        TIPMOV: input.tipoMovimento,
+        ...(input.observacao ? { OBSERVACAO: input.observacao } : {}),
+        ...(input.statusNota ? { STATUSNOTA: input.statusNota } : {}),
+        ...(input.numeroPedidoExterno ? { AD_NUMPEDIDO: input.numeroPedidoExterno } : {}),
+      }),
+    };
+
+    // camposExtras entra POR ULTIMO, depois de checar colisao: sobrescrever um
+    // campo tipado em silencio mandaria ao ERP um valor que o chamador nao
+    // pediu. Falha alto, antes de qualquer side-effect (nenhuma rede).
+    if (input.camposExtras) {
+      for (const [campo, valor] of Object.entries(input.camposExtras)) {
+        if (campo in cabecalho) {
+          throw new SankhyaError(
+            `IncluirNotaGatewayInput.camposExtras nao pode sobrescrever o campo tipado '${campo}' do cabecalho`,
+            'VALIDATION_ERROR',
+          );
+        }
+        cabecalho[campo] = serialize({ [campo]: valor })[campo];
+      }
+    }
 
     const result = await this.http.gatewayCall<Record<string, unknown>>(
       'mgecom',
       'CACSP.incluirNota',
       {
         nota: {
-          cabecalho: serialize({
-            CODPARC: input.codigoCliente,
-            DTNEG: input.dataNegociacao,
-            CODTIPOPER: input.codigoTipoOperacao,
-            CODTIPVENDA: input.codigoTipoNegociacao,
-            CODVEND: input.codigoVendedor,
-            CODEMP: input.codigoEmpresa,
-            TIPMOV: input.tipoMovimento,
-            ...(input.observacao ? { OBSERVACAO: input.observacao } : {}),
-          }),
-          itens: { item: itens },
+          cabecalho,
+          itens: {
+            INFORMARPRECO: input.informarPreco === false ? 'False' : 'True',
+            item: itens,
+          },
         },
       },
       options,
     );
 
-    const nunota = (result as Record<string, unknown>).NUNOTA;
-    return { codigoPedido: safeParseNumber(nunota, 'NUNOTA') };
+    return { codigoPedido: safeParseNumber(readNunota(result), 'NUNOTA') };
   }
 
   /**
