@@ -197,3 +197,16 @@ export type {
   CancelarNotaResult,
   ConfirmarNotaResult,
 } from './types/notas.js';
+
+// Conferencia (D2.5) — bloco proprio ao fim para merge limpo
+export { ConferenciaResource } from './resources/conferencia.js';
+export type {
+  AbrirConferenciaInput,
+  AbrirConferenciaResult,
+  ApontarNaNotaInput,
+  BiparInput,
+  CarimbarSeparacaoInput,
+  ConferenciaDaNota,
+  FecharConferenciaInput,
+  ReapontarOrigemInput,
+} from './types/conferencia.js';

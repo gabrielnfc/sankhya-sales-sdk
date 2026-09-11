@@ -3,6 +3,7 @@ import { SankhyaClient } from '../../src/client.js';
 import { HttpClient } from '../../src/core/http.js';
 import { CadastrosResource } from '../../src/resources/cadastros.js';
 import { ClientesResource } from '../../src/resources/clientes.js';
+import { ConferenciaResource } from '../../src/resources/conferencia.js';
 import { DatasetResource } from '../../src/resources/dataset.js';
 import { DbExplorerResource } from '../../src/resources/db-explorer.js';
 import { EstoqueResource } from '../../src/resources/estoque.js';
@@ -188,6 +189,12 @@ describe('SankhyaClient', () => {
       const client = new SankhyaClient(validConfig);
       expect(client.notas).toBeInstanceOf(NotasResource);
       expect(client.notas).toBe(client.notas);
+    });
+
+    it('client.conferencia returns ConferenciaResource instance (lazy, mesma instancia)', () => {
+      const client = new SankhyaClient(validConfig);
+      expect(client.conferencia).toBeInstanceOf(ConferenciaResource);
+      expect(client.conferencia).toBe(client.conferencia);
     });
   });
 
