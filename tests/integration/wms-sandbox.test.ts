@@ -7,6 +7,7 @@ import {
   type FetchInterceptado,
   TETO_CHAMADAS,
   callBudget,
+  credenciaisDaLane,
   ehErroDeTeto,
   interceptarFetch,
   motivoDoSkip,
@@ -44,11 +45,16 @@ import { assertSandbox } from './_write-guard.js';
  *    gatilho `pull_request` — e ha teste travando isso.
  */
 
+// Conjunto resolvido em UM lugar (`_call-budget.ts`): existindo
+// `SANKHYA_SANDBOX_API_URL`, vale o conjunto `SANKHYA_SANDBOX_*` inteiro; senao,
+// os nomes genericos que o workflow injeta. Nunca os dois misturados.
+const credenciais = credenciaisDaLane(process.env);
+
 const config = {
-  baseUrl: process.env.SANKHYA_BASE_URL ?? '',
-  clientId: process.env.SANKHYA_CLIENT_ID ?? '',
-  clientSecret: process.env.SANKHYA_CLIENT_SECRET ?? '',
-  xToken: process.env.SANKHYA_X_TOKEN ?? '',
+  baseUrl: credenciais.baseUrl,
+  clientId: credenciais.clientId,
+  clientSecret: credenciais.clientSecret,
+  xToken: credenciais.xToken,
   timeout: 30_000,
   logger: { level: 'silent' as const },
 };
@@ -226,7 +232,9 @@ describe.skipIf(!habilitada)('Lane WMS — sandbox Sankhya (opt-in duplo)', () =
   beforeAll(async () => {
     // Sandbox ou nada — antes de qualquer chamada.
     assertSandbox(config.baseUrl);
-    console.log(`[wms-sandbox] host=${new URL(config.baseUrl).hostname}`);
+    console.log(
+      `[wms-sandbox] conjunto=${credenciais.conjunto.nome} host=${new URL(config.baseUrl).hostname}`,
+    );
 
     // Teto por interceptacao do fetch global: toda requisicao HTTP do SDK paga.
     fetchDaLane = interceptarFetch(orcamento);

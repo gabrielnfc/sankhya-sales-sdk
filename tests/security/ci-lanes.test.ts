@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  type ConjuntoDeCredenciais,
   LANE_OPT_IN,
   TETO_CHAMADAS,
   callBudget,
+  credenciaisDaLane,
   ehErroDeTeto,
   interceptarFetch,
   motivoDoSkip,
@@ -139,43 +141,90 @@ describe('linhasDeCodigo — o strip que as travas estruturais usam', () => {
   });
 });
 
+/** Preenche um conjunto inteiro com valores marcados, para distinguir a origem. */
+function preenche(conjunto: ConjuntoDeCredenciais, marca: string): Record<string, string> {
+  return {
+    [conjunto.baseUrl]: `https://${marca}.exemplo.invalido`,
+    [conjunto.clientId]: `${marca}-id`,
+    [conjunto.clientSecret]: `${marca}-secret`,
+    [conjunto.xToken]: `${marca}-token`,
+  };
+}
+
+const SO_FLAG = { [LANE_OPT_IN.flag]: LANE_OPT_IN.valorDaFlag };
+
 describe('opt-in duplo da lane — comportamento', () => {
-  const credenciais = Object.fromEntries(LANE_OPT_IN.credenciais.map((nome) => [nome, 'x']));
+  const sandbox = preenche(LANE_OPT_IN.sandbox, 'sandbox');
+  const generico = preenche(LANE_OPT_IN.generico, 'generico');
 
   it('credenciais sem a flag NAO autorizam (o acidente do .env esquecido)', () => {
-    expect(optInSatisfeito(credenciais)).toBe(false);
-    expect(motivoDoSkip(credenciais)).toContain(LANE_OPT_IN.flag);
+    expect(optInSatisfeito(sandbox)).toBe(false);
+    expect(motivoDoSkip(sandbox)).toContain(LANE_OPT_IN.flag);
   });
 
-  it('flag sem credenciais NAO autoriza', () => {
-    expect(optInSatisfeito({ [LANE_OPT_IN.flag]: LANE_OPT_IN.valorDaFlag })).toBe(false);
+  it('flag sem credencial nenhuma NAO autoriza', () => {
+    expect(optInSatisfeito(SO_FLAG)).toBe(false);
   });
 
-  it('credencial faltando derruba o opt-in mesmo com a flag', () => {
-    for (const nome of LANE_OPT_IN.credenciais) {
-      const parcial: Record<string, string> = {
-        ...credenciais,
-        [LANE_OPT_IN.flag]: LANE_OPT_IN.valorDaFlag,
-      };
-      delete parcial[nome];
+  it('so o conjunto SANDBOX + flag autoriza, e e ele que resolve', () => {
+    const env = { ...sandbox, ...SO_FLAG };
+    expect(optInSatisfeito(env)).toBe(true);
+    expect(motivoDoSkip(env)).toBe('');
+    expect(credenciaisDaLane(env).conjunto.nome).toBe('sandbox');
+    expect(credenciaisDaLane(env).baseUrl).toBe(sandbox[LANE_OPT_IN.sandbox.baseUrl]);
+  });
+
+  it('so o conjunto GENERICO + flag autoriza (caminho do CI)', () => {
+    const env = { ...generico, ...SO_FLAG };
+    expect(optInSatisfeito(env)).toBe(true);
+    expect(credenciaisDaLane(env).conjunto.nome).toBe('generico');
+    expect(credenciaisDaLane(env).baseUrl).toBe(generico[LANE_OPT_IN.generico.baseUrl]);
+  });
+
+  it('com os DOIS conjuntos, o SANDBOX vence e o generico e ignorado inteiro', () => {
+    const env = { ...generico, ...sandbox, ...SO_FLAG };
+    const resolvido = credenciaisDaLane(env);
+    expect(resolvido.conjunto.nome).toBe('sandbox');
+    expect(resolvido.baseUrl).toBe(sandbox[LANE_OPT_IN.sandbox.baseUrl]);
+    expect(resolvido.clientId).toBe(sandbox[LANE_OPT_IN.sandbox.clientId]);
+    expect(resolvido.clientSecret).toBe(sandbox[LANE_OPT_IN.sandbox.clientSecret]);
+    expect(resolvido.xToken).toBe(sandbox[LANE_OPT_IN.sandbox.xToken]);
+  });
+
+  it('SANDBOX incompleto NAO completa com generico: nao autoriza e nomeia a chave que falta', () => {
+    for (const chave of [
+      LANE_OPT_IN.sandbox.clientId,
+      LANE_OPT_IN.sandbox.clientSecret,
+      LANE_OPT_IN.sandbox.xToken,
+    ]) {
+      const parcial: Record<string, string> = { ...generico, ...sandbox, ...SO_FLAG };
+      delete parcial[chave];
       expect(optInSatisfeito(parcial)).toBe(false);
+      expect(motivoDoSkip(parcial)).toContain(chave);
+      expect(credenciaisDaLane(parcial).conjunto.nome).toBe('sandbox');
+    }
+  });
+
+  it('credencial faltando derruba o opt-in em qualquer conjunto', () => {
+    for (const conjunto of [LANE_OPT_IN.sandbox, LANE_OPT_IN.generico]) {
+      const completo = preenche(conjunto, 'x');
+      for (const chave of Object.keys(completo)) {
+        const parcial: Record<string, string> = { ...completo, ...SO_FLAG };
+        delete parcial[chave];
+        expect(optInSatisfeito(parcial)).toBe(false);
+      }
     }
   });
 
   it('flag com valor diferente do esperado NAO autoriza', () => {
-    expect(optInSatisfeito({ ...credenciais, [LANE_OPT_IN.flag]: 'true' })).toBe(false);
-  });
-
-  it('credenciais completas + flag autorizam', () => {
-    const env = { ...credenciais, [LANE_OPT_IN.flag]: LANE_OPT_IN.valorDaFlag };
-    expect(optInSatisfeito(env)).toBe(true);
-    expect(motivoDoSkip(env)).toBe('');
+    expect(optInSatisfeito({ ...sandbox, [LANE_OPT_IN.flag]: 'true' })).toBe(false);
   });
 
   it('ambiente vazio: o motivo cita os dois lados e nenhum valor', () => {
     const motivo = motivoDoSkip({});
     expect(motivo).toContain(LANE_OPT_IN.flag);
-    for (const nome of LANE_OPT_IN.credenciais) expect(motivo).toContain(nome);
+    expect(motivo).toContain(LANE_OPT_IN.sandbox.baseUrl);
+    expect(motivo).not.toContain('exemplo.invalido');
   });
 });
 
@@ -244,6 +293,13 @@ describe('lane WMS — travas estruturais', () => {
 
   it('usa o teto exportado', () => {
     expect(codigo).toMatch(/callBudget\(TETO_CHAMADAS\)/);
+  });
+
+  it('resolve as credenciais por um conjunto so, sem ler env por conta propria', () => {
+    expect(codigo).toMatch(/credenciaisDaLane\(process\.env\)/);
+    // NEGATIVA, fonte cru: nenhum acesso direto a variavel de credencial fora do
+    // resolvedor — e assim que os dois conjuntos se misturariam.
+    expect(cru).not.toMatch(/process\.env\.SANKHYA/);
   });
 
   it('prova o sandbox antes de construir o client', () => {

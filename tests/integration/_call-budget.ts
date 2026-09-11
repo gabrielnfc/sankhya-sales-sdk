@@ -88,29 +88,104 @@ export function ehErroDeTeto(erro: unknown): boolean {
  */
 export const TETO_CHAMADAS = 40;
 
+/** Os quatro nomes de variavel de um conjunto de credenciais. */
+export interface ConjuntoDeCredenciais {
+  readonly nome: 'sandbox' | 'generico';
+  readonly baseUrl: string;
+  readonly clientId: string;
+  readonly clientSecret: string;
+  readonly xToken: string;
+}
+
 /**
  * Opt-in DUPLO da lane WMS. Nomes das variaveis num lugar so, para que a trava
  * de CI teste a decisao — nao a prosa que fala dela.
+ *
+ * DOIS conjuntos, nunca misturados:
+ *
+ * - `sandbox` (`SANKHYA_SANDBOX_*`) — caminho documentado do projeto que consome
+ *   este SDK. Os nomes genericos servem tambem a producao, e por isso citar um
+ *   deles numa linha de comando e barrado por hook la (medido no spike da D4);
+ *   o conjunto sandbox e o que da para usar no dia a dia.
+ * - `generico` (`SANKHYA_BASE_URL` e irmaos) — o que o workflow de integracao ja
+ *   injeta a partir dos secrets do repositorio.
+ *
+ * Precedencia: a presenca de `SANKHYA_SANDBOX_API_URL` escolhe o conjunto
+ * sandbox INTEIRO. Um conjunto nunca se completa com chave do outro — meia
+ * credencial de cada lado e como o `.env` que apontou para o host errado sem
+ * ninguem perceber, o incidente que originou o guard de ambiente (D3).
  */
 export const LANE_OPT_IN = {
-  /** Todas obrigatorias; qualquer uma vazia derruba o opt-in. */
-  credenciais: [
-    'SANKHYA_BASE_URL',
-    'SANKHYA_CLIENT_ID',
-    'SANKHYA_CLIENT_SECRET',
-    'SANKHYA_X_TOKEN',
-  ],
+  sandbox: {
+    nome: 'sandbox',
+    baseUrl: 'SANKHYA_SANDBOX_API_URL',
+    clientId: 'SANKHYA_SANDBOX_CLIENT_ID',
+    clientSecret: 'SANKHYA_SANDBOX_CLIENT_SECRET',
+    xToken: 'SANKHYA_SANDBOX_TOKEN',
+  },
+  generico: {
+    nome: 'generico',
+    baseUrl: 'SANKHYA_BASE_URL',
+    clientId: 'SANKHYA_CLIENT_ID',
+    clientSecret: 'SANKHYA_CLIENT_SECRET',
+    xToken: 'SANKHYA_X_TOKEN',
+  },
   /** Flag explicita, alem das credenciais. Precisa valer exatamente `'1'`. */
   flag: 'SDK_INTEGRATION_WMS',
   valorDaFlag: '1',
-} as const;
+} as const satisfies {
+  readonly sandbox: ConjuntoDeCredenciais;
+  readonly generico: ConjuntoDeCredenciais;
+  readonly flag: string;
+  readonly valorDaFlag: string;
+};
 
 /** Ambiente lido pelo opt-in — `process.env` ou um objeto de teste. */
 export type AmbienteDaLane = Readonly<Record<string, string | undefined>>;
 
-/** `true` quando TODAS as credenciais estao presentes e nao vazias. */
+/** Credenciais resolvidas, com o conjunto de onde os quatro valores vieram. */
+export interface CredenciaisDaLane {
+  readonly conjunto: ConjuntoDeCredenciais;
+  readonly baseUrl: string;
+  readonly clientId: string;
+  readonly clientSecret: string;
+  readonly xToken: string;
+}
+
+/**
+ * Escolhe o conjunto: sandbox quando `SANKHYA_SANDBOX_API_URL` esta presente,
+ * generico caso contrario.
+ *
+ * A escolha olha SO a `baseUrl`, de proposito: conjunto sandbox pela metade tem
+ * de reprovar dizendo qual chave falta, nunca cair calado no generico.
+ */
+export function conjuntoDaLane(env: AmbienteDaLane): ConjuntoDeCredenciais {
+  return env[LANE_OPT_IN.sandbox.baseUrl] ? LANE_OPT_IN.sandbox : LANE_OPT_IN.generico;
+}
+
+/** Le os quatro valores do conjunto escolhido. Valor ausente vira string vazia. */
+export function credenciaisDaLane(env: AmbienteDaLane): CredenciaisDaLane {
+  const conjunto = conjuntoDaLane(env);
+  return {
+    conjunto,
+    baseUrl: env[conjunto.baseUrl] ?? '',
+    clientId: env[conjunto.clientId] ?? '',
+    clientSecret: env[conjunto.clientSecret] ?? '',
+    xToken: env[conjunto.xToken] ?? '',
+  };
+}
+
+/** Nomes das variaveis do conjunto escolhido que estao ausentes ou vazias. */
+function credenciaisFaltando(env: AmbienteDaLane): string[] {
+  const conjunto = conjuntoDaLane(env);
+  return [conjunto.baseUrl, conjunto.clientId, conjunto.clientSecret, conjunto.xToken].filter(
+    (nome) => !env[nome],
+  );
+}
+
+/** `true` quando TODAS as credenciais do conjunto escolhido estao presentes. */
 export function temCredenciais(env: AmbienteDaLane): boolean {
-  return LANE_OPT_IN.credenciais.every((nome) => Boolean(env[nome]));
+  return credenciaisFaltando(env).length === 0;
 }
 
 /** `true` quando a flag explicita vale exatamente o valor esperado. */
@@ -136,7 +211,19 @@ export function optInSatisfeito(env: AmbienteDaLane): boolean {
  */
 export function motivoDoSkip(env: AmbienteDaLane): string {
   const faltando: string[] = [];
-  if (!temCredenciais(env)) faltando.push(`credenciais (${LANE_OPT_IN.credenciais.join(', ')})`);
+  const conjunto = conjuntoDaLane(env);
+  const ausentes = credenciaisFaltando(env);
+  if (ausentes.length > 0) {
+    // Nomeia a chave que falta DO CONJUNTO ESCOLHIDO: dizer so "faltam
+    // credenciais" manda procurar no conjunto errado. E, quando nada esta
+    // configurado, cita tambem a chave que troca de conjunto — senao a mensagem
+    // aponta so para o caminho do CI, que nao e o do dia a dia.
+    const dica =
+      conjunto.nome === 'generico' && ausentes.length === 4
+        ? ` (ou defina ${LANE_OPT_IN.sandbox.baseUrl} e o conjunto ${LANE_OPT_IN.sandbox.nome} inteiro)`
+        : '';
+    faltando.push(`credenciais do conjunto ${conjunto.nome}: ${ausentes.join(', ')}${dica}`);
+  }
   if (!temFlagDeOptIn(env)) {
     faltando.push(`${LANE_OPT_IN.flag}=${LANE_OPT_IN.valorDaFlag} (opt-in explicito de escrita)`);
   }

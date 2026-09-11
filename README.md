@@ -390,6 +390,12 @@ SDK_INTEGRATION_WMS=1 npm run test:integration
 Sem as credenciais **ou** sem `SDK_INTEGRATION_WMS=1` a suíte é SKIP e imprime o motivo — nunca
 faz rede por acidente.
 
+**Dois conjuntos de credenciais, com precedência:** se `SANKHYA_SANDBOX_API_URL` estiver definida,
+a lane usa o conjunto `SANKHYA_SANDBOX_*` **inteiro** (`…_API_URL`, `…_CLIENT_ID`,
+`…_CLIENT_SECRET`, `…_TOKEN`) e ignora os nomes genéricos; senão usa `SANKHYA_BASE_URL` e irmãos,
+que é o que o workflow injeta. Os dois nunca se misturam — conjunto escolhido pela metade vira
+SKIP nomeando a chave que falta, jamais completado com a chave do outro conjunto.
+
 **Travado por teste, no CI de PR e sem rede** (`tests/security/ci-lanes.test.ts`):
 
 | Garantia | Como é verificada |
