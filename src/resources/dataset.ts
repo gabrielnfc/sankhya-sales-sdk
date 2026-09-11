@@ -39,6 +39,27 @@ function cellToString(cell: unknown, where: string): string {
 }
 
 /**
+ * `true` para a celula de metadata que o `DatasetSP` acrescenta DEPOIS das
+ * celulas dos `fields`.
+ *
+ * Fato medido (a), fixtures de 06/09 `spike-raw/faturamento/S1_DS_ITENS_1813.json`
+ * e `S1_DS_ESTOQUE_DATAS.json` (`/res/result`): cada linha vem com N celulas de
+ * campo mais uma final
+ * `{"_rmd": {"provider": "PRODUTORMP", "CODPROD": {"decVlr": 4, ...}}}` —
+ * casas decimais e rotulo de lote para a tela do ERP, nada que uma escrita
+ * precise. Nao e valor de campo, e por isso nao vira celula (RD-8).
+ *
+ * O reconhecimento e pela chave `_rmd`, nao pela posicao: excedente que nao
+ * seja exatamente esta forma continua reprovando — resposta inesperada de
+ * fronteira externa nao vira silencio.
+ */
+function ehMetadataRmd(cell: unknown): boolean {
+  return (
+    typeof cell === 'object' && cell !== null && !Array.isArray(cell) && Object.hasOwn(cell, '_rmd')
+  );
+}
+
+/**
  * `total` presente e utilizavel na resposta de `DatasetSP.save`.
  *
  * `null` e `''` contam como ausentes de proposito: `safeParseNumber` os
@@ -178,6 +199,17 @@ export class DatasetResource {
    * vira estado terminal em silencio); `PARSE_ERROR` se `total` nao for numero.
    * @throws {GatewayError} Em erro de negocio Sankhya.
    * @throws {AuthError} Se autenticacao falhar.
+   *
+   * @remarks
+   * **Celula `_rmd` (RD-8, D2.2b).** O `DatasetSP` devolve, depois das celulas
+   * dos `fields`, uma celula de metadata de renderizacao
+   * (`{"_rmd": {"provider": …, "<CAMPO>": {"decVlr": …}}}`) — medida nos
+   * fixtures de 06/09 `S1_DS_ITENS_1813.json` e `S1_DS_ESTOQUE_DATAS.json`.
+   * Ela e DESCARTADA: `result` traz so as celulas dos campos. A metadata **nao**
+   * e exposta no retorno de proposito — sao casas decimais e rotulo de lote para
+   * a tela do ERP, sem uso para quem escreve, e expo-la ampliaria a superficie
+   * publica por um dado que ninguem pediu. Excedente de outra forma, ou objeto
+   * nao vazio em posicao de campo, continua lancando.
    * @example
    * ```ts
    * const fields = ['NUNOTA', 'NUCONFATUAL'];
@@ -230,7 +262,23 @@ export class DatasetResource {
           'DATASET_SAVE_MALFORMED_RESPONSE',
         );
       }
-      return row.map((cell, position) => cellToString(cell, `result[${index}][${position}]`));
+
+      // Excedente de UMA celula que seja a metadata `_rmd` e descartado (RD-8);
+      // qualquer outro excedente reprova. Linha mais CURTA que `fields` segue
+      // valida: e a forma medida da insercao multi-record (M88), em que o
+      // servidor devolve so a chave gerada.
+      const excedente = row.length - params.fields.length;
+      let celulas = row;
+      if (excedente === 1 && ehMetadataRmd(row[params.fields.length])) {
+        celulas = row.slice(0, params.fields.length);
+      } else if (excedente > 0) {
+        throw new SankhyaError(
+          `dataset.save: result[${index}] tem ${row.length} celulas e fields tem ${params.fields.length}; o excedente nao e a metadata '_rmd'. Resposta inconsistente — nenhuma linha parcial foi devolvida.`,
+          'DATASET_SAVE_MALFORMED_RESPONSE',
+        );
+      }
+
+      return celulas.map((cell, position) => cellToString(cell, `result[${index}][${position}]`));
     });
 
     return { total: safeParseNumber(raw.total, 'DatasetSP.save.total'), result };
