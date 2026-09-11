@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { HttpClient } from '../../src/core/http.js';
+import type { DbExplorerResource } from '../../src/resources/db-explorer.js';
 import { EstoqueResource } from '../../src/resources/estoque.js';
 
 function createMockHttp(overrides?: Partial<HttpClient>) {
@@ -94,5 +95,102 @@ describe('EstoqueResource', () => {
 
     expect(items).toHaveLength(1);
     expect(items[0]).toEqual({ codigoProduto: 1, quantidade: 100 });
+  });
+  // --- porLote (D2.6) — leitura de TGFEST via DbExplorer, sem rede ---
+
+  /** `dbExplorer` dublado: `porLote` e SELECT puro, nunca REST. */
+  function createMockDbx(rows: Array<Record<string, string>>) {
+    return { query: vi.fn().mockResolvedValue(rows) } as unknown as DbExplorerResource & {
+      query: ReturnType<typeof vi.fn>;
+    };
+  }
+
+  it('estoque.porLote devolve numeros e nulos tipados', async () => {
+    const http = createMockHttp();
+    const dbx = createMockDbx([
+      {
+        CODEMP: '2',
+        CODLOCAL: '30301',
+        CODPROD: '10077',
+        CONTROLE: 'SDK-T-A',
+        TIPO: 'P',
+        CODPARC: '0',
+        ESTOQUE: '10',
+        RESERVADO: '0',
+        DTVAL: '06/09/2027',
+        DTFABRICACAO: '',
+        STATUSLOTE: 'N',
+      },
+    ]);
+
+    await expect(
+      new EstoqueResource(http, { dbExplorer: dbx }).porLote({ codProd: 10077 }),
+    ).resolves.toEqual([
+      {
+        codEmp: 2,
+        codLocal: 30301,
+        codProd: 10077,
+        controle: 'SDK-T-A',
+        tipo: 'P',
+        codParc: 0,
+        estoque: 10,
+        reservado: 0,
+        dtVal: '06/09/2027',
+        dtFab: null,
+        statusLote: 'N',
+      },
+    ]);
+  });
+
+  it('porLote sem dbExplorer injetado lanca mensagem explicita (compat com new EstoqueResource(http))', async () => {
+    await expect(new EstoqueResource(createMockHttp()).porLote({ codProd: 1 })).rejects.toThrow(
+      /dbExplorer/,
+    );
+  });
+
+  it('porLote recusa ESTOQUE nao numerico em vez de devolver 0 (parse estrito)', async () => {
+    const dbx = createMockDbx([
+      {
+        CODEMP: '2',
+        CODLOCAL: '30301',
+        CODPROD: '10077',
+        CONTROLE: 'SDK-T-A',
+        TIPO: 'P',
+        CODPARC: '0',
+        ESTOQUE: 'ABC',
+        RESERVADO: '0',
+        DTVAL: '',
+        DTFABRICACAO: '',
+        STATUSLOTE: 'N',
+      },
+    ]);
+
+    await expect(
+      new EstoqueResource(createMockHttp(), { dbExplorer: dbx }).porLote({ codProd: 10077 }),
+    ).rejects.toThrow(/ESTOQUE/);
+  });
+
+  it('porLote recusa codProd nao inteiro antes da consulta (G3)', async () => {
+    const dbx = createMockDbx([]);
+
+    await expect(
+      new EstoqueResource(createMockHttp(), { dbExplorer: dbx }).porLote({ codProd: 1.5 }),
+    ).rejects.toThrow(/codProd/);
+    expect(dbx.query).not.toHaveBeenCalled();
+  });
+
+  it('porLote filtra por CODEMP e CODLOCAL quando informados', async () => {
+    const dbx = createMockDbx([]);
+
+    await new EstoqueResource(createMockHttp(), { dbExplorer: dbx }).porLote({
+      codProd: 10077,
+      codEmp: 2,
+      codLocal: 30301,
+    });
+
+    const sql = dbx.query.mock.calls[0]?.[0] as string;
+    expect(sql).toMatch(/CODPROD = 10077/);
+    expect(sql).toMatch(/CODEMP = 2/);
+    expect(sql).toMatch(/CODLOCAL = 30301/);
   });
 });

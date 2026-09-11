@@ -210,3 +210,15 @@ export type {
   FecharConferenciaInput,
   ReapontarOrigemInput,
 } from './types/conferencia.js';
+
+// Lotes / virada (D2.6) — bloco proprio ao fim para merge limpo
+export { LotesResource } from './resources/lotes.js';
+export type {
+  BaixaLoteInput,
+  BaixaLoteItem,
+  EntradaLoteInput,
+  EntradaLoteItem,
+  NotaDeLoteResult,
+} from './types/lotes.js';
+export type { EstoqueLote } from './types/estoque.js';
+export type { SetTipoControleInput } from './types/produtos.js';

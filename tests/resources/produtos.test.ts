@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HttpClient } from '../../src/core/http.js';
+import type { DatasetResource } from '../../src/resources/dataset.js';
+import type { DbExplorerResource } from '../../src/resources/db-explorer.js';
 import { ProdutosResource } from '../../src/resources/produtos.js';
 
 /** Logger estavel: `getLogger()` novo por chamada nao daria para asserir. */
@@ -198,6 +200,119 @@ describe('ProdutosResource', () => {
 
     expect(items).toHaveLength(1);
     expect(items[0]).toEqual({ codigoProduto: 1, descricao: 'Widget' });
+  });
+  // --- setTipoControle (D2.6, REQ-VIR-3) — prova de saldo E reserva zero ---
+
+  /** `dbExplorer` dublado: a prova de saldo zero e SELECT global em TGFEST. */
+  function createMockDbx(rows: Array<Record<string, string>>) {
+    return { query: vi.fn().mockResolvedValue(rows) } as unknown as DbExplorerResource & {
+      query: ReturnType<typeof vi.fn>;
+    };
+  }
+
+  /** `dataset` dublado: a escrita e `DatasetSP.save` em `Produto`. */
+  function createMockDs(result: unknown = { total: 1, result: [['10015']] }) {
+    return { save: vi.fn().mockResolvedValue(result) } as unknown as DatasetResource & {
+      save: ReturnType<typeof vi.fn>;
+    };
+  }
+
+  it('setTipoControle recusa quando ha SALDO em qualquer empresa/local (M103, REQ-VIR-3)', async () => {
+    const http = createMockHttp();
+    const dbx = createMockDbx([
+      { CODEMP: '1', CODLOCAL: '30201', ESTOQUE: '0', RESERVADO: '0' },
+      { CODEMP: '2', CODLOCAL: '30301', ESTOQUE: '12', RESERVADO: '0' },
+    ]);
+    const ds = createMockDs();
+
+    await expect(
+      new ProdutosResource(http, { dataset: ds, dbExplorer: dbx }).setTipoControle({
+        codProd: 10015,
+        tipo: 'L',
+        usaLoteDtVal: true,
+      }),
+    ).rejects.toThrow(/saldo/i);
+    expect(ds.save).not.toHaveBeenCalled();
+  });
+
+  it('setTipoControle recusa quando ha RESERVA, mesmo com ESTOQUE zero (M102, spec §4.2.3 passo 1)', async () => {
+    const http = createMockHttp();
+    const dbx = createMockDbx([{ CODEMP: '2', CODLOCAL: '30301', ESTOQUE: '0', RESERVADO: '3' }]);
+    const ds = createMockDs();
+
+    await expect(
+      new ProdutosResource(http, { dataset: ds, dbExplorer: dbx }).setTipoControle({
+        codProd: 10015,
+        tipo: 'L',
+        usaLoteDtVal: true,
+      }),
+    ).rejects.toThrow(/reserva/i);
+    expect(ds.save).not.toHaveBeenCalled();
+  });
+
+  it('setTipoControle grava Produto quando TODAS as linhas estao zeradas em ESTOQUE e RESERVADO', async () => {
+    const http = createMockHttp();
+    const dbx = createMockDbx([{ CODEMP: '1', CODLOCAL: '30201', ESTOQUE: '0', RESERVADO: '0' }]);
+    const ds = createMockDs();
+
+    await new ProdutosResource(http, { dataset: ds, dbExplorer: dbx }).setTipoControle({
+      codProd: 10015,
+      tipo: 'L',
+      usaLoteDtVal: true,
+    });
+
+    expect(dbx.query.mock.calls[0]?.[0]).not.toMatch(/CODEMP\s*=/); // SELECT global (M103)
+    expect(ds.save).toHaveBeenCalledWith({
+      entityName: 'Produto',
+      fields: ['CODPROD', 'TIPCONTEST', 'USALOTEDTVAL'],
+      records: [{ pk: { CODPROD: '10015' }, values: { '1': 'L', '2': 'S' } }],
+    });
+  });
+
+  it('setTipoControle grava quando o SELECT global nao devolve nenhuma linha de TGFEST (M104/M91, RD-6)', async () => {
+    const http = createMockHttp();
+    const dbx = createMockDbx([]);
+    const ds = createMockDs();
+
+    await new ProdutosResource(http, { dataset: ds, dbExplorer: dbx }).setTipoControle({
+      codProd: 10015,
+      tipo: 'N',
+      usaLoteDtVal: false,
+    });
+
+    expect(dbx.query).toHaveBeenCalledTimes(1); // o SELECT EXECUTOU: 0 linhas e resposta, nao ausencia
+    expect(ds.save).toHaveBeenCalledWith({
+      entityName: 'Produto',
+      fields: ['CODPROD', 'TIPCONTEST', 'USALOTEDTVAL'],
+      records: [{ pk: { CODPROD: '10015' }, values: { '1': 'N', '2': 'N' } }],
+    });
+  });
+
+  it('setTipoControle propaga a falha do SELECT em vez de tratar como 0 linhas (RD-6)', async () => {
+    const http = createMockHttp();
+    const dbx = {
+      query: vi.fn().mockRejectedValue(new Error('DbExplorer fora do ar')),
+    } as unknown as DbExplorerResource & { query: ReturnType<typeof vi.fn> };
+    const ds = createMockDs();
+
+    await expect(
+      new ProdutosResource(http, { dataset: ds, dbExplorer: dbx }).setTipoControle({
+        codProd: 10015,
+        tipo: 'N',
+        usaLoteDtVal: false,
+      }),
+    ).rejects.toThrow(/DbExplorer fora do ar/);
+    expect(ds.save).not.toHaveBeenCalled();
+  });
+
+  it('setTipoControle sem as deps injetadas lanca citando a dep faltante', async () => {
+    await expect(
+      new ProdutosResource(createMockHttp()).setTipoControle({
+        codProd: 10015,
+        tipo: 'L',
+        usaLoteDtVal: true,
+      }),
+    ).rejects.toThrow(/dbExplorer/);
   });
 
   it('le volumes do gateway (TGFVOA) e converte os numericos', async () => {

@@ -10,6 +10,7 @@ import { EstoqueResource } from '../../src/resources/estoque.js';
 import { FinanceirosResource } from '../../src/resources/financeiros.js';
 import { FiscalResource } from '../../src/resources/fiscal.js';
 import { GatewayResource } from '../../src/resources/gateway.js';
+import { LotesResource } from '../../src/resources/lotes.js';
 import { NotasResource } from '../../src/resources/notas.js';
 import { PedidosResource } from '../../src/resources/pedidos.js';
 import { PrecosResource } from '../../src/resources/precos.js';
@@ -195,6 +196,12 @@ describe('SankhyaClient', () => {
       const client = new SankhyaClient(validConfig);
       expect(client.conferencia).toBeInstanceOf(ConferenciaResource);
       expect(client.conferencia).toBe(client.conferencia);
+    });
+
+    it('client.lotes returns LotesResource instance (lazy, mesma instancia)', () => {
+      const client = new SankhyaClient(validConfig);
+      expect(client.lotes).toBeInstanceOf(LotesResource);
+      expect(client.lotes).toBe(client.lotes);
     });
   });
 

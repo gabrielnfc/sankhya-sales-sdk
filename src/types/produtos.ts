@@ -178,3 +178,13 @@ export interface GrupoProduto {
 
 /** Filtros para listagem de produtos. */
 export interface ListarProdutosParams extends PaginationParams, ModifiedSinceParams {}
+
+/** Parametros de `produtos.setTipoControle` (virada de controle de lote, REQ-VIR-3). */
+export interface SetTipoControleInput {
+  /** `CODPROD` do produto a virar. */
+  readonly codProd: number;
+  /** `TIPCONTEST`: `'L'` liga o controle por lote, `'N'` desliga. */
+  readonly tipo: 'L' | 'N';
+  /** `USALOTEDTVAL`: `true` grava `'S'`, `false` grava `'N'`. */
+  readonly usaLoteDtVal: boolean;
+}
