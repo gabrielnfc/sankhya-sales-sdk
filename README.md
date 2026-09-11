@@ -27,7 +27,7 @@ npm install sankhya-sales-sdk
 ### Variaveis de ambiente
 
 ```bash
-export SANKHYA_BASE_URL=https://api.sankhya.com.br
+export SANKHYA_BASE_URL=https://api.sandbox.sankhya.com.br
 export SANKHYA_CLIENT_ID=seu-client-id
 export SANKHYA_CLIENT_SECRET=seu-client-secret
 export SANKHYA_X_TOKEN=seu-x-token
@@ -45,6 +45,34 @@ const sankhya = new SankhyaClient({
   xToken: process.env.SANKHYA_X_TOKEN!,
 });
 ```
+
+### Guarda de ambiente (allowlist de host, fail-closed)
+
+O cliente só sobe contra host que a allowlist aceita — **o default é recusar**:
+
+| Host | Sobe? |
+|---|---|
+| contém `sandbox` (ex.: `api.sandbox.sankhya.com.br`) | sim, sem aviso |
+| consta de `allowedHosts` (host exato) | sim, sem aviso |
+| produção (`PRODUCTION_HOSTS` e subdomínios) | só com a flag `allowProduction` ligada — e sai um `logger.warn` citando **só o host** |
+| qualquer outro host, ou `baseUrl` que não parseia | **aborta** (`SankhyaError`) |
+
+```typescript
+// ERP interno de homologação: amplie a allowlist, não a flag de produção.
+const sankhya = new SankhyaClient({
+  baseUrl: 'https://erp.interno.example.local',
+  allowedHosts: ['erp.interno.example.local'],
+  // ...credenciais...
+});
+```
+
+Produção exige `allowProduction` ligada explicitamente na config — decisão de quem
+chama, nunca default. O repo tem uma trava (`tests/security/allow-production-flag.test.ts`)
+que reprova qualquer arquivo de `src/`, `tests/` ou `.github/` que ligue a flag.
+
+Helpers exportados para quem precisa decidir antes de construir o cliente:
+`isAllowedHost(host, allowedHosts?)`, `isProductionHost(host)`, `assertAllowedHost(baseUrl, opts, logger)`,
+mais as constantes `SANDBOX_MARKER` e `PRODUCTION_HOSTS`.
 
 ### Resiliência (opcional)
 

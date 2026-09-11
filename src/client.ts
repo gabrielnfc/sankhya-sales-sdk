@@ -1,4 +1,5 @@
 import { AuthManager } from './core/auth.js';
+import { assertAllowedHost } from './core/environment-guard.js';
 import { HttpClient } from './core/http.js';
 import { createLogger } from './core/logger.js';
 import {
@@ -22,9 +23,14 @@ import type { Logger, SankhyaConfig } from './types/config.js';
  * Facade que expoe todos os recursos da API via propriedades lazy-loaded.
  * Cada recurso e instanciado apenas no primeiro acesso.
  *
+ * O host passa por uma allowlist fail-closed: sandbox sobe direto, host interno
+ * precisa constar de `allowedHosts`, producao exige `allowProduction` explicito
+ * (e e logada). Qualquer outro host aborta a construcao.
+ *
  * @example
  * ```ts
  * const sankhya = new SankhyaClient({
+ *   // sandbox: 'https://api.sandbox.sankhya.com.br'
  *   baseUrl: process.env.SANKHYA_BASE_URL!,
  *   clientId: process.env.SANKHYA_CLIENT_ID!,
  *   clientSecret: process.env.SANKHYA_CLIENT_SECRET!,
@@ -56,10 +62,16 @@ export class SankhyaClient {
    *
    * @param config - Configuracao de conexao com a API Sankhya.
    * @throws {Error} Se campos obrigatorios estiverem ausentes.
+   * @throws {SankhyaError} Se o host de `baseUrl` estiver fora da allowlist
+   *   (`VALIDATION_ERROR`) ou for producao sem `allowProduction` (`PRODUCTION_BLOCKED`).
    */
   constructor(config: SankhyaConfig) {
     this.validateConfig(config);
     this.logger = createLogger(config.logger);
+    // Allowlist fail-closed: roda depois da validacao de tipos e ANTES de
+    // instanciar AuthManager/HttpClient — nenhum recurso de rede e criado
+    // para um host que a guarda recusaria.
+    assertAllowedHost(config.baseUrl, config, this.logger);
     this.auth = new AuthManager(
       config.baseUrl,
       config.clientId,

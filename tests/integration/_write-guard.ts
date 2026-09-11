@@ -8,10 +8,11 @@
  *
  * Regra: escrita exige host de sandbox. Qualquer outra coisa aborta.
  * Falhar o teste e infinitamente mais barato que criar um pedido em producao.
+ *
+ * "O que e host permitido" NAO mora aqui: vem de `src/core/environment-guard.ts`,
+ * fonte unica do marcador de sandbox (D3). Este arquivo so reexporta a decisao.
  */
-
-/** Host de producao nunca contem este marcador; o de sandbox sempre contem. */
-const SANDBOX_MARKER = 'sandbox';
+import { isAllowedHost } from '../../src/core/environment-guard.js';
 
 const DICA = 'Use SANKHYA_* (sandbox) em escrita; SANKHYA_PROD_* e producao, somente leitura.';
 
@@ -35,7 +36,8 @@ export function assertSandbox(baseUrl: string): void {
     throw new Error(`[write-guard] SANKHYA_BASE_URL invalida: "${baseUrl}". ${DICA}`);
   }
 
-  if (!host.includes(SANDBOX_MARKER)) {
+  // Sem `allowedHosts`: em escrita, a allowlist e so o sandbox.
+  if (!isAllowedHost(host)) {
     throw new Error(`[write-guard] ABORTADO: host "${host}" nao e sandbox. ${DICA}`);
   }
 }
