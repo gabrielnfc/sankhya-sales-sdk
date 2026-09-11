@@ -31,6 +31,26 @@ const ENTRADA_OK = {
   ],
 } as const;
 
+/**
+ * Campos de `CabecalhoNota` medidos em `spike-raw/faturamento/s1.ts:8` (1813) e
+ * `spike-raw/virada/t05e.ts:4` (1811) — a MESMA lista nos dois. Escrito aqui a
+ * mao de proposito: se o resource perder ou trocar um campo, o `toEqual` cai.
+ */
+const CAMPOS_CABECALHO_MEDIDOS = [
+  'NUNOTA',
+  'NUMNOTA',
+  'CODPARC',
+  'DTNEG',
+  'CODTIPOPER',
+  'CODTIPVENDA',
+  'CODVEND',
+  'CODEMP',
+  'TIPMOV',
+  'CODNAT',
+  'CODCENCUS',
+  'OBSERVACAO',
+];
+
 describe('LotesResource', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -123,6 +143,60 @@ describe('LotesResource', () => {
       expect(notas.confirmar).toHaveBeenCalledWith(1889280);
     });
 
+    it('entrada1813 manda o payload medido de CabecalhoNota, campo a campo (s1.ts:8-9)', async () => {
+      const ds = createMockDs();
+      const notas = createMockNotas();
+
+      await new LotesResource(ds, notas).entrada1813({
+        ...ENTRADA_OK,
+        itens: [...ENTRADA_OK.itens],
+      });
+
+      expect(ds.save.mock.calls[0]?.[0]).toEqual({
+        entityName: 'CabecalhoNota',
+        fields: CAMPOS_CABECALHO_MEDIDOS,
+        records: [
+          {
+            values: {
+              '1': '0',
+              '2': '0',
+              '3': '06/09/2026',
+              '4': '1813',
+              '5': '0',
+              '6': '0',
+              '7': '2',
+              '8': 'Q',
+              '9': '99010000',
+              '10': '204004',
+              '11': 'SDK-T entrada',
+            },
+          },
+        ],
+      });
+    });
+
+    it.each([
+      ['result vazio', { total: 1, result: [] }],
+      ['celula vazia', { total: 1, result: [['']] }],
+      ['celula nao numerica', { total: 1, result: [['X']] }],
+    ])(
+      'entrada1813 lanca LOTES_NUNOTA_AUSENTE com %s e nao segue para ItemNota/Estoque/confirmar (I11)',
+      async (_caso, resposta) => {
+        const ds = createMockDs(resposta);
+        const notas = createMockNotas();
+
+        await expect(
+          new LotesResource(ds, notas).entrada1813({
+            ...ENTRADA_OK,
+            itens: [...ENTRADA_OK.itens],
+          }),
+        ).rejects.toThrow(/LOTES_NUNOTA_AUSENTE|NUNOTA utilizavel/);
+        // O CabecalhoNota ja foi mandado; nada depois dele pode ter ido.
+        expect(ds.save).toHaveBeenCalledTimes(1);
+        expect(notas.confirmar).not.toHaveBeenCalled();
+      },
+    );
+
     it('entrada1813 recusa itens vazio ANTES de qualquer escrita', async () => {
       const ds = createMockDs();
       const notas = createMockNotas();
@@ -157,6 +231,64 @@ describe('LotesResource', () => {
       const ite = ds.save.mock.calls[1]?.[0] as DatasetSaveParams;
       expect(Object.values(ite.records[0]?.values ?? {})).toContain('-1');
       expect(ite.records).toHaveLength(2);
+      // A nota de ajuste fica em STATUSNOTA='A': so assim excluirNotas reverte a
+      // baixa (M81/M104). Confirmar fecharia a porta de volta.
+      expect(notas.confirmar).not.toHaveBeenCalled();
+    });
+
+    it('baixa1811 manda o payload medido de CabecalhoNota, campo a campo (t05e.ts:4-6)', async () => {
+      const ds = createMockDs({ total: 1, result: [['1889290']] });
+      const notas = createMockNotas();
+
+      await new LotesResource(ds, notas).baixa1811({
+        codEmp: 1,
+        codProd: 10015,
+        dtNeg: '06/09/2026',
+        observacao: 'SDK-T ajuste',
+        itens: [{ codLocal: 30201, quantidade: 2 }],
+      });
+
+      expect(ds.save.mock.calls[0]?.[0]).toEqual({
+        entityName: 'CabecalhoNota',
+        fields: CAMPOS_CABECALHO_MEDIDOS,
+        records: [
+          {
+            values: {
+              '1': '0',
+              '2': '0',
+              '3': '06/09/2026',
+              '4': '1811',
+              '5': '0',
+              '6': '0',
+              '7': '1',
+              '8': 'Q',
+              '9': '99010000',
+              '10': '204004',
+              '11': 'SDK-T ajuste',
+            },
+          },
+        ],
+      });
+    });
+
+    it('baixa1811 recusa controle em PARTE dos itens antes de qualquer escrita (M92)', async () => {
+      const ds = createMockDs();
+      const notas = createMockNotas();
+
+      await expect(
+        new LotesResource(ds, notas).baixa1811({
+          codEmp: 1,
+          codProd: 10015,
+          dtNeg: '06/09/2026',
+          observacao: 'SDK-T ajuste',
+          itens: [
+            { codLocal: 30201, quantidade: 2, controle: 'SDK-T-A' },
+            { codLocal: 30403, quantidade: 10 },
+          ],
+        }),
+      ).rejects.toThrow(/controle/i);
+      expect(ds.save).not.toHaveBeenCalled();
+      expect(notas.confirmar).not.toHaveBeenCalled();
     });
 
     it('baixa1811 recusa quantidade <= 0 ANTES de qualquer escrita', async () => {

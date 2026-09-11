@@ -32,7 +32,16 @@ const DESCRITOR_LOCAIS: ResourceDescriptor = {
   endpoint: '/estoque/locais',
 };
 
-/** Colunas de `TGFEST` lidas por `porLote`, na ordem do SELECT medido. */
+/**
+ * Colunas de `TGFEST` lidas por `porLote`.
+ *
+ * **Escolhidas a partir** de `spike-raw/virada/D1_EST_10015_TODAS.json:2`, com
+ * **ordem propria**: aquele SELECT medido le
+ * `CODEMP, CODLOCAL, CONTROLE, ESTOQUE, RESERVADO, WMSBLOQUEADO, STATUSLOTE,
+ * DTVAL, DTFABRICACAO, TIPO, CODPARC, ATIVO` — aqui `CODPROD` foi acrescentado
+ * (a leitura pode ser global) e `WMSBLOQUEADO`/`ATIVO` ficaram de fora
+ * (`WMSBLOQUEADO` nao e gate, M98). Nao e a fixture reproduzida (R14).
+ */
 const COLUNAS_TGFEST = [
   'CODEMP',
   'CODLOCAL',

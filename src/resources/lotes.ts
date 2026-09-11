@@ -49,7 +49,13 @@ const CAMPOS_ITEM_BAIXA = [
   'ATUALESTOQUE',
 ] as const;
 
-/** Campos de `ItemNota` na baixa **com** lote: os da baixa + `CONTROLE`. */
+/**
+ * Campos de `ItemNota` na baixa **com** lote: os da baixa + `CONTROLE`.
+ *
+ * **(b)** — derivado, nao medido: nenhuma fixture do spike faz baixa informando
+ * `CONTROLE` (t05e baixa sem lote). A posicao de `CONTROLE` ao fim de `fields` e
+ * escolha nossa; o ERP pode exigir outra coisa. Meca antes de usar em producao.
+ */
 const CAMPOS_ITEM_BAIXA_COM_LOTE = [...CAMPOS_ITEM_BAIXA, 'CONTROLE'] as const;
 
 /**
@@ -68,14 +74,15 @@ const CAMPOS_ESTOQUE_DATAS = [
 ] as const;
 
 /**
- * Constantes do payload copiadas do spike, **sem regra de negocio medida por
- * tras** — sao o que funcionou no sandbox em 06/09/2026, nao um contrato.
+ * Constantes do payload, **(a) medidas no sandbox em 06/09/2026**: aparecem
+ * literais em payload que o ERP aceitou — `spike-raw/faturamento/s1.ts:9,15,20`
+ * e `spike-raw/virada/t05e.ts:6,9`.
  *
- * `CODNAT` (natureza) e `CODCENCUS` (centro de custo) valem para a empresa
- * daquele sandbox; `TIPMOV='Q'` e o que as 5 TOPs de ajuste usam (M100);
- * `CODVOL='UN'`, `CODPARC='0'`, `TIPO='P'`, `NUMNOTA='0'`, `CODTIPVENDA='0'` e
- * `CODVEND='0'` idem. **(b)** — confirme com o dono/contabilidade antes de rodar
- * contra outra base.
+ * O que e **(b)** e a **generalidade**: `CODNAT` (natureza) e `CODCENCUS`
+ * (centro de custo) valem para a empresa daquele sandbox, e nenhuma regra de
+ * negocio por tras deles foi medida — confirme com o dono/contabilidade antes
+ * de rodar contra outra base. `TIPMOV='Q'` e o que as 5 TOPs de ajuste usam
+ * (M100).
  */
 const PADROES_MEDIDOS = {
   NUMNOTA: '0',
