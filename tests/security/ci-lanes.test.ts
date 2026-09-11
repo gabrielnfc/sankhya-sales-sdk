@@ -371,6 +371,10 @@ describe('lane WMS — travas estruturais', () => {
     expect(codigo).toMatch(/CABECALHO_REFERENCIA_06_09/);
     expect(codigo).toMatch(/CODNAT: '01010101'/);
     expect(codigo).toMatch(/PERCDESC: '0'/);
+    // `DTPREVENT` e a unica chave do cabecalho de referencia que NAO vem
+    // literal do spike: a data fixa de la nao serve. A trava e no call-site,
+    // porque a constante sozinha nao diz quem a usa (MINOR-7).
+    expect(codigo).toMatch(/DTPREVENT: DATA_HOJE/);
     // A lane nunca manda `L` — o cabecalho de referencia veio de um spike que usava.
     expect(codigo).not.toMatch(/STATUSNOTA: 'L'/);
   });
