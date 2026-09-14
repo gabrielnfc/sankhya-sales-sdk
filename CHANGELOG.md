@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.6.0] - 2026-09-11
+## [2.0.0] - 2026-09-14
 
-> **Sobre o número da versão.** O texto abaixo descreve a entrega; **1.6.0 × 2.0.0 é decisão do dono na hora da tag** e o conteúdo vale para os dois. Há uma quebra de compatibilidade deliberada (a guarda de host), documentada em **BREAKING (segurança)** com o passo a passo de migração. Enquanto a tag não sai, `package.json` continua em `1.5.0`.
+> **Sobre o número da versão.** Decisão do dono em 2026-09-14: **2.0.0** (há uma quebra de compatibilidade deliberada — a guarda de host — documentada em **BREAKING (segurança)** com o passo a passo de migração). O conteúdo abaixo foi escrito como "1.6.0" em 2026-09-11 e vale integralmente para a 2.0.0.
 >
 > Toda linha cita a medição de origem: `Mn` = fato medido no sandbox Sankhya (`docs/superpowers/specs/2026-09-05-diagnostico-separatrue-v3.md`, com os payloads brutos em `spike-raw/`), `RD-n` = ruling desta entrega, `D-n` = item de backlog.
 >
