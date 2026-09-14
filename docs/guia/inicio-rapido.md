@@ -114,10 +114,10 @@ console.log('Pedido confirmado!');
 
 | Ambiente | Base URL | Uso |
 |----------|----------|-----|
-| **Produção** | o host que consta de `PRODUCTION_HOSTS` | Dados reais. **Desde a 1.6.0 exige `allowProduction: true`** na config — sem a flag o cliente aborta com `PRODUCTION_BLOCKED`, e com ela sai um `logger.warn` citando o host |
+| **Produção** | o host que consta de `PRODUCTION_HOSTS` | Dados reais. **Desde a 2.0.0 exige `allowProduction: true`** na config — sem a flag o cliente aborta com `PRODUCTION_BLOCKED`, e com ela sai um `logger.warn` citando o host |
 | **Sandbox** | `https://api.sandbox.sankhya.com.br` | Testes. Sobe sem flag e sem aviso |
 
-> **A guarda de ambiente é fail-closed (1.6.0).** Host que não é sandbox nem produção só
+> **A guarda de ambiente é fail-closed (2.0.0).** Host que não é sandbox nem produção só
 > sobe se constar de `allowedHosts`. Detalhes em
 > [SankhyaClient — Guarda de ambiente](../api-reference/cliente-sdk.md#guarda-de-ambiente-allowlist-de-host-fail-closed).
 

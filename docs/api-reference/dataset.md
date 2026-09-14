@@ -7,7 +7,7 @@ gravar em entidades MGE que a REST v1 não expõe (conferência, estoque por lot
 **API Layer:** Gateway
 **Módulo:** MGE
 **Serviços:** `DatasetSP.save`, `DatasetSP.removeRecord`, `CRUDServiceProvider.loadRecords`
-**Novo em:** 1.6.0
+**Novo em:** 2.0.0
 
 > **Nada aqui é retentado automaticamente.** `save` e `removeRecord` são escrita e estão
 > fora da allowlist de idempotentes (`src/core/http.ts:8-10`) — uma reexecução duplicaria

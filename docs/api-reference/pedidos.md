@@ -213,8 +213,8 @@ sankhya.pedidos.faturar(input: FaturarPedidoInput): Promise<void>
 
 | Campo | Tipo | Obrigatório | Descrição |
 |-------|------|-------------|-----------|
-| `codigoPedido` | `number` | Sim | NUNOTA. **Inteiro** — mudou na 1.6.0 |
-| `codigoTipoOperacao` | `number` | Sim | CODTIPOPER para faturamento. **Inteiro** — mudou na 1.6.0 |
+| `codigoPedido` | `number` | Sim | NUNOTA. **Inteiro** — mudou na 2.0.0 |
+| `codigoTipoOperacao` | `number` | Sim | CODTIPOPER para faturamento. **Inteiro** — mudou na 2.0.0 |
 | `dataFaturamento` | `string` | Não | `dd/MM/yyyy`. Omitida ou vazia, o wizard usa a data corrente do ERP (`dtFaturamento: ''` medido em M51) |
 | `tipoFaturamento` | `TipoFaturamento` | Não | Default: `FaturamentoNormal` |
 | `faturarTodosItens` | `boolean` | Não | Default: `true`. **`false` lança** (M82) |
@@ -222,7 +222,7 @@ sankhya.pedidos.faturar(input: FaturarPedidoInput): Promise<void>
 | `codigoLocalDestino` | `string` | Não | `CODLOCALDEST`; default `''` = o do cadastro |
 | `umaNotaParaCada` | `boolean` | Não | Default `false` |
 
-> **Aperto de contrato na 1.6.0 (D-11).** `validateFaturarPedidoInput` — que é export
+> **Aperto de contrato na 2.0.0 (D-11).** `validateFaturarPedidoInput` — que é export
 > público — passou a exigir **inteiro** em `codigoPedido` e `codigoTipoOperacao`. Antes
 > qualquer número finito passava e `'1.5'` chegava ao payload do ERP.
 
@@ -287,10 +287,10 @@ sankhya.pedidos.incluirNotaGateway(
 | `codigoEmpresa` | `CODEMP` | Sim | — |
 | `tipoMovimento` | `TIPMOV` | Sim | — |
 | `observacao` | `OBSERVACAO` | Não | Omitido, o campo não vai no cabeçalho |
-| `statusNota` | `STATUSNOTA` | Não | **Novo em 1.6.0.** `'A'` aberta, `'L'` liberada. Omitido, o ERP aplica o default do TOP |
-| `numeroPedidoExterno` | `AD_NUMPEDIDO` | Não | **Novo em 1.6.0.** Número do pedido no sistema de origem (marketplace/e-commerce) |
-| `informarPreco` | `itens.INFORMARPRECO` | Não (default `true`) | **Novo em 1.6.0.** Serializado como a STRING `'True'`/`'False'` (M46) |
-| `camposExtras` | — | Não | **Novo em 1.6.0.** Campos crus do cabeçalho (`AD_MARKET_PLACE`, `CIF_FOB`, `CODCENCUS`, …) |
+| `statusNota` | `STATUSNOTA` | Não | **Novo em 2.0.0.** `'A'` aberta, `'L'` liberada. Omitido, o ERP aplica o default do TOP |
+| `numeroPedidoExterno` | `AD_NUMPEDIDO` | Não | **Novo em 2.0.0.** Número do pedido no sistema de origem (marketplace/e-commerce) |
+| `informarPreco` | `itens.INFORMARPRECO` | Não (default `true`) | **Novo em 2.0.0.** Serializado como a STRING `'True'`/`'False'` (M46) |
+| `camposExtras` | — | Não | **Novo em 2.0.0.** Campos crus do cabeçalho (`AD_MARKET_PLACE`, `CIF_FOB`, `CODCENCUS`, …) |
 
 **Itens (`ItemNotaGatewayInput`):**
 
@@ -301,8 +301,8 @@ sankhya.pedidos.incluirNotaGateway(
 | `valorUnitario` | `VLRUNIT` | Sim | Finito, >= 0. Vai **cru**, sem arredondamento |
 | `unidade` | `CODVOL` | Sim | — |
 | `codigoLocalOrigem` | `CODLOCALORIG` | Não | — |
-| `percentualDesconto` | `PERCDESC` | Não (default **0**) | **Novo em 1.6.0.** Finito, em `[0, 100]` |
-| `valorTotal` | `VLRTOT` | Não (default `valorUnitario × quantidade` **em centavos**) | **Novo em 1.6.0.** Finito, >= 0 |
+| `percentualDesconto` | `PERCDESC` | Não (default **0**) | **Novo em 2.0.0.** Finito, em `[0, 100]` |
+| `valorTotal` | `VLRTOT` | Não (default `valorUnitario × quantidade` **em centavos**) | **Novo em 2.0.0.** Finito, >= 0 |
 
 **Exemplo:**
 

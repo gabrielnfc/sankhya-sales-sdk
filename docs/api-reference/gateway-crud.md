@@ -116,7 +116,7 @@ sankhya.gateway.saveRecord(params: SaveRecordParams): Promise<Record<string, str
 | `data` | `Record<string, string>` | Sim | Campos e valores → `dataRow.localFields` |
 | `primaryKey` | `Record<string, string>` | Não | Chave do registro → `dataRow.key`. **Omita para inserir** |
 
-> **Mudou na 1.6.0 (M34).** Até a 1.5.0 o SDK mandava os campos direto em
+> **Mudou na 2.0.0 (M34).** Até a 1.5.0 o SDK mandava os campos direto em
 > `dataSet.entity`, e a documentação dizia "PK dentro de `data`". O formato que o ERP
 > aceita é `dataSet.dataRow.{key, localFields}`, e a chave tem campo próprio:
 >
@@ -186,7 +186,7 @@ sankhya.gateway.call<T>(
 | `body` | `Record<string, unknown>` | Sim | Corpo do `requestBody`, **já no formato do serviço** |
 | `options` | `RequestOptions` | Não | `timeout`, `idempotencyKey` |
 
-**Novo em 1.6.0.** Escape hatch para serviços sem método dedicado no SDK. O corpo vai como
+**Novo em 2.0.0.** Escape hatch para serviços sem método dedicado no SDK. O corpo vai como
 veio — nenhuma serialização `{ "$": valor }` é aplicada — e a resposta volta sem
 transformação. A escrita **nunca** é retentada automaticamente.
 

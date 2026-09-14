@@ -310,7 +310,7 @@ const { nunota } = await sankhya.lotes.entrada1813({
 const lotes = await sankhya.estoque.porLote({ codProd: 10077, codEmp: 2 });
 ```
 
-## Migrando de 1.5 para 1.6
+## Migrando de 1.5 para 2.0
 
 Três mudanças quebram código que funcionava. Nenhuma delas é silenciosa: todas
 lançam com a causa na mensagem.

@@ -6,7 +6,7 @@ idempotência e a prova por read-back que o ERP **não** dá de graça.
 **API Layer:** Gateway
 **Módulo:** MGECOM
 **Serviços:** `CACSP.confirmarNota`, `CACSP.excluirNotas`, `CACSP.cancelarNota`
-**Novo em:** 1.6.0
+**Novo em:** 2.0.0
 
 > **Os três métodos são escrita** e estão fora da allowlist de idempotentes
 > (`src/core/http.ts:8-10`): nenhum é retentado automaticamente.
