@@ -22,8 +22,8 @@ interface SankhyaConfig {
   circuitBreaker?: CircuitBreakerConfig;    // Breaker local de autenticação
   tokenCacheProvider?: TokenCacheProvider;  // Provider customizado para cache de token
   logger?: LoggerOptions;                   // Configuração do logger
-  allowProduction?: boolean;                // 1.6.0 — libera host de produção (default: false)
-  allowedHosts?: readonly string[];         // 1.6.0 — hosts extras na allowlist
+  allowProduction?: boolean;                // 2.0.0 — libera host de produção (default: false)
+  allowedHosts?: readonly string[];         // 2.0.0 — hosts extras na allowlist
   onDegradedResponse?: 'flag';              // hoje sem efeito; default passa a 'throw' na 2.0.0
 }
 ```
@@ -401,7 +401,7 @@ interface Volume {
 
 ### `VolumeProduto`
 
-Lido de `TGFVOA` por SQL (`produtos.volumesProduto`). **Novo em 1.6.0.**
+Lido de `TGFVOA` por SQL (`produtos.volumesProduto`). **Novo em 2.0.0.**
 
 ```typescript
 interface VolumeProduto {
@@ -420,7 +420,7 @@ interface VolumeProduto {
 
 ### `SetTipoControleInput`
 
-**Novo em 1.6.0.**
+**Novo em 2.0.0.**
 
 ```typescript
 interface SetTipoControleInput {
@@ -528,7 +528,7 @@ interface Estoque {
 
 ### `EstoqueLote`
 
-Linha de `TGFEST` lida por `estoque.porLote`. **Novo em 1.6.0.**
+Linha de `TGFEST` lida por `estoque.porLote`. **Novo em 2.0.0.**
 
 ```typescript
 interface EstoqueLote {
@@ -713,15 +713,15 @@ interface ConfirmarPedidoInput {
 
 ```typescript
 interface FaturarPedidoInput {
-  codigoPedido: number;                    // NUNOTA. INTEIRO desde a 1.6.0 (D-11)
-  codigoTipoOperacao: number;              // INTEIRO desde a 1.6.0 (D-11)
+  codigoPedido: number;                    // NUNOTA. INTEIRO desde a 2.0.0 (D-11)
+  codigoTipoOperacao: number;              // INTEIRO desde a 2.0.0 (D-11)
   dataFaturamento?: string;                // dd/MM/yyyy — OPCIONAL: vazia, o wizard usa a
                                            // data corrente do ERP (dtFaturamento: '', M51)
   tipoFaturamento?: TipoFaturamento;       // default FaturamentoNormal
   faturarTodosItens?: boolean;             // default true. `false` LANÇA (M82)
-  serie?: string;                          // 1.6.0 — default '1' (M49)
-  codigoLocalDestino?: string;             // 1.6.0 — default '' = o do cadastro
-  umaNotaParaCada?: boolean;               // 1.6.0 — default false
+  serie?: string;                          // 2.0.0 — default '1' (M49)
+  codigoLocalDestino?: string;             // 2.0.0 — default '' = o do cadastro
+  umaNotaParaCada?: boolean;               // 2.0.0 — default false
 }
 ```
 
@@ -759,11 +759,11 @@ interface IncluirNotaGatewayInput {
   codigoEmpresa: number;                   // CODEMP
   tipoMovimento: string;                   // TIPMOV (ex: 'P' para Pedido)
   observacao?: string;                     // OBSERVACAO
-  statusNota?: 'A' | 'L';                  // 1.6.0 — STATUSNOTA
-  numeroPedidoExterno?: string;            // 1.6.0 — AD_NUMPEDIDO
-  informarPreco?: boolean;                 // 1.6.0 — itens.INFORMARPRECO, default true,
+  statusNota?: 'A' | 'L';                  // 2.0.0 — STATUSNOTA
+  numeroPedidoExterno?: string;            // 2.0.0 — AD_NUMPEDIDO
+  informarPreco?: boolean;                 // 2.0.0 — itens.INFORMARPRECO, default true,
                                            // serializado como STRING 'True'/'False' (M46)
-  camposExtras?: Record<string, string | number>; // 1.6.0 — cabeçalho cru.
+  camposExtras?: Record<string, string | number>; // 2.0.0 — cabeçalho cru.
                                            // Citar chave tipada LANÇA (11 chaves)
   itens: ItemNotaGatewayInput[];
 }
@@ -778,9 +778,9 @@ interface ItemNotaGatewayInput {
   valorUnitario: number;                   // VLRUNIT — finito, >= 0. Vai CRU
   unidade: string;                         // CODVOL
   codigoLocalOrigem?: number;              // CODLOCALORIG
-  percentualDesconto?: number;             // 1.6.0 — PERCDESC, default 0, em [0, 100].
+  percentualDesconto?: number;             // 2.0.0 — PERCDESC, default 0, em [0, 100].
                                            // O ERP EXIGE (CORE_E03235) — D-14
-  valorTotal?: number;                     // 1.6.0 — VLRTOT, finito e >= 0.
+  valorTotal?: number;                     // 2.0.0 — VLRTOT, finito e >= 0.
                                            // Default: valorUnitario x quantidade EM CENTAVOS
 }
 ```
@@ -1097,13 +1097,13 @@ interface SaveRecordParams {
   entity: string;
   fields: string;
   data: Record<string, string>;            // -> dataSet.dataRow.localFields
-  primaryKey?: Record<string, string>;     // 1.6.0 — presente: dataSet.dataRow.key
+  primaryKey?: Record<string, string>;     // 2.0.0 — presente: dataSet.dataRow.key
                                            // ausente: a chave é omitida
                                            // {}: recusado com VALIDATION_ERROR
 }
 ```
 
-> **Mudou na 1.6.0 (M34).** Até a 1.5.0 a documentação dizia "PK dentro de `data`" e o SDK
+> **Mudou na 2.0.0 (M34).** Até a 1.5.0 a documentação dizia "PK dentro de `data`" e o SDK
 > mandava os campos em `dataSet.entity`. O formato aceito é `dataSet.dataRow.{key,
 > localFields}`. Ver [gateway-crud.md](./gateway-crud.md#saverecordparams).
 

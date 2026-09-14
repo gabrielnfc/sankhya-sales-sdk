@@ -6,7 +6,7 @@ read-back depois**.
 **API Layer:** Gateway + DbExplorer
 **Módulo:** MGECOM
 **Serviço:** `SelecaoDocumentoSP.faturar`
-**Novo em:** 1.6.0
+**Novo em:** 2.0.0
 
 > `faturar` é escrita e está fora da allowlist de idempotentes
 > (`src/core/http.ts:8-10`): não é retentado automaticamente.

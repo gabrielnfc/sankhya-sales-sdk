@@ -1,6 +1,6 @@
 # Módulo de Autenticação (Interno)
 
-> **Allowlist de host (desde a 1.6.0).** Os exemplos usam o **sandbox**, que sobe sem
+> **Allowlist de host (desde a 2.0.0).** Os exemplos usam o **sandbox**, que sobe sem
 > nenhuma flag. Host de produção exige `allowProduction: true` e emite um `logger.warn`
 > citando só o host; qualquer outro host precisa constar de `allowedHosts`, senão o
 > cliente **aborta**. Ver

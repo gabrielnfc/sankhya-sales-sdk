@@ -16,7 +16,7 @@ Módulo para consulta de estoque e locais de armazenamento.
 ### `porLote(input)`
 
 Lê as linhas de `TGFEST` de um produto — o saldo **por lote**, que a REST v1 não expõe
-(`/estoque/produtos/{id}` agrega por local, sem `CONTROLE`). **Novo em 1.6.0.**
+(`/estoque/produtos/{id}` agrega por local, sem `CONTROLE`). **Novo em 2.0.0.**
 
 ```typescript
 sankhya.estoque.porLote(input: {
@@ -171,7 +171,7 @@ _Removido da documentação em 2026-09-11 (D5.0). Esta página documentava
 `sankhya.estoque.detalhes()` sobre `ConsultaProdutosSP.getDetalhesEstoques`, mas
 **o método não existe** em `src/resources/estoque.ts` — nem hoje, nem no histórico do
 repositório. O caso de uso que ele prometia (estoque por lote / controle) é o de
-[`porLote`](#porloteinput), que passou a existir na 1.6.0._
+[`porLote`](#porloteinput), que passou a existir na 2.0.0._
 
 ---
 

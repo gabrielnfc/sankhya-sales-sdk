@@ -26,15 +26,15 @@ const sankhya = new SankhyaClient(config: SankhyaConfig);
 | `retries` | `number` | Não | `3` | Número de retentativas para erros transientes |
 | `tokenCacheProvider` | `TokenCacheProvider` | Não | Memória | Provider customizado para cache de token |
 | `logger` | `LoggerOptions` | Não | `{ level: 'warn' }` | Configuração do logger |
-| `allowProduction` | `boolean` | Não | `false` | **Novo em 1.6.0.** Libera explicitamente um host de produção. Sem ela, host de produção **aborta** a construção do cliente. Ligada, o SDK emite `logger.warn` citando **só o host** |
-| `allowedHosts` | `readonly string[]` | Não | `[]` | **Novo em 1.6.0.** Hosts extras aceitos pela allowlist (ex.: um ERP interno de homologação). Host exato, comparação case-insensitive, **sem** subdomínio implícito. Host de sandbox já passa sem constar aqui |
+| `allowProduction` | `boolean` | Não | `false` | **Novo em 2.0.0.** Libera explicitamente um host de produção. Sem ela, host de produção **aborta** a construção do cliente. Ligada, o SDK emite `logger.warn` citando **só o host** |
+| `allowedHosts` | `readonly string[]` | Não | `[]` | **Novo em 2.0.0.** Hosts extras aceitos pela allowlist (ex.: um ERP interno de homologação). Host exato, comparação case-insensitive, **sem** subdomínio implícito. Host de sandbox já passa sem constar aqui |
 | `authRetry` | `AuthRetryConfig` | Não | `{ maxRetries: 3, baseDelayMs: 500 }` | Retry da autenticação OAuth — só para falhas transientes |
 | `circuitBreaker` | `CircuitBreakerConfig` | Não | `{ threshold: 3, resetTimeoutMs: 30000 }` | Circuit breaker local de autenticação |
 | `onDegradedResponse` | `'flag'` | Não | `'flag'` | Política para resposta degradada. **Sem efeito hoje**: o SDK não lê o valor, porque só existe uma política implementada. O default passa a `'throw'` na 2.0.0 |
 
 ### Guarda de ambiente (allowlist de host, fail-closed)
 
-**Novo em 1.6.0.**
+**Novo em 2.0.0.**
 
 O construtor decide o host **antes** de instanciar `AuthManager`/`HttpClient`: nenhum
 recurso de rede é criado para um host que a guarda recusaria. A ordem está travada em
@@ -127,12 +127,12 @@ Cada propriedade dá acesso a um módulo da API:
 | `sankhya.fiscal` | `FiscalResource` | Cálculo de impostos, NFS-e | [fiscal.md](./fiscal.md) |
 | `sankhya.metadata` | `MetadataResource` | Descoberta de campos (incl. `AD_*`) por entidade | [metadata.md](./metadata.md) |
 | `sankhya.gateway` | `GatewayResource` | CRUD genérico + `call()` para qualquer serviço | [gateway-crud.md](./gateway-crud.md) |
-| `sankhya.dbExplorer` | `DbExplorerResource` | **Novo em 1.6.0.** `SELECT` puro somente-leitura | [db-explorer.md](./db-explorer.md) |
-| `sankhya.dataset` | `DatasetResource` | **Novo em 1.6.0.** Escrita/leitura tipada sobre o `DatasetSP` | [dataset.md](./dataset.md) |
-| `sankhya.notas` | `NotasResource` | **Novo em 1.6.0.** Confirmar (idempotente), excluir, cancelar com read-back | [notas.md](./notas.md) |
-| `sankhya.faturamento` | `FaturamentoResource` | **Novo em 1.6.0.** Faturar com guard e prova | [faturamento.md](./faturamento.md) |
-| `sankhya.conferencia` | `ConferenciaResource` | **Novo em 1.6.0.** Conferência nativa `TGFCON2`/`TGFCOI2` | [conferencia.md](./conferencia.md) |
-| `sankhya.lotes` | `LotesResource` | **Novo em 1.6.0.** Entrada 1813 / baixa 1811 | [lotes.md](./lotes.md) |
+| `sankhya.dbExplorer` | `DbExplorerResource` | **Novo em 2.0.0.** `SELECT` puro somente-leitura | [db-explorer.md](./db-explorer.md) |
+| `sankhya.dataset` | `DatasetResource` | **Novo em 2.0.0.** Escrita/leitura tipada sobre o `DatasetSP` | [dataset.md](./dataset.md) |
+| `sankhya.notas` | `NotasResource` | **Novo em 2.0.0.** Confirmar (idempotente), excluir, cancelar com read-back | [notas.md](./notas.md) |
+| `sankhya.faturamento` | `FaturamentoResource` | **Novo em 2.0.0.** Faturar com guard e prova | [faturamento.md](./faturamento.md) |
+| `sankhya.conferencia` | `ConferenciaResource` | **Novo em 2.0.0.** Conferência nativa `TGFCON2`/`TGFCOI2` | [conferencia.md](./conferencia.md) |
+| `sankhya.lotes` | `LotesResource` | **Novo em 2.0.0.** Entrada 1813 / baixa 1811 | [lotes.md](./lotes.md) |
 
 ## Métodos
 
@@ -238,6 +238,6 @@ await sankhya.pedidos.faturar({
 
 - [Tipos](./tipos.md)
 - [DbExplorer](./db-explorer.md) · [Dataset](./dataset.md) · [Notas](./notas.md) · [Faturamento](./faturamento.md) · [Conferência](./conferencia.md) · [Lotes](./lotes.md)
-- [CHANGELOG — migrando de 1.5 para 1.6](../../CHANGELOG.md)
+- [CHANGELOG — migrando de 1.5 para 2.0](../../CHANGELOG.md)
 - [Autenticação](./autenticacao.md)
 - [Guia de Início Rápido](../guia/inicio-rapido.md)

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.0] - 2026-09-14
 
-> **Sobre o número da versão.** Decisão do dono em 2026-09-14: **2.0.0** (há uma quebra de compatibilidade deliberada — a guarda de host — documentada em **BREAKING (segurança)** com o passo a passo de migração). O conteúdo abaixo foi escrito como "1.6.0" em 2026-09-11 e vale integralmente para a 2.0.0.
+> **Sobre o número da versão.** Decisão do dono em 2026-09-14: **2.0.0** — há uma quebra de compatibilidade deliberada (a guarda de host), documentada em **BREAKING (segurança)** com o passo a passo de migração. Esta entrega foi redigida em 2026-09-11 sob o nome provisório 1.6 e nunca foi publicada com ele.
 >
 > Toda linha cita a medição de origem: `Mn` = fato medido no sandbox Sankhya (`docs/superpowers/specs/2026-09-05-diagnostico-separatrue-v3.md`, com os payloads brutos em `spike-raw/`), `RD-n` = ruling desta entrega, `D-n` = item de backlog.
 >
@@ -32,17 +32,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   ```ts
   // 1.5 — subia contra qualquer host, calado.
-  // 1.6 — host de sandbox continua passando sozinho: nada a fazer.
+  // 2.0 — host de sandbox continua passando sozinho: nada a fazer.
   new SankhyaClient({ baseUrl: 'https://api.sandbox.sankhya.com.br', /* ... */ });
 
-  // 1.6 — host que não é sandbox nem produção: declare-o.
+  // 2.0 — host que não é sandbox nem produção: declare-o.
   new SankhyaClient({
     baseUrl: 'https://erp.interno.example.local',
     allowedHosts: ['erp.interno.example.local'],
     /* ... */
   });
 
-  // 1.6 — produção: decisão explícita de quem chama, e fica no log.
+  // 2.0 — produção: decisão explícita de quem chama, e fica no log.
   new SankhyaClient({
     baseUrl: urlDeProducao,  // host que consta de PRODUCTION_HOSTS
     allowProduction: true,   // emite logger.warn citando só o host

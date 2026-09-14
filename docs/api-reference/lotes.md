@@ -4,7 +4,7 @@ Entrada e baixa de estoque **por lote**, via notas de ajuste montadas no `Datase
 
 **API Layer:** Gateway (Dataset)
 **Módulo:** MGE
-**Novo em:** 1.6.0
+**Novo em:** 2.0.0
 
 > **Nada aqui é retentado automaticamente.** `DatasetSP.save` é escrita e está fora da
 > allowlist de idempotentes (`src/core/http.ts:8-10`) — uma reexecução criaria uma segunda

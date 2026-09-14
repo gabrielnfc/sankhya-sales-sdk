@@ -4,7 +4,7 @@ Conferência nativa do Sankhya (`TGFCON2` / `TGFCOI2`) pelo `DatasetSP` do Gatew
 
 **API Layer:** Gateway (Dataset + DbExplorer)
 **Módulo:** MGE
-**Novo em:** 1.6.0
+**Novo em:** 2.0.0
 
 > **A REST v1 não tem endpoint de conferência.** O único caminho é o Dataset sobre as
 > entidades MGE `CabecalhoConferencia` (`TGFCON2`) e `DetalhesConferencia` (`TGFCOI2`) —

@@ -142,7 +142,7 @@ const volumes = await sankhya.produtos.volumes(1001);
 
 ### `volumesProduto(codigoProduto)`
 
-Lê os volumes do produto em `TGFVOA` por **SQL** (`dbExplorer.query`). **Novo em 1.6.0.**
+Lê os volumes do produto em `TGFVOA` por **SQL** (`dbExplorer.query`). **Novo em 2.0.0.**
 
 ```typescript
 sankhya.produtos.volumesProduto(codigoProduto: number): Promise<VolumeProduto[]>
@@ -266,7 +266,7 @@ sankhya.produtos.buscarGrupo(codigoGrupoProduto: number): Promise<GrupoProduto>
 
 ### `setTipoControle(input)`
 
-Vira o controle de lote do produto (`TGFPRO.TIPCONTEST`). **Novo em 1.6.0.**
+Vira o controle de lote do produto (`TGFPRO.TIPCONTEST`). **Novo em 2.0.0.**
 
 ```typescript
 sankhya.produtos.setTipoControle(input: SetTipoControleInput): Promise<void>

@@ -215,7 +215,7 @@ measured 2026-09-11). The count includes the `listarTodos*` scan helpers.
 
 > **Upgrading from 1.5?** Three breaking changes — host allowlist, integer-only `faturar`
 > input, and injected dependencies for `porLote`/`setTipoControle`/`volumesProduto`.
-> See [Migrando de 1.5 para 1.6](../README.md#migrando-de-15-para-16) and the
+> See [Migrando de 1.5 para 2.0](../README.md#migrando-de-15-para-20) and the
 > [CHANGELOG](../CHANGELOG.md).
 
 ## Features

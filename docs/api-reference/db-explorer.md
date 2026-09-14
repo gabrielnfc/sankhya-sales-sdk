@@ -6,7 +6,7 @@ nenhum resource dedicado cobre.
 **API Layer:** Gateway
 **Módulo:** MGE
 **Serviço:** `DbExplorerSP.executeQuery`
-**Novo em:** 1.6.0
+**Novo em:** 2.0.0
 
 > **Pré-requisito.** O usuário OAuth precisa ter permissão para executar o DbExplorer;
 > sem ela o servidor devolve `GatewayError`.
